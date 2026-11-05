@@ -1,0 +1,23 @@
+[Unit]
+Description=ServersStatus web application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=serversstatus
+Group=serversstatus
+WorkingDirectory=/opt/ServersStatus
+Environment=STATUS_DB=/var/lib/serversstatus/status.sqlite3
+StateDirectory=serversstatus
+UMask=0077
+ExecStart=/opt/ServersStatus/.venv/bin/python -m uvicorn server.app:app --host 127.0.0.1 --port 8000 --no-proxy-headers
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serversstatus
+
+[Install]
+WantedBy=multi-user.target

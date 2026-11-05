@@ -1,0 +1,12 @@
+# Replace with a domain whose DNS A record points to your home IP.
+status.example.com {
+    request_body {
+        max_size 64KB
+    }
+    reverse_proxy 127.0.0.1:8000
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+    }
+}

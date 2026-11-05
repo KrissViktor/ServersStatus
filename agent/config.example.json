@@ -1,0 +1,10 @@
+{
+  "server_url": "https://status.example.com",
+  "agent_id": "sql-server-01",
+  "token": "REPLACE_WITH_INDIVIDUAL_AGENT_KEY",
+  "interval_seconds": 60,
+  "services": ["MSSQLSERVER"],
+  "backups": [
+    {"path": "D:\\Backups", "pattern": "**/*.bak", "max_age_hours": 26}
+  ]
+}
