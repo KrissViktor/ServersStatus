@@ -1,0 +1,17 @@
+[Unit]
+Description=ServersStatus event journal evaluation
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=serversstatus
+Group=serversstatus
+WorkingDirectory=/opt/ServersStatus
+Environment=STATUS_DB=/var/lib/serversstatus/status.sqlite3
+ExecStart=/opt/ServersStatus/.venv/bin/python -m server.events
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serversstatus

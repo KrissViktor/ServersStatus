@@ -17,6 +17,7 @@ class BackupRule(BaseModel):
 
 
 class MonitoringSettings(BaseModel):
+    auto_monitor_services: bool = True
     model_config = ConfigDict(extra='forbid')
     backups: list[BackupRule] = Field(default_factory=list, max_length=20)
     services: list[str] = Field(default_factory=list, max_length=100)

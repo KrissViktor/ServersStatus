@@ -10,9 +10,7 @@ import urllib.request
 from .dashboard import backup_problems
 
 
-class DeliveryError(Exception):
-    def __init__(self, retry_after=60):
-        self.retry_after = max(60, min(86400, retry_after))
+from .notification_types import DeliveryError
 
 
 def proxy_request(token, method, payload, proxy):
@@ -69,38 +67,7 @@ def send_message(token, chat_id, text):
     telegram_request(token, 'sendMessage', {'chat_id': chat_id, 'text': text[:4000]})
 
 
-def incident_key(agent, path):
-    return 'backup:' + hashlib.sha256((agent + '\0' + path).encode()).hexdigest()
-
-
-def evaluate(rows, existing, now):
-    incidents, valid, checked = {}, set(), set()
-    for row in rows:
-        if row['received'] is None:
-            continue  # Newly registered agents have not yet been connected.
-        agent = row['id']
-        report = json.loads(row['data'])
-        name = report.get('hostname') or agent
-        elapsed = max(0, now - row['received'])
-        connection = 'connection:' + agent
-        valid.add(connection)
-        checked.add(connection)
-        if elapsed >= 180:
-            incidents[connection] = (agent, f'{name} ({agent}): нет связи более 3 минут.')
-            # Do not claim recovery of backup problems using stale reports.
-            valid.update(s['key'] for s in existing if s['agent'] == agent and s['key'].startswith('backup:'))
-            continue
-        for backup in report.get('backups', []):
-            key = incident_key(agent, backup.get('path', backup.get('name', '')))
-            valid.add(key)
-            problems = backup_problems(backup, elapsed)
-            if backup.get('state') == 'observing' and not problems:
-                continue  # Require a confirmed file before recovery.
-            checked.add(key)
-            if problems:
-                label = backup.get('name') or backup.get('path', 'Бэкап')
-                incidents[key] = (agent, f'{name} ({agent}) · {label}\n' + '\n'.join(problems))
-    return incidents, valid, checked
+from .incidents import incident_key, evaluate
 
 
 def tick(db, sender, now=None):
@@ -140,6 +107,7 @@ def tick(db, sender, now=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true')
+    parser.add_argument('--daily-test', action='store_true')
     parser.add_argument('--discover-chat', action='store_true')
     args = parser.parse_args()
     token = os.environ.get('STATUS_TELEGRAM_TOKEN', '').strip()
@@ -162,6 +130,17 @@ def main():
             print('Тестовое сообщение отправлено.')
             return
         from .app import db, DB
+        if args.daily_test:
+            from .daily import build_summary, MSK
+            from datetime import datetime, timedelta
+            end = datetime.now(MSK).replace(hour=0, minute=0, second=0, microsecond=0)
+            with db() as c:
+                chunks = build_summary(c, (end-timedelta(days=1)).timestamp(), end.timestamp(), time.time())
+            for chunk in chunks:
+                send_message(token, chat_id, 'Тестовая сводка\n' + chunk)
+                time.sleep(1.1)
+            print('Тестовая суточная сводка отправлена.')
+            return
         import fcntl
         # Timer normally serializes execution; lock also protects manual runs.
         with open(DB + '.telegram.lock', 'a') as lock:
@@ -172,7 +151,13 @@ def main():
             def sender(text):
                 send_message(token, chat_id, text)
                 time.sleep(1.1)
+            from .events import process_events
+            from .daily import deliver_daily
+            process_events(db)
             delivered, failed = tick(db, sender)
+            daily_sent, daily_failed = deliver_daily(db, sender)
+            delivered += daily_sent
+            failed += daily_failed
         print(f'Отправлено: {delivered}; ошибок доставки: {failed}.')
         if failed:
             raise SystemExit(1)

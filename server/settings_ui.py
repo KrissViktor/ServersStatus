@@ -17,7 +17,9 @@ def settings_page(agent_id, values, csrf, revision, applied, error='', saved=Fal
     if saved:
         content += '<p class="notice">Настройки сохранены. Агент получит их при следующем отчёте и применит в следующем цикле. Обновите страницу через 1–2 минуты для проверки.</p>'
     url = '/settings/' + quote(agent_id, safe='')
-    content += '<form method="post" action="' + esc(url) + '">' + hidden + '<section class="server"><h2>Службы Windows</h2><p class="muted">Системные имена служб, по одному на строку. Например MSSQLSERVER. Пустой список отключает контроль служб.</p><textarea name="services" rows="4" maxlength="26000">' + esc('\n'.join(values.get('services', []))) + '</textarea></section><section class="server"><h2>Правила бэкапов</h2><p class="muted">Пути на контролируемом компьютере. Пустой путь удаляет правило. Можно добавить до 20 правил. 1 Гб = 1024³ байт.</p><div id="backup-rules">'
+    auto_checked = 'checked' if values.get('auto_monitor_services', True) else ''
+    auto_control = '<label class="check"><input type="checkbox" name="auto_monitor_services" value="yes" ' + auto_checked + '>Автоматически контролировать обнаруженные службы 1С и SQL Server</label>'
+    content += '<form method="post" action="' + esc(url) + '">' + hidden + '<section class="server"><h2>Службы Windows</h2>' + auto_control + '<p class="muted">Системные имена служб, по одному на строку. Например MSSQLSERVER. Пустой список отключает ручные проверки; автоматический поиск 1С/SQL управляется флажком выше.</p><textarea name="services" rows="4" maxlength="26000">' + esc('\n'.join(values.get('services', []))) + '</textarea></section><section class="server"><h2>Правила бэкапов</h2><p class="muted">Пути на контролируемом компьютере. Пустой путь удаляет правило. Можно добавить до 20 правил. 1 Гб = 1024³ байт.</p><div id="backup-rules">'
     def rule_html(index, rule):
         def field(key, label, default='', kind='text', extra=''):
             value = rule.get(key, default)

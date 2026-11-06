@@ -73,7 +73,7 @@ def compact_card(row, now):
     else:
         content += '<p class="text-normal compact-ok">Проблем по полученным данным нет</p>'
     content += '<p class="muted">Отчёт: ' + duration(age) + ' назад · В работе: ' + duration(data.get('uptime_seconds')) + '</p>'
-    return content + f'<p class="history-link"><a class="nav-link" href="{esc(url)}">Открыть сервер →</a> <a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">Графики CPU/RAM</a></p></article>'
+    return content + f'<p class="history-link"><a class="nav-link" href="{esc(url)}">Открыть сервер →</a> <a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">Графики нагрузки</a></p></article>'
 
 
 def detail_page(row, csrf):
@@ -81,5 +81,7 @@ def detail_page(row, csrf):
     title = dict(row).get('display_name') or ''
     content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/settings/' + esc(identifier) + '">Настройки мониторинга</a><a class="nav-link" href="/servers/' + esc(identifier) + '">Обновить данные</a></header>'
     content += '<p class="muted detail-note">Подробные данные на момент открытия страницы. Для обновления нажмите «Обновить данные».</p>' + server_card(row, time.time())
+    from .forecast import forecast_html
+    content += forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180)
     content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
     return page(content)

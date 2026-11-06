@@ -1,0 +1,10 @@
+[Unit]
+Description=Record ServersStatus transitions every minute
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+Unit=serversstatus-events.service
+
+[Install]
+WantedBy=timers.target

@@ -12,7 +12,7 @@ Environment=STATUS_DB=/var/lib/serversstatus/status.sqlite3
 EnvironmentFile=/etc/serversstatus-telegram.env
 ExecStart=/opt/ServersStatus/.venv/bin/python -m server.notifications
 UMask=0077
-TimeoutStartSec=360
+TimeoutStartSec=600
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

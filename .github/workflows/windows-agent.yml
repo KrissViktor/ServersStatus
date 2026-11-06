@@ -24,8 +24,10 @@ jobs:
         run: python -m unittest discover -s tests -p test_updater.py -v
       - name: Test remote monitoring settings
         run: python -m unittest discover -s tests -p test_settings.py -v
+      - name: Test Windows inventory
+        run: python -m unittest discover -s tests -p test_windows_inventory.py -v
       - name: Build standalone service
-        run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --hidden-import win32timezone --paths . agent/windows_service.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --hidden-import win32timezone --hidden-import win32ts --paths . agent/windows_service.py
       - name: Test frozen service registration and startup
         shell: pwsh
         run: |

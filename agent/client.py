@@ -11,6 +11,7 @@ import urllib.request
 import psutil
 from agent.backups import inspect_backup
 from agent.metrics import counters, extended_metrics
+from agent.windows_inventory import discover_services, rdp_sessions
 from agent.settings import load_cache, save_cache, effective_config
 
 
@@ -23,9 +24,13 @@ def collect(config, previous):
         except OSError:
             continue
     backups = [inspect_backup(item, previous) for item in config.get('backups', [])]
-    services = []
+    discovered = discover_services()
+    services = list(discovered) if config.get('auto_monitor_services', True) else []
+    names = {s['name'].casefold() for s in services}
     if os.name == 'nt':
         for name in config.get('services', []):
+            if name.casefold() in names:
+                continue
             try:
                 services.append({'name': name, 'status': psutil.win_service_get(name).status()})
             except (psutil.Error, OSError):
@@ -34,7 +39,7 @@ def collect(config, previous):
     cpu = psutil.cpu_percent(interval=1)
     after = counters()
     extra = extended_metrics(before, after)
-    return {**extra, 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': psutil.virtual_memory().percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
+    return {**extra, 'features': ['auto_services_v1', 'rdp_v1'], 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': psutil.virtual_memory().percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
 
 
 def run(config_path, stop=None):

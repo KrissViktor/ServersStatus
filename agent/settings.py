@@ -12,8 +12,10 @@ def validate_remote(payload):
         if payload['revision'] != 0:
             raise ValueError('Invalid local settings revision')
         return {'revision': 0, 'settings': None}
-    if not isinstance(settings, dict) or set(settings) != {'backups', 'services'}:
+    if not isinstance(settings, dict) or not {'backups', 'services'} <= set(settings) or set(settings) - {'backups', 'services', 'auto_monitor_services'}:
         raise ValueError('Invalid settings keys')
+    if 'auto_monitor_services' in settings and not isinstance(settings['auto_monitor_services'], bool):
+        raise ValueError('Invalid service discovery flag')
     services, backups = settings['services'], settings['backups']
     if not isinstance(services, list) or len(services) > 100 or any(not isinstance(s, str) or not s.strip() or len(s) > 255 for s in services):
         raise ValueError('Invalid services')

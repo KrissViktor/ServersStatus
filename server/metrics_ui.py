@@ -8,7 +8,7 @@ def rate(value):
 def extended_sections(data):
     system = data.get('system')
     if not system:
-        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите Windows-агент для сведений об ОС, сети и дисковых операциях.</p></section>'
+        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите Windows-агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data)
     facts = [
         ('Операционная система', ' '.join(str(system.get(k) or '') for k in ('os', 'release', 'edition'))),
         ('Версия / сборка', system.get('version') or 'Недоступно'),
@@ -29,4 +29,26 @@ def extended_sections(data):
     if not data.get('disk_io'):
         content += '<p class="muted">Счётчики дисковых операций недоступны в Windows.</p>'
     content += '<p class="muted legend">IOPS — операций в секунду. Скорости измерены за ' + esc(f'{data.get("sample_seconds") or 0:.1f}') + ' с перед отправкой отчёта, а не за весь интервал между отчётами. Устройства указаны по именам Windows; соответствие буквам дисков не определялось.</p></section>'
-    return content
+    return content + rdp_section(data)
+
+
+def rdp_section(data):
+    rdp = data.get('rdp')
+    content = '<section class="extended"><h3>Пользователи RDP</h3>'
+    if not rdp:
+        content += '<p class="muted">Обновите Windows-агент для списка RDP-пользователей.</p>'
+    elif rdp.get('status') != 'available':
+        content += '<p class="muted">Список RDP недоступен: платформа или права службы не позволяют прочитать сессии.</p>'
+    elif not rdp.get('sessions'):
+        content += '<p class="muted">Пользователей RDP нет.</p>'
+    else:
+        active = [s for s in rdp['sessions'] if s.get('state') == 'active']
+        unique = {(s.get('domain', ''), s.get('username', '')) for s in active}
+        content += f'<p class="muted">Подключённых пользователей: {len(unique)} · Активных сессий: {len(active)}</p>'
+        content += '<div class="table-scroll"><table class="metric-table"><tr><th>Пользователь</th><th>Сессия</th><th>Состояние</th></tr>'
+        for session in rdp['sessions']:
+            user = (str(session.get('domain'))+'\\\\' if session.get('domain') else '') + str(session.get('username', ''))
+            state = {'active':'Подключён','disconnected':'Отключён (сессия сохранена)'}.get(session.get('state'), 'Другое')
+            content += '<tr><td>'+esc(user)+'</td><td>'+esc(session.get('session_id',''))+'</td><td>'+state+'</td></tr>'
+        content += '</table></div>'
+    return content + '</section>'

@@ -109,7 +109,7 @@ def server_card(row, now):
     from .overview import issues
     problem_class = ' problem-server' if issues(row, now) else ''
     content = f'<article class="server{problem_class}"><header class="server-head"><div><p class="eyebrow">WINDOWS · АГЕНТ {esc(row["id"])}</p><h2>{esc(title)}</h2><p class="muted">{esc(hostname)}</p></div><span class="badge {badge}">● {state}</span></header>'
-    content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История CPU / RAM →</a></p>'
+    content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История нагрузки →</a></p>'
     if age is None:
         return content + '<div class="empty">Ожидаем первый отчёт агента</div></article>'
     content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
@@ -126,7 +126,7 @@ def server_card(row, now):
     for service in services:
         state = service.get('status', 'unavailable')
         labels = {'running': 'Работает', 'stopped': 'Остановлена', 'paused': 'Приостановлена', 'unavailable': 'Недоступна'}
-        content += f'<div class="list-row"><b>{esc(service.get("name", "—"))}</b><span class="badge {"normal" if state == "running" else "warning"}">{esc(labels.get(state, state))}</span></div>'
+        content += f'<div class="list-row"><b>{esc(service.get("display_name") or service.get("name", "—"))}</b><span class="badge {"normal" if state == "running" else "warning"}">{esc(labels.get(state, state))}</span></div>'
     content += '</section><section><h3>Резервные копии</h3>'
     backups = data.get('backups', [])
     if not backups:
@@ -165,7 +165,7 @@ def dashboard(rows, q='', view='all'):
         data = json.loads(row['data']) if row['data'] else {}
         if any(number(d.get('used_percent')) >= 85 for d in data.get('disks', [])):
             attention += 1
-    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 30 с</span></div>'
+    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/events">Журнал событий</a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 30 с</span></div>'
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     from .overview import compact_card, matches, search_form
     selected = [row for row in rows if matches(row, now, q, view)]

@@ -309,3 +309,28 @@ class WorkflowTest(unittest.TestCase):
             limiter.reset()
         self.assertEqual(self.client.post('/login', content='x'*65537).status_code, 413)
         self.assertEqual(self.client.request('TRACE', '/').status_code, 405)
+
+    def test_new_metrics_journal_and_forecast_pages(self):
+        from server.events import process_events
+        import time
+        self.assertEqual(self.client.get('/events',follow_redirects=False).status_code,303)
+        self.client.post('/login',data={'username':'admin','password':'test-password-123'})
+        payload={'hostname':'SQL-RDP','cpu_percent':10,'memory_percent':40,'uptime_seconds':1,
+                 'features':['auto_services_v1','rdp_v1'],'rdp':{'status':'available','sessions':[{'session_id':1,'username':'user<script>','domain':'DOMAIN','state':'active'}]},
+                 'network':[{'name':'Ethernet','is_up':True,'receive_bytes_per_second':1048576,'send_bytes_per_second':2097152}],
+                 'disk_io':[{'name':'PhysicalDrive0','read_bytes_per_second':3145728,'write_bytes_per_second':4194304,'read_iops':10,'write_iops':20}],
+                 'services':[{'name':'MSSQLSERVER','status':'stopped'}],'disks':[{'path':'C:','free_bytes':50*1024**3,'total_bytes':100*1024**3,'used_percent':50}]}
+        self.assertEqual(self.client.post('/api/report/pc',json=payload,headers={'Authorization':'Bearer agent-secret'}).status_code,200)
+        process_events(module.db)
+        journal=self.client.get('/events').text
+        self.assertIn('MSSQLSERVER',journal)
+        self.assertEqual(self.client.get('/events?level=invalid').status_code,400)
+        details=self.client.get('/servers/pc').text
+        self.assertIn('Прогноз заполнения',details)
+        self.assertIn('user&lt;script&gt;',details)
+        self.assertNotIn('user<script>',details)
+        self.assertIn('Подключён',details)
+        history=self.client.get('/history/pc?period=1h').text
+        self.assertEqual(history.count('<svg '),8)
+        self.assertIn('1.0 Мб/с',history)
+        self.assertIn('PhysicalDrive0',history)

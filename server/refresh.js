@@ -4,7 +4,7 @@
   if (!targets.length) return;
   let busy = false;
   setInterval(async () => {
-    if (busy || document.hidden) return;
+    if (busy || document.hidden || (targets.some(target => target.contains(document.activeElement)) && document.activeElement.matches('input,select,textarea'))) return;
     busy = true;
     try {
       const response = await fetch(location.href, {credentials: 'same-origin', cache: 'no-store'});

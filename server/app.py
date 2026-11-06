@@ -17,6 +17,7 @@ from .agents_ui import agents_page
 from .history import PERIODS, load_history, history_page
 from .configuration import MonitoringSettings
 from .settings_ui import settings_page
+from .events import record
 from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
@@ -37,6 +38,11 @@ def db():
         CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
         CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
+        CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT,received REAL,agent TEXT,category TEXT,level TEXT,message TEXT);
+        CREATE INDEX IF NOT EXISTS events_time ON events(received);
+        CREATE INDEX IF NOT EXISTS events_agent_time ON events(agent,received);
+        CREATE TABLE IF NOT EXISTS event_state (key TEXT PRIMARY KEY,agent TEXT,body TEXT,active INTEGER);
+        CREATE TABLE IF NOT EXISTS daily_delivery (day TEXT PRIMARY KEY,chunks TEXT,next_part INTEGER,retry_at REAL,completed INTEGER);
         CREATE TABLE IF NOT EXISTS auth_guard (address TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
@@ -106,6 +112,8 @@ async def login(request: Request):
             raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
         if not valid:
             wait = failed_login(c, address, now)
+            if wait:
+                record(c, '', 'security', 'IP заблокирован после двух ошибок входа: '+address, 'warning',now)
         else:
             # Successful login clears the error counter, not escalation history.
             c.execute('UPDATE auth_guard SET failures=0 WHERE address=?', (address,))
@@ -160,7 +168,24 @@ class DiskIO(BaseModel):
     write_iops: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
+class RdpSession(BaseModel):
+    session_id: int = Field(ge=0)
+    username: str = Field(max_length=255)
+    domain: str = Field(default='', max_length=255)
+    state: str = Field(pattern='^(active|disconnected|other)$')
+
+
+class RdpInfo(BaseModel):
+    status: str = Field(pattern='^(available|unavailable|unsupported)$')
+    sessions: list[RdpSession] = Field(default_factory=list, max_length=200)
+
+
 class Report(BaseModel):
+    auto_services_enabled: bool | None = None
+    manual_services: list[str] | None = Field(default=None, max_length=100)
+    features: list[str] = Field(default_factory=list, max_length=20)
+    discovered_services: list[dict] = Field(default_factory=list, max_length=100)
+    rdp: RdpInfo | None = None
     monitoring_revision: int | None = Field(default=None, ge=0)
     system: SystemInfo | None = None
     network: list[NetworkInfo] = Field(default_factory=list, max_length=100)
@@ -199,6 +224,8 @@ async def report(agent_id: str, request: Request):
         c.execute('DELETE FROM reports WHERE received<?', (time.time() - 30 * 86400,))
         remote = c.execute('SELECT revision, data FROM agent_settings WHERE agent=?', (agent_id,)).fetchone()
         monitoring = {'revision': remote['revision'], 'settings': json.loads(remote['data'])} if remote else {'revision': 0, 'settings': None}
+    if monitoring['settings'] is not None and 'auto_services_v1' not in data.features:
+        monitoring['settings'].pop('auto_monitor_services', None)
     return {'ok': True, 'monitoring': monitoring}
 
 
@@ -212,7 +239,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -264,6 +291,7 @@ async def change_agent(action: str, request: Request):
                 key = secrets.token_urlsafe(32)
                 try:
                     c.execute('INSERT INTO agents VALUES (?,?)', (name, digest(key)))
+                    record(c,name,'configuration','Агент зарегистрирован')
                 except sqlite3.IntegrityError:
                     key = None
                     error, status = 'Агент с таким именем уже существует.', 409
@@ -280,11 +308,13 @@ async def change_agent(action: str, request: Request):
                 else:
                     key = secrets.token_urlsafe(32)
                     c.execute('UPDATE agents SET token=? WHERE id=?', (digest(key), name))
+                    record(c,name,'configuration','Ключ агента перевыпущен')
             elif value('confirmation') != name:
                 error, status = 'Имя для подтверждения удаления не совпало.', 400
             else:
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
+                record(c,name,'configuration','Агент удалён')
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
     if action == 'delete' and not error:
@@ -293,7 +323,7 @@ async def change_agent(action: str, request: Request):
 
 
 @app.get('/history/{agent_id}', response_class=HTMLResponse)
-def agent_history(agent_id: str, request: Request, period: str = '24h'):
+def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str = '', disk: str = ''):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
     if period not in PERIODS:
@@ -305,7 +335,9 @@ def agent_history(agent_id: str, request: Request, period: str = '24h'):
         if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
             raise HTTPException(404, 'Агент не найден')
         points = load_history(c, agent_id, start, end, bucket)
-    return HTMLResponse(history_page(agent_id, points, period, start, end))
+        from .io_history import sections
+        io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk)
+    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io))
 
 
 def settings_state(agent_id):
@@ -334,7 +366,7 @@ def settings_state(agent_id):
                           'min_size_bytes': backup.get('min_size_bytes', 1024**3),
                           'max_age_hours': backup.get('max_age_hours', 30),
                           'grace_hours': backup.get('grace_hours', 36)})
-        values = {'backups': rules[:20], 'services': [s['name'] for s in report.get('services', []) if s.get('name')]}
+        values = {'auto_monitor_services': report.get('auto_services_enabled') if report.get('auto_services_enabled') is not None else True, 'backups': rules[:20], 'services': report.get('manual_services') if report.get('manual_services') is not None else [s['name'] for s in report.get('services', []) if s.get('name') and not s.get('kind')]}
     return values, remote['revision'] if remote else 0, report.get('monitoring_revision')
 
 
@@ -373,6 +405,7 @@ async def monitoring_save(agent_id: str, request: Request):
                 raise ValueError('Подтвердите возврат к локальному файлу.')
             with db() as c:
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (agent_id,))
+                record(c,agent_id,'configuration','Возврат к локальным настройкам')
             values, revision, applied = settings_state(agent_id)
         elif value('mode') == 'save':
             indices = sorted({int(key[5:]) for key in form if re.fullmatch(r'path_[0-9]{1,6}', key)})
@@ -397,13 +430,14 @@ async def monitoring_save(agent_id: str, request: Request):
             services = list(dict.fromkeys(s.strip() for s in value('services').splitlines() if s.strip()))
             if any(len(s) > 255 for s in services):
                 raise ValueError('Имя службы слишком длинное.')
-            values = MonitoringSettings(backups=rules, services=services).model_dump()
+            values = MonitoringSettings(backups=rules, services=services, auto_monitor_services=value('auto_monitor_services') == 'yes').model_dump()
             revision = time.time_ns()
             with db() as c:
                 c.execute('BEGIN IMMEDIATE')
                 if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
                     raise HTTPException(404)
                 c.execute('INSERT INTO agent_settings VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET revision=excluded.revision, data=excluded.data', (agent_id, revision, json.dumps(values, ensure_ascii=False)))
+                record(c,agent_id,'configuration','Настройки мониторинга изменены')
         else:
             raise ValueError('Неизвестное действие.')
     except (ValueError, OverflowError, ValidationError):
@@ -419,6 +453,10 @@ def server_detail(agent_id: str, request: Request):
     row = next((row for row in server_rows() if row['id'] == agent_id), None)
     if row is None:
         raise HTTPException(404)
+    from .forecast import load_forecasts
+    with db() as c:
+        current_disks = {d.get('path') for d in json.loads(row['data'] or '{}').get('disks', [])}
+        row['forecasts'] = {path: value for path,value in load_forecasts(c, agent_id, time.time()).items() if path in current_disks}
     return HTMLResponse(detail_page(row, csrf_token(request)))
 
 
@@ -447,6 +485,7 @@ async def rename_server(agent_id: str, request: Request):
         if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
             raise HTTPException(404)
         c.execute('INSERT INTO agent_profiles VALUES (?,?) ON CONFLICT(agent) DO UPDATE SET display_name=excluded.display_name', (agent_id, name))
+        record(c,agent_id,'configuration','Название в панели изменено')
     return RedirectResponse('/servers/' + quote(agent_id, safe=''), status_code=303)
 
 
@@ -480,3 +519,14 @@ async def request_protection(request: Request, call_next):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
     return response
+
+@app.get('/events', response_class=HTMLResponse)
+def journal(request: Request, agent: str = '', level: str = '', before: int = 0):
+    if not authenticated(request):
+        return RedirectResponse('/', status_code=303)
+    if level not in ('','warning','info') or len(agent)>255 or before<0:
+        raise HTTPException(400)
+    from .events import event_page
+    with db() as c:
+        rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before)).fetchall()
+    return HTMLResponse(event_page(rows,agent,level,before))
