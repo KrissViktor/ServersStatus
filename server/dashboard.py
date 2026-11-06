@@ -58,6 +58,43 @@ def login_page():
     return page('''<div class="login"><div class="logo">S<span>●</span></div><p class="eyebrow">SERVERSSTATUS</p><h1>Всё под контролем</h1><p class="muted">Войдите, чтобы увидеть состояние серверов</p><form method="post" action="/login"><label>Логин<input name="username" autocomplete="username" required autofocus></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">Войти</button></form><p class="muted footnote">Центр мониторинга инфраструктуры</p></div>''')
 
 
+def backup_problems(backup, elapsed=0):
+    """Evaluate latest report on every refresh, including time without contact."""
+    state = backup.get('state', 'error')
+    daily = backup.get('schedule', 'daily') == 'daily'
+    age = number(backup.get('age_seconds')) + max(0, elapsed)
+    problems = []
+    if state == 'missing':
+        problems.append('Бэкапы не делаются: файлы копий не найдены')
+    elif daily and backup.get('file') and age > 30 * 3600:
+        problems.append('Бэкапы не делаются: ежедневная копия старше 30 часов (' + duration(age) + ')')
+    elif state == 'stale' and not daily:
+        problems.append('Нет актуальной ежемесячной копии')
+    if backup.get('file') and number(backup.get('size_bytes')) < 1024**3:
+        problems.append('Ошибка бэкапа: размер файла меньше 1 Гб (' + size(backup.get('size_bytes')) + ')')
+    if state == 'error':
+        problems.append('Не удаётся проверить бэкапы: папка недоступна или ошибка чтения')
+    if state == 'future':
+        problems.append('Ошибка даты бэкапа: файл датирован будущим')
+    return problems
+
+
+def backup_alerts(rows, now):
+    items = []
+    for row in rows:
+        data = json.loads(row['data']) if row['data'] else {}
+        elapsed = max(0, now - row['received']) if row['received'] is not None else 0
+        for backup in data.get('backups', []):
+            problems = backup_problems(backup, elapsed)
+            if not problems:
+                continue
+            name = backup.get('name') or backup.get('path', 'Бэкап')
+            items.append('<li><strong>' + esc(data.get('hostname') or row['id']) + ' · ' + esc(name) + '</strong><ul>' + ''.join('<li>' + esc(problem) + '</li>' for problem in problems) + '</ul>' + ('<p>Нет связи с агентом — состояние рассчитано по последнему отчёту.</p>' if elapsed >= 180 else '') + '</li>')
+    if not items:
+        return ''
+    return '<section class="backup-alarm" role="alert"><p class="eyebrow">ТРЕБУЕТСЯ ВНИМАНИЕ</p><h2>Ошибка резервного копирования</h2><ul>' + ''.join(items) + '</ul></section>'
+
+
 def server_card(row, now):
     data = json.loads(row['data']) if row['data'] else {}
     age = max(0, now - row['received']) if row['received'] is not None else None
@@ -90,14 +127,21 @@ def server_card(row, now):
         content += '<p class="empty small">Папки бэкапов не настроены</p>'
     for backup in backups:
         state = backup.get('state', 'error')
-        labels = {'fresh': 'Свежий файл', 'stale': 'Просрочен', 'observing': 'Проверяем стабильность', 'missing': 'Файл не найден', 'error': 'Ошибка чтения', 'future': 'Дата из будущего', 'empty': 'Пустой файл'}
-        color = 'normal' if state == 'fresh' else 'danger' if state in ('stale', 'missing', 'error', 'future', 'empty') else 'warning'
+        problems = backup_problems(backup, age)
+        if problems:
+            state = 'alarm'
+        elif state == 'stale' and backup.get('schedule', 'daily') == 'daily':
+            state = 'fresh'
+        labels = {'alarm': 'Ошибка бэкапа', 'too_small': 'Размер меньше 1 Гб', 'fresh': 'Свежий файл', 'stale': 'Просрочен', 'observing': 'Проверяем стабильность', 'missing': 'Файл не найден', 'error': 'Ошибка чтения', 'future': 'Дата из будущего', 'empty': 'Пустой файл'}
+        color = 'normal' if state == 'fresh' else 'danger' if state in ('alarm', 'too_small', 'stale', 'missing', 'error', 'future', 'empty') else 'warning'
         content += f'<div class="backup"><div class="list-row"><b>{esc(backup.get("name") or backup.get("path", "—"))}</b><span class="badge {color}">{esc(labels.get(state, state))}</span></div>'
         content += f'<p>{esc(backup.get("path", ""))}</p>'
         if backup.get('expected_since'):
             content += f'<p>Ожидается копия за 1-е число месяца от {esc(backup["expected_since"])}</p>'
         if backup.get('file'):
             content += f'<p>{esc(backup["file"])} · {size(backup.get("size_bytes"))} · {duration(backup.get("age_seconds"))} назад</p>'
+        for problem in problems:
+            content += '<p class="backup-error">' + esc(problem) + '</p>'
         content += '</div>'
     if backups:
         content += '<p class="muted legend">Свежесть файла не подтверждает возможность восстановления SQL.</p>'
@@ -117,4 +161,4 @@ def dashboard(rows):
     header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 30 с</span></div>'
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     cards = ''.join(server_card(row, now) for row in rows) or '<div class="empty">Серверов пока нет. Зарегистрируйте агент, чтобы начать мониторинг.</div>'
-    return page(header + stats + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>', refresh=True)
+    return page(header + backup_alerts(rows, now) + stats + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>', refresh=True)

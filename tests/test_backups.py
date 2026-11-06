@@ -10,7 +10,7 @@ class BackupScheduleTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.rule = {'path': str(self.root), 'pattern': 'ERP_backup_*.bak', 'schedule': 'monthly', 'recursive': True, 'date_from_filename': True, 'grace_hours': 36}
+        self.rule = {'path': str(self.root), 'pattern': 'ERP_backup_*.bak', 'schedule': 'monthly', 'recursive': True, 'date_from_filename': True, 'grace_hours': 36, 'min_size_bytes': 0}
         self.previous = {}
 
     def create(self, date):
@@ -55,3 +55,15 @@ class BackupScheduleTest(unittest.TestCase):
         self.assertEqual(self.inspect('2026-01-01T10:00:00')['state'], 'fresh')
         self.create('2026_02_01')
         self.assertEqual(self.inspect('2026-01-06T10:00:00')['state'], 'future')
+
+    def test_minimum_size_and_thirty_hour_boundary(self):
+        self.rule.update(schedule='daily', max_age_hours=30, min_size_bytes=1024**3)
+        path = self.create('2026_11_06')
+        with path.open('wb') as stream:
+            stream.truncate(1024**3 - 1)
+        self.assertEqual(self.inspect('2026-11-06T10:00:00')['state'], 'too_small')
+        with path.open('wb') as stream:
+            stream.truncate(1024**3)
+        self.inspect('2026-11-07T06:37:23')
+        self.assertEqual(self.inspect('2026-11-07T06:37:23')['state'], 'fresh')
+        self.assertEqual(self.inspect('2026-11-07T06:37:24')['state'], 'stale')

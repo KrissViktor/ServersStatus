@@ -43,7 +43,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'}).status_code, 429)
 
     def test_backup_states(self):
-        config = {'backups': [{'path': self.directory.name, 'pattern': '*.bak', 'max_age_hours': 1}]}
+        config = {'backups': [{'path': self.directory.name, 'pattern': '*.bak', 'max_age_hours': 1, 'min_size_bytes': 0}]}
         previous = {}
         self.assertEqual(collect(config, previous)['backups'][0]['state'], 'missing')
         path = Path(self.directory.name) / 'db.bak'
@@ -146,3 +146,23 @@ class WorkflowTest(unittest.TestCase):
             self.assertIn('50.4%', result.text)
             self.assertEqual(result.text.count('<svg '), 2)
             self.assertIn('МСК', result.text)
+
+    def test_prominent_backup_alarm(self):
+        from server.dashboard import backup_problems, dashboard
+        import time
+        backup = {'name': 'ERP <daily>', 'schedule': 'daily', 'file': 'copy.bak',
+                  'size_bytes': 1024**3, 'age_seconds': 30*3600, 'state': 'fresh'}
+        self.assertEqual(backup_problems(backup), [])
+        self.assertIn('старше 30 часов', backup_problems(backup, 1)[0])
+        backup['size_bytes'] -= 1
+        self.assertIn('меньше 1 Гб', backup_problems(backup)[0])
+        rows = [{'id': 'backup-host', 'received': time.time() - 240,
+                 'data': json.dumps({'hostname': 'WIN-CU629F0N7II', 'backups': [backup]})}]
+        content = dashboard(rows)
+        self.assertIn('role="alert"', content)
+        self.assertIn('Ошибка резервного копирования', content)
+        self.assertIn('WIN-CU629F0N7II · ERP &lt;daily&gt;', content)
+        self.assertIn('меньше 1 Гб', content)
+        self.assertIn('старше 30 часов', content)
+        self.assertIn('Нет связи с агентом', content)
+        self.assertLess(content.index('role="alert"'), content.index('<div class="stats">'))

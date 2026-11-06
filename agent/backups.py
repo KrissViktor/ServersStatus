@@ -12,7 +12,7 @@ DATE = re.compile(r'_backup_(\d{4}_\d{2}_\d{2}_\d{6})_')
 def inspect_backup(item, previous, now=None):
     now = time.time() if now is None else now
     folder = item['path']
-    result = {'path': folder, 'name': item.get('name', folder), 'schedule': item.get('schedule', 'daily')}
+    result = {'path': folder, 'name': item.get('name', folder), 'schedule': item.get('schedule', 'daily'), 'min_size_bytes': item.get('min_size_bytes', 1024**3)}
     try:
         # scandir raises on a missing/inaccessible root; do not call it "no files".
         with os.scandir(folder):
@@ -61,12 +61,16 @@ def inspect_backup(item, previous, now=None):
             fresh = datetime.fromtimestamp(timestamp) >= required
             result['expected_since'] = required.strftime('%Y-%m-%d')
         else:
-            fresh = now - timestamp <= item.get('max_age_hours', 26) * 3600
+            fresh = now - timestamp <= item.get('max_age_hours', 30) * 3600
         state = 'fresh' if fresh else 'stale'
         if timestamp > now + 300:
             state = 'future'
         elif stat.st_size == 0:
             state = 'empty'
+        elif stat.st_size < result['min_size_bytes']:
+            state = 'too_small'
+        elif not fresh:
+            state = 'stale'
         elif not stable:
             state = 'observing'
         return dict(result, state=state, file=path.name, relative_path=str(path.relative_to(folder)),

@@ -5,7 +5,8 @@
     "pattern": "ERP_backup_*.bak",
     "schedule": "daily",
     "date_from_filename": true,
-    "max_age_hours": 26
+    "max_age_hours": 30,
+    "min_size_bytes": 1073741824
   },
   {
     "name": "ERP · ежемесячная",
@@ -14,7 +15,8 @@
     "schedule": "monthly",
     "date_from_filename": true,
     "recursive": true,
-    "grace_hours": 36
+    "grace_hours": 36,
+    "min_size_bytes": 1073741824
   },
   {
     "name": "Бух ERP · ежедневная",
@@ -22,7 +24,8 @@
     "pattern": "ERP_INTEK_backup_*.bak",
     "schedule": "daily",
     "date_from_filename": true,
-    "max_age_hours": 26
+    "max_age_hours": 30,
+    "min_size_bytes": 1073741824
   },
   {
     "name": "Бух ERP · ежемесячная",
@@ -31,6 +34,7 @@
     "schedule": "monthly",
     "date_from_filename": true,
     "recursive": true,
-    "grace_hours": 36
+    "grace_hours": 36,
+    "min_size_bytes": 1073741824
   }
 ]
