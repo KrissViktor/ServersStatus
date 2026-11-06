@@ -109,7 +109,7 @@ def dashboard(rows):
         data = json.loads(row['data']) if row['data'] else {}
         if any(number(d.get('used_percent')) >= 85 for d in data.get('disks', [])):
             attention += 1
-    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 30 с</span></div>'
+    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 30 с</span></div>'
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     cards = ''.join(server_card(row, now) for row in rows) or '<div class="empty">Серверов пока нет. Зарегистрируйте агент, чтобы начать мониторинг.</div>'
     return page(header + stats + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>', refresh=True)

@@ -73,3 +73,36 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('Контроль служб не настроен', content)
         self.assertIn('Папки бэкапов не настроены', content)
         self.assertIn('http-equiv="refresh" content="30"', content)
+
+    def test_agent_management_lifecycle(self):
+        import re
+        self.assertEqual(self.client.get('/agents', follow_redirects=False).status_code, 303)
+        self.assertEqual(self.client.post('/agents/create', data={}).status_code, 401)
+        self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'})
+        response = self.client.get('/agents')
+        self.assertEqual(response.headers['cache-control'], 'no-store')
+        csrf = re.search(r'name="csrf" value="([^"]+)"', response.text).group(1)
+        self.assertEqual(self.client.post('/agents/create', data={'agent_id': 'new'}).status_code, 403)
+        form = {'agent_id': 'new', 'csrf': csrf}
+        created = self.client.post('/agents/create', data=form)
+        self.assertEqual(created.status_code, 200)
+        key = re.search(r'<input readonly value="([^"]+)" autocomplete="off"', created.text).group(1)
+        self.assertNotIn(key, self.client.get('/agents').text)
+        with module.db() as c:
+            self.assertEqual(c.execute('SELECT token FROM agents WHERE id=?', ('new',)).fetchone()['token'], module.digest(key))
+        self.assertEqual(self.client.post('/agents/create', data=form).status_code, 409)
+        payload = {'hostname': 'pc', 'cpu_percent': 1, 'memory_percent': 2, 'uptime_seconds': 3, 'disks': []}
+        old_headers = {'Authorization': 'Bearer ' + key}
+        self.assertEqual(self.client.post('/api/report/new', json=payload, headers=old_headers).status_code, 200)
+        self.assertEqual(self.client.post('/agents/rotate', data=form).status_code, 400)
+        rotated = self.client.post('/agents/rotate', data=dict(form, confirm='yes'))
+        new_key = re.search(r'<input readonly value="([^"]+)" autocomplete="off"', rotated.text).group(1)
+        self.assertNotEqual(key, new_key)
+        self.assertEqual(self.client.post('/api/report/new', json=payload, headers=old_headers).status_code, 401)
+        new_headers = {'Authorization': 'Bearer ' + new_key}
+        self.assertEqual(self.client.post('/api/report/new', json=payload, headers=new_headers).status_code, 200)
+        self.assertEqual(self.client.post('/agents/delete', data=dict(form, confirmation='wrong')).status_code, 400)
+        self.assertEqual(self.client.post('/agents/delete', data=dict(form, confirmation='new'), follow_redirects=False).status_code, 303)
+        self.assertEqual(self.client.post('/api/report/new', json=payload, headers=new_headers).status_code, 401)
+        with module.db() as c:
+            self.assertEqual(c.execute('SELECT count(*) FROM reports WHERE agent=?', ('new',)).fetchone()[0], 0)

@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -10,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
+from .agents_ui import agents_page
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 app = FastAPI(title='ServersStatus')
@@ -126,6 +128,10 @@ async def report(agent_id: str, request: Request):
             data = Report.model_validate_json(body)
         except ValueError:
             raise HTTPException(422, 'Некорректный отчёт')
+        c.execute('BEGIN IMMEDIATE')
+        current = c.execute('SELECT token FROM agents WHERE id=?', (agent_id,)).fetchone()
+        if not current or not hmac.compare_digest(current['token'], agent['token']):
+            raise HTTPException(401)
         c.execute('INSERT INTO reports VALUES (?,?,?)', (agent_id, time.time(), data.model_dump_json()))
         c.execute('DELETE FROM reports WHERE received<?', (time.time() - 30 * 86400,))
     return {'ok': True}
@@ -136,3 +142,84 @@ def health():
     with db() as c:
         c.execute('SELECT 1')
     return {'status': 'ok'}
+
+
+@app.middleware('http')
+async def private_pages(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path == '/' or request.url.path.startswith('/agents'):
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
+def csrf_token(request):
+    return digest('agent-management:' + request.cookies.get('session', ''))
+
+
+def agent_rows():
+    with db() as c:
+        return c.execute('SELECT a.id, MAX(r.received) AS received FROM agents a LEFT JOIN reports r ON a.id=r.agent GROUP BY a.id ORDER BY a.id').fetchall()
+
+
+@app.get('/agents', response_class=HTMLResponse)
+def manage_agents(request: Request):
+    if not authenticated(request):
+        return RedirectResponse('/', status_code=303)
+    return HTMLResponse(agents_page(agent_rows(), csrf_token(request)))
+
+
+@app.post('/agents/{action}', response_class=HTMLResponse)
+async def change_agent(action: str, request: Request):
+    from urllib.parse import parse_qs
+    if not authenticated(request):
+        raise HTTPException(401, 'Войдите в панель')
+    if action not in ('create', 'rotate', 'delete'):
+        raise HTTPException(404)
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 4096:
+            raise HTTPException(413)
+    try:
+        form = parse_qs(body.decode('utf-8'))
+    except UnicodeDecodeError:
+        raise HTTPException(400)
+    value = lambda name: form.get(name, [''])[0]
+    if not hmac.compare_digest(value('csrf').encode(), csrf_token(request).encode()):
+        raise HTTPException(403, 'Обновите страницу и повторите действие')
+    name = value('agent_id').strip()
+    error, key = '', None
+    status = 200
+    with db() as c:
+        if action == 'create':
+            if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', name):
+                error, status = 'Некорректное имя агента.', 400
+            else:
+                key = secrets.token_urlsafe(32)
+                try:
+                    c.execute('INSERT INTO agents VALUES (?,?)', (name, digest(key)))
+                except sqlite3.IntegrityError:
+                    key = None
+                    error, status = 'Агент с таким именем уже существует.', 409
+        else:
+            # Reserve the write transaction so concurrent report ingestion cannot
+            # insert a report between deleting history and deleting registration.
+            c.execute('BEGIN IMMEDIATE')
+            exists = c.execute('SELECT 1 FROM agents WHERE id=?', (name,)).fetchone()
+            if not exists:
+                error, status = 'Агент не найден.', 404
+            elif action == 'rotate':
+                if value('confirm') != 'yes':
+                    error, status = 'Подтвердите отключение старого ключа.', 400
+                else:
+                    key = secrets.token_urlsafe(32)
+                    c.execute('UPDATE agents SET token=? WHERE id=?', (digest(key), name))
+            elif value('confirmation') != name:
+                error, status = 'Имя для подтверждения удаления не совпало.', 400
+            else:
+                c.execute('DELETE FROM reports WHERE agent=?', (name,))
+                c.execute('DELETE FROM agents WHERE id=?', (name,))
+    if action == 'delete' and not error:
+        return RedirectResponse('/agents', status_code=303)
+    return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name), status_code=status)
