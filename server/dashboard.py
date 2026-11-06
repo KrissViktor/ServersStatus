@@ -22,7 +22,7 @@ def number(value):
 
 def size(value):
     value = number(value)
-    for unit in ('Б', 'КиБ', 'МиБ', 'ГиБ', 'ТиБ', 'ПиБ'):
+    for unit in ('Б', 'КиБ', 'МиБ', 'Гб', 'ТиБ', 'ПиБ'):
         if value < 1024 or unit == 'ПиБ':
             return f'{value:.1f} {unit}'
         value /= 1024

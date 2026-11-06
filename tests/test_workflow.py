@@ -66,7 +66,7 @@ class WorkflowTest(unittest.TestCase):
                              {'id': 'new', 'received': None, 'data': None}])
         self.assertNotIn('<script>alert(1)</script>', content)
         self.assertIn('&lt;script&gt;', content)
-        self.assertIn('52.4 ГиБ', content)
+        self.assertIn('52.4 Гб', content)
         self.assertIn('1 д 6 ч 31 мин', content)
         self.assertIn('Данные устарели', content)
         self.assertIn('Ожидаем первый отчёт', content)
