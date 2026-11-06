@@ -1,0 +1,10 @@
+[Unit]
+Description=Check ServersStatus incidents every minute
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+Unit=serversstatus-notify.service
+
+[Install]
+WantedBy=timers.target

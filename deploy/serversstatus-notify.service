@@ -1,0 +1,20 @@
+[Unit]
+Description=ServersStatus Telegram notification check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=serversstatus
+Group=serversstatus
+WorkingDirectory=/opt/ServersStatus
+Environment=STATUS_DB=/var/lib/serversstatus/status.sqlite3
+EnvironmentFile=/etc/serversstatus-telegram.env
+ExecStart=/opt/ServersStatus/.venv/bin/python -m server.notifications
+UMask=0077
+TimeoutStartSec=360
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serversstatus
