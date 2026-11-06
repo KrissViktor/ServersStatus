@@ -32,6 +32,7 @@ def db():
         CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY, token TEXT);
         CREATE TABLE IF NOT EXISTS reports (agent TEXT, received REAL, data TEXT);
         CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
+        CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
@@ -56,13 +57,18 @@ def authenticated(request):
                          (digest(token), time.time())).fetchone() is not None
 
 
+def server_rows():
+    with db() as c:
+        return [dict(row) for row in c.execute('SELECT a.id, p.display_name, r.received, r.data FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1) ORDER BY a.id').fetchall()]
+
+
 @app.get('/', response_class=HTMLResponse)
-def index(request: Request):
+def index(request: Request, q: str = '', view: str = 'all'):
     if not authenticated(request):
         return HTMLResponse(login_page())
-    with db() as c:
-        rows = c.execute('SELECT a.id, r.received, r.data FROM agents a LEFT JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1) ORDER BY a.id').fetchall()
-    return HTMLResponse(dashboard(rows))
+    if view not in ('all', 'problems', 'offline') or len(q) > 200:
+        raise HTTPException(400)
+    return HTMLResponse(dashboard(server_rows(), q, view))
 
 
 @app.post('/login')
@@ -189,7 +195,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -263,6 +269,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
+                c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
     if action == 'delete' and not error:
         return RedirectResponse('/agents', status_code=303)
     return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name), status_code=status)
@@ -385,3 +392,42 @@ async def monitoring_save(agent_id: str, request: Request):
     except (ValueError, OverflowError, ValidationError):
         error = 'Настройки не сохранены. Проверьте расписание, размеры и числовые пороги (возраст 1–8760 ч, ожидание 0–672 ч).'
     return HTMLResponse(settings_page(agent_id, values, csrf_token(request), revision, applied, error, not error), status_code=400 if error else 200)
+
+
+@app.get('/servers/{agent_id}', response_class=HTMLResponse)
+def server_detail(agent_id: str, request: Request):
+    if not authenticated(request):
+        return RedirectResponse('/', status_code=303)
+    from .overview import detail_page
+    row = next((row for row in server_rows() if row['id'] == agent_id), None)
+    if row is None:
+        raise HTTPException(404)
+    return HTMLResponse(detail_page(row, csrf_token(request)))
+
+
+@app.post('/servers/{agent_id}/name')
+async def rename_server(agent_id: str, request: Request):
+    from urllib.parse import parse_qs, quote
+    if not authenticated(request):
+        raise HTTPException(401)
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 4096:
+            raise HTTPException(413)
+    try:
+        form = parse_qs(body.decode())
+    except UnicodeDecodeError:
+        raise HTTPException(400)
+    csrf = form.get('csrf', [''])[0]
+    if not hmac.compare_digest(csrf.encode(), csrf_token(request).encode()):
+        raise HTTPException(403)
+    name = form.get('display_name', [''])[0].strip()
+    if len(name) > 120:
+        raise HTTPException(400, 'Название не должно превышать 120 символов')
+    with db() as c:
+        c.execute('BEGIN IMMEDIATE')
+        if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
+            raise HTTPException(404)
+        c.execute('INSERT INTO agent_profiles VALUES (?,?) ON CONFLICT(agent) DO UPDATE SET display_name=excluded.display_name', (agent_id, name))
+    return RedirectResponse('/servers/' + quote(agent_id, safe=''), status_code=303)

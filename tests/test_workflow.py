@@ -68,10 +68,12 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('&lt;script&gt;', content)
         self.assertIn('52.4 Гб', content)
         self.assertIn('1 д 6 ч 31 мин', content)
-        self.assertIn('Данные устарели', content)
+        from server.overview import detail_page
+        details = detail_page({'id': 'pc', 'received': time.time() - 240, 'data': json.dumps(payload)}, 'csrf')
+        self.assertIn('Данные устарели', details)
         self.assertIn('Ожидаем первый отчёт', content)
-        self.assertIn('Контроль служб не настроен', content)
-        self.assertIn('Папки бэкапов не настроены', content)
+        self.assertIn('Контроль служб не настроен', details)
+        self.assertIn('Папки бэкапов не настроены', details)
         self.assertIn('http-equiv="refresh" content="30"', content)
 
     def test_agent_management_lifecycle(self):
@@ -178,7 +180,7 @@ class WorkflowTest(unittest.TestCase):
         headers = {'Authorization': 'Bearer agent-secret'}
         self.assertEqual(self.client.post('/api/report/pc', json=payload, headers=headers).status_code, 200)
         self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'})
-        content = self.client.get('/').text
+        content = self.client.get('/servers/pc').text
         for text in ('ServerStandard', '10.0.17763', '192.168.1.10', '1.0 МиБ/с', 'PhysicalDrive0'):
             self.assertIn(text, content)
         self.assertIn('&lt;Ethernet&gt;', content)
@@ -231,3 +233,37 @@ class WorkflowTest(unittest.TestCase):
         self.assertTrue(any('меньше 2 Гб' in problem for problem in problems))
         backup.update(max_age_hours=48, min_size_bytes=1024**3)
         self.assertEqual(backup_problems(backup), [])
+
+    def test_overview_filter_search_and_display_name(self):
+        import re
+        import time
+        self.assertEqual(self.client.get('/servers/pc', follow_redirects=False).status_code, 303)
+        self.assertEqual(self.client.post('/servers/pc/name', data={}).status_code, 401)
+        self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'})
+        details = self.client.get('/servers/pc')
+        self.assertEqual(details.headers['cache-control'], 'no-store')
+        csrf = re.search(r'name="csrf" value="([^"]+)"', details.text).group(1)
+        self.assertEqual(self.client.post('/servers/pc/name', data={'display_name': 'ERP'}).status_code, 403)
+        rename = {'csrf': csrf, 'display_name': 'SQL — ERP <main>'}
+        self.assertEqual(self.client.post('/servers/pc/name', data=rename, follow_redirects=False).status_code, 303)
+        payload = {'hostname': 'WIN-SQL', 'cpu_percent': 2, 'memory_percent': 30, 'uptime_seconds': 1, 'disks': []}
+        with module.db() as c:
+            c.execute('INSERT INTO reports VALUES (?,?,?)', ('pc', time.time(), json.dumps(payload)))
+            c.execute('INSERT INTO agents VALUES (?,?)', ('offline', 'token'))
+            c.execute('INSERT INTO reports VALUES (?,?,?)', ('offline', time.time()-500, json.dumps(dict(payload, hostname='WIN-OLD'))))
+        content = self.client.get('/?q=erp').text
+        self.assertIn('SQL — ERP &lt;main&gt;', content)
+        self.assertNotIn('WIN-OLD', content)
+        self.assertIn('WIN-SQL', self.client.get('/?q=win-sql').text)
+        self.assertNotIn('WIN-SQL', self.client.get('/?view=offline').text)
+        self.assertIn('WIN-OLD', self.client.get('/?view=problems').text)
+        self.assertNotIn('WIN-SQL', self.client.get('/?view=problems').text)
+        self.assertIn('Нет серверов по выбранным условиям', self.client.get('/?q=missing').text)
+        self.assertEqual(self.client.get('/?view=invalid').status_code, 400)
+        self.assertEqual(self.client.get('/servers/missing').status_code, 404)
+        with module.db() as c:
+            self.assertEqual(c.execute('SELECT token FROM agents WHERE id=?', ('pc',)).fetchone()[0], module.digest('agent-secret'))
+        self.assertIn('SQL — ERP &lt;main&gt;', self.client.get('/servers/pc').text)
+        self.assertEqual(self.client.post('/servers/pc/name', data={'csrf': csrf, 'display_name': 'x'*121}).status_code, 400)
+        self.client.post('/servers/pc/name', data={'csrf': csrf, 'display_name': ''})
+        self.assertNotIn('SQL — ERP &lt;main&gt;', self.client.get('/servers/pc').text)

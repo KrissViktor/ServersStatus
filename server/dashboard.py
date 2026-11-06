@@ -104,7 +104,8 @@ def server_card(row, now):
     state = 'Нет данных' if age is None else 'Онлайн' if online else 'Нет связи'
     badge = 'normal' if online else 'danger' if age is not None else 'neutral'
     hostname = data.get('hostname') or row['id']
-    content = f'<article class="server"><header class="server-head"><div><p class="eyebrow">WINDOWS · АГЕНТ {esc(row["id"])}</p><h2>{esc(hostname)}</h2></div><span class="badge {badge}">● {state}</span></header>'
+    title = dict(row).get('display_name') or hostname
+    content = f'<article class="server"><header class="server-head"><div><p class="eyebrow">WINDOWS · АГЕНТ {esc(row["id"])}</p><h2>{esc(title)}</h2><p class="muted">{esc(hostname)}</p></div><span class="badge {badge}">● {state}</span></header>'
     content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История CPU / RAM →</a></p>'
     if age is None:
         return content + '<div class="empty">Ожидаем первый отчёт агента</div></article>'
@@ -152,7 +153,7 @@ def server_card(row, now):
     return content
 
 
-def dashboard(rows):
+def dashboard(rows, q='', view='all'):
     now = time.time()
     online = sum(row['received'] is not None and now - row['received'] < 180 for row in rows)
     missing = sum(row['received'] is None for row in rows)
@@ -163,5 +164,10 @@ def dashboard(rows):
             attention += 1
     header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 30 с</span></div>'
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
-    cards = ''.join(server_card(row, now) for row in rows) or '<div class="empty">Серверов пока нет. Зарегистрируйте агент, чтобы начать мониторинг.</div>'
+    from .overview import compact_card, matches, search_form
+    selected = [row for row in rows if matches(row, now, q, view)]
+    cards = '<div class="server-grid">' + ''.join(compact_card(row, now) for row in selected) + '</div>'
+    if not selected:
+        cards = '<div class="empty">Нет серверов по выбранным условиям.</div>'
+    cards = search_form(q, view, len(selected), len(rows)) + cards
     return page(header + backup_alerts(rows, now) + stats + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>', refresh=True)
