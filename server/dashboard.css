@@ -13,3 +13,4 @@ textarea,select{font:inherit;background:#0b1423;color:var(--text);border:1px sol
 
 .compact .server-head>div{min-width:0}.compact .muted{overflow-wrap:anywhere}.compact-disks b{overflow-wrap:anywhere}
 .server.problem-server{background:linear-gradient(135deg,#39291f,#282326);border-color:#875b3480}.problem-server .metric{background:#181a23}.credits{border-top:1px solid var(--line);margin-top:24px;padding:20px 0 30px;text-align:center}.search-status:empty{display:none}.search-status{margin-top:12px}
+.search-status:empty{display:block}.search-status{height:20px;line-height:20px;margin:10px 0 0;font-size:12px;overflow:hidden}.result-count{min-height:40px}.searchbar,#server-results,#overview-alerts,#overview-stats,[data-refresh]{overflow-anchor:none}#server-results .compact{transition:background-color .18s ease,border-color .18s ease}#server-results .metric-top strong{font-variant-numeric:tabular-nums}

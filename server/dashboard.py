@@ -7,6 +7,7 @@ from urllib.parse import quote
 from pathlib import Path
 
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')
+REFRESH_SCRIPT = Path(__file__).with_name('refresh.js').read_text(encoding='utf-8')
 
 
 def esc(value):
@@ -23,8 +24,8 @@ def number(value):
 
 def size(value):
     value = number(value)
-    for unit in ('Б', 'КиБ', 'МиБ', 'Гб', 'ТиБ', 'ПиБ'):
-        if value < 1024 or unit == 'ПиБ':
+    for unit in ('Б', 'Кб', 'Мб', 'Гб', 'Тб', 'Пб'):
+        if value < 1024 or unit == 'Пб':
             return f'{value:.1f} {unit}'
         value /= 1024
 
@@ -51,7 +52,7 @@ def meter(label, value, description):
 
 
 def page(content, refresh=False):
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + ('<meta http-equiv="refresh" content="30">' if refresh else '') + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + ('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
 
 def login_page():
@@ -173,4 +174,4 @@ def dashboard(rows, q='', view='all'):
         cards = '<div class="empty">Нет серверов по выбранным условиям.</div>'
     from .overview import LIVE_SCRIPT
     cards = search_form(q, view, len(selected), len(rows)) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
-    return page(header + backup_alerts(rows, now) + stats + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>', refresh=True)
+    return page(header + '<div id="overview-alerts">' + backup_alerts(rows, now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')

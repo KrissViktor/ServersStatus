@@ -78,4 +78,4 @@ def history_page(agent_id, points, period, start, end):
         content += f'<p class="muted history-note">Отчётов: {total} · Точки — средние за {bucket // 60} мин. Наведите на точку, чтобы увидеть пик и время. Разрывы означают отсутствие отчётов более 3 минут; интервалы с пропусками показаны отдельными точками. Время — московское (МСК).</p>'
         content += chart(points, 'cpu', 'Процессор · CPU', start, end, '#4adeab')
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
-    return page(content + '<footer>История хранится 30 дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
+    return page('<div id="history-content" data-refresh>' + content + '</div><footer>История хранится 30 дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)

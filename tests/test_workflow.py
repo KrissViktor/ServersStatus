@@ -74,7 +74,8 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('Ожидаем первый отчёт', content)
         self.assertIn('Контроль служб не настроен', details)
         self.assertIn('Папки бэкапов не настроены', details)
-        self.assertIn('http-equiv="refresh" content="30"', content)
+        self.assertNotIn('http-equiv="refresh"', content)
+        self.assertIn('30000', content)
 
     def test_agent_management_lifecycle(self):
         import re
@@ -181,7 +182,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(self.client.post('/api/report/pc', json=payload, headers=headers).status_code, 200)
         self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'})
         content = self.client.get('/servers/pc').text
-        for text in ('ServerStandard', '10.0.17763', '192.168.1.10', '1.0 МиБ/с', 'PhysicalDrive0'):
+        for text in ('ServerStandard', '10.0.17763', '192.168.1.10', '1.0 Мб/с', 'PhysicalDrive0'):
             self.assertIn(text, content)
         self.assertIn('&lt;Ethernet&gt;', content)
         self.assertNotIn('<Ethernet>', content)

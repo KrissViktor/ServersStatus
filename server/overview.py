@@ -55,7 +55,7 @@ def compact_card(row, now):
     age = max(0, now-row['received']) if row['received'] is not None else None
     state, color = ('Ожидает данных', 'neutral') if age is None else ('Онлайн', 'normal') if age < 180 else ('Нет связи', 'danger')
     problem_class = ' problem-server' if issues(row, now) else ''
-    content = f'<article class="server compact{problem_class}"><header class="server-head"><div><h2><a href="{esc(url)}">{esc(title)}</a></h2><p class="muted">{esc(hostname)} · {esc(row["id"])}</p></div><span class="badge {color}">● {state}</span></header>'
+    content = f'<article class="server compact{problem_class}" data-server-id="{esc(row["id"])}"><header class="server-head"><div><h2><a href="{esc(url)}">{esc(title)}</a></h2><p class="muted">{esc(hostname)} · {esc(row["id"])}</p></div><span class="badge {color}">● {state}</span></header>'
     if age is None:
         return content + '<p class="empty">Ожидаем первый отчёт агента</p><a class="nav-link" href="' + esc(url) + '">Открыть сервер →</a></article>'
     if age >= 180:
