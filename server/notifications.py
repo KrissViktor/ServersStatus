@@ -15,7 +15,35 @@ class DeliveryError(Exception):
         self.retry_after = max(60, min(86400, retry_after))
 
 
+def proxy_request(token, method, payload, proxy):
+    # Only the Telegram transport uses this client; never change global proxies.
+    try:
+        import httpx
+        from urllib.parse import urlsplit
+        parsed = urlsplit(proxy)
+        if parsed.scheme not in ('socks5', 'socks5h', 'http', 'https') or not parsed.hostname:
+            raise DeliveryError()
+        with httpx.Client(proxy=proxy, timeout=15, trust_env=False, follow_redirects=False) as client:
+            response = client.post('https://api.telegram.org/bot' + token + '/' + method, json=payload)
+            result = response.json()
+            if response.status_code == 429:
+                raise DeliveryError(int(result.get('parameters', {}).get('retry_after', 60)))
+            if response.status_code != 200 or not result.get('ok'):
+                raise DeliveryError()
+            return result['result']
+    except ImportError:
+        raise DeliveryError() from None
+    except Exception as error:
+        if isinstance(error, DeliveryError):
+            raise error from None
+        # httpx errors can include the bot URL or proxy credentials. Redact them.
+        raise DeliveryError() from None
+
+
 def telegram_request(token, method, payload):
+    proxy = os.environ.get('STATUS_TELEGRAM_PROXY', '').strip()
+    if proxy:
+        return proxy_request(token, method, payload, proxy)
     request = urllib.request.Request('https://api.telegram.org/bot' + token + '/' + method,
                                      data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'}, method='POST')
     try:

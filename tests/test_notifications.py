@@ -98,3 +98,37 @@ class NotificationsTest(unittest.TestCase):
                 telegram_request('dummy-test-token', 'sendMessage', {})
             self.assertEqual(caught.exception.retry_after, 120)
             self.assertNotIn('dummy-test-token', str(caught.exception))
+
+    def test_telegram_only_proxy_and_no_direct_fallback(self):
+        import os
+        from unittest.mock import patch, MagicMock
+        from server.notifications import telegram_request
+        response = MagicMock(status_code=200)
+        response.json.return_value = {'ok': True, 'result': {'message_id': 123}}
+        with patch.dict(os.environ, {'STATUS_TELEGRAM_PROXY': 'socks5h://127.0.0.1:1080'}), patch('httpx.Client') as factory, patch('server.notifications.urllib.request.urlopen') as direct:
+            client = factory.return_value.__enter__.return_value
+            client.post.return_value = response
+            self.assertEqual(telegram_request('dummy-token', 'sendMessage', {}), {'message_id': 123})
+            factory.assert_called_once_with(proxy='socks5h://127.0.0.1:1080', timeout=15, trust_env=False, follow_redirects=False)
+            direct.assert_not_called()
+            client.post.side_effect = RuntimeError('proxy-secret dummy-token')
+            with self.assertRaises(DeliveryError) as caught:
+                telegram_request('dummy-token', 'sendMessage', {})
+            self.assertNotIn('dummy-token', str(caught.exception))
+            direct.assert_not_called()
+
+    def test_proxy_rate_limit_and_invalid_scheme(self):
+        import os
+        from unittest.mock import patch, MagicMock
+        from server.notifications import telegram_request
+        response = MagicMock(status_code=429)
+        response.json.return_value = {'parameters': {'retry_after': 180}}
+        with patch.dict(os.environ, {'STATUS_TELEGRAM_PROXY': 'socks5h://127.0.0.1:1080'}), patch('httpx.Client') as factory:
+            factory.return_value.__enter__.return_value.post.return_value = response
+            with self.assertRaises(DeliveryError) as caught:
+                telegram_request('dummy-token', 'sendMessage', {})
+            self.assertEqual(caught.exception.retry_after, 180)
+        with patch.dict(os.environ, {'STATUS_TELEGRAM_PROXY': 'ftp://invalid'}), patch('httpx.Client') as factory:
+            with self.assertRaises(DeliveryError):
+                telegram_request('dummy-token', 'sendMessage', {})
+            factory.assert_not_called()

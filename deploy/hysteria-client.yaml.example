@@ -1,0 +1,7 @@
+# Paste your full hy2:// or hysteria2:// link locally, never commit the real value.
+# Do not use links with insecure=1; use a valid certificate/SNI or trusted pin.
+server: "hysteria2://REPLACE_WITH_YOUR_LINK"
+tls:
+  insecure: false
+socks5:
+  listen: 127.0.0.1:1080
