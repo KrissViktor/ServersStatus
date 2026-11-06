@@ -53,3 +53,23 @@ class WorkflowTest(unittest.TestCase):
         os.utime(path, (1, 1))
         collect(config, previous)
         self.assertEqual(collect(config, previous)['backups'][0]['state'], 'stale')
+
+    def test_dashboard_safe_render_and_stale_state(self):
+        from server.dashboard import dashboard
+        import time
+        payload = {'hostname': '<script>alert(1)</script>', 'cpu_percent': 6.8,
+                   'memory_percent': 50.4, 'uptime_seconds': 109895,
+                   'disks': [{'path': 'C:', 'free_bytes': 56312016896,
+                              'total_bytes': 479452983296, 'used_percent': 88.3}],
+                   'services': [], 'backups': []}
+        content = dashboard([{'id': 'pc', 'received': time.time() - 240, 'data': json.dumps(payload)},
+                             {'id': 'new', 'received': None, 'data': None}])
+        self.assertNotIn('<script>alert(1)</script>', content)
+        self.assertIn('&lt;script&gt;', content)
+        self.assertIn('52.4 ГиБ', content)
+        self.assertIn('1 д 6 ч 31 мин', content)
+        self.assertIn('Данные устарели', content)
+        self.assertIn('Ожидаем первый отчёт', content)
+        self.assertIn('Контроль служб не настроен', content)
+        self.assertIn('Папки бэкапов не настроены', content)
+        self.assertIn('http-equiv="refresh" content="30"', content)

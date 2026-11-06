@@ -1,7 +1,5 @@
 import hashlib
 import hmac
-import html
-import json
 import os
 import secrets
 import sqlite3
@@ -11,6 +9,7 @@ from contextlib import contextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
+from .dashboard import dashboard, login_page
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 app = FastAPI(title='ServersStatus')
@@ -50,22 +49,13 @@ def authenticated(request):
                          (digest(token), time.time())).fetchone() is not None
 
 
-STYLE = '<style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:16px;background:#101827;color:#e2e8f0}input,button{padding:10px;margin:5px}article{background:#1e293b;padding:20px;margin:16px 0;border-radius:12px}pre{white-space:pre-wrap}a{color:#7dd3fc}</style>'
-
-
 @app.get('/', response_class=HTMLResponse)
 def index(request: Request):
     if not authenticated(request):
-        return HTMLResponse(STYLE + '<h1>ServersStatus</h1><form method="post" action="/login"><input name="username" placeholder="Логин" required><input name="password" type="password" placeholder="Пароль" required><button>Войти</button></form>')
+        return HTMLResponse(login_page())
     with db() as c:
-        rows = c.execute('SELECT a.id, r.received, r.data FROM agents a LEFT JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1)').fetchall()
-    cards = ''
-    for row in rows:
-        age = int(time.time() - row['received']) if row['received'] else None
-        state = 'Нет данных' if age is None else ('Онлайн' if age < 180 else 'Нет связи') + f' · {age} с назад'
-        data = json.loads(row['data']) if row['data'] else {}
-        cards += '<article><h2>' + html.escape(row['id']) + '</h2><p>' + state + '</p><pre>' + html.escape(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></article>'
-    return HTMLResponse(STYLE + '<h1>Серверы</h1><form method="post" action="/logout"><button>Выйти</button></form>' + (cards or '<p>Агенты ещё не зарегистрированы. Используйте CLI.</p>'))
+        rows = c.execute('SELECT a.id, r.received, r.data FROM agents a LEFT JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1) ORDER BY a.id').fetchall()
+    return HTMLResponse(dashboard(rows))
 
 
 @app.post('/login')
