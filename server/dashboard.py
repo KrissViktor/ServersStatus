@@ -51,7 +51,7 @@ def meter(label, value, description):
 
 
 def page(content, refresh=False):
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + ('<meta http-equiv="refresh" content="30">' if refresh else '') + '<title>ServersStatus · Мониторинг</title><style>' + CSS + '</style></head><body><main>' + content + '</main></body></html>'
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + ('<meta http-equiv="refresh" content="30">' if refresh else '') + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
 
 def login_page():
@@ -105,7 +105,9 @@ def server_card(row, now):
     badge = 'normal' if online else 'danger' if age is not None else 'neutral'
     hostname = data.get('hostname') or row['id']
     title = dict(row).get('display_name') or hostname
-    content = f'<article class="server"><header class="server-head"><div><p class="eyebrow">WINDOWS · АГЕНТ {esc(row["id"])}</p><h2>{esc(title)}</h2><p class="muted">{esc(hostname)}</p></div><span class="badge {badge}">● {state}</span></header>'
+    from .overview import issues
+    problem_class = ' problem-server' if issues(row, now) else ''
+    content = f'<article class="server{problem_class}"><header class="server-head"><div><p class="eyebrow">WINDOWS · АГЕНТ {esc(row["id"])}</p><h2>{esc(title)}</h2><p class="muted">{esc(hostname)}</p></div><span class="badge {badge}">● {state}</span></header>'
     content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История CPU / RAM →</a></p>'
     if age is None:
         return content + '<div class="empty">Ожидаем первый отчёт агента</div></article>'
@@ -169,5 +171,6 @@ def dashboard(rows, q='', view='all'):
     cards = '<div class="server-grid">' + ''.join(compact_card(row, now) for row in selected) + '</div>'
     if not selected:
         cards = '<div class="empty">Нет серверов по выбранным условиям.</div>'
-    cards = search_form(q, view, len(selected), len(rows)) + cards
+    from .overview import LIVE_SCRIPT
+    cards = search_form(q, view, len(selected), len(rows)) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
     return page(header + backup_alerts(rows, now) + stats + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>', refresh=True)

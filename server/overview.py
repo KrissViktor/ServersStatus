@@ -1,6 +1,9 @@
 """Compact overview and detailed server pages."""
 import json
 import time
+from pathlib import Path
+
+LIVE_SCRIPT = Path(__file__).with_name("overview.js").read_text(encoding="utf-8")
 from urllib.parse import quote
 from .dashboard import esc, page, duration, size, number, meter, server_card, backup_problems
 
@@ -41,7 +44,7 @@ def matches(row, now, query, view):
 
 def search_form(query, view, shown, total):
     options = ''.join(f'<option value="{value}" {"selected" if value == view else ""}>{label}</option>' for value, label in [('all', 'Все серверы'), ('problems', 'Есть проблемы'), ('offline', 'Нет связи')])
-    return f'<form class="searchbar" method="get" action="/"><label>Поиск по названию или имени<input name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label><button>Найти</button><a class="nav-link" href="/">Сбросить</a></form><p class="muted result-count">Показано {shown} из {total}. Фильтр «Есть проблемы»: связь, CPU/RAM от 95%, диски от 85%, бэкапы и службы.</p>'
+    return f'<form class="searchbar" method="get" action="/"><label>Поиск по названию или имени<input name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label><noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><p class="muted result-count">Показано {shown} из {total}. Фильтр «Есть проблемы»: связь, CPU/RAM от 95%, диски от 85%, бэкапы и службы.</p>'
 
 
 def compact_card(row, now):
@@ -51,7 +54,8 @@ def compact_card(row, now):
     url = '/servers/' + quote(row['id'], safe='')
     age = max(0, now-row['received']) if row['received'] is not None else None
     state, color = ('Ожидает данных', 'neutral') if age is None else ('Онлайн', 'normal') if age < 180 else ('Нет связи', 'danger')
-    content = f'<article class="server compact"><header class="server-head"><div><h2><a href="{esc(url)}">{esc(title)}</a></h2><p class="muted">{esc(hostname)} · {esc(row["id"])}</p></div><span class="badge {color}">● {state}</span></header>'
+    problem_class = ' problem-server' if issues(row, now) else ''
+    content = f'<article class="server compact{problem_class}"><header class="server-head"><div><h2><a href="{esc(url)}">{esc(title)}</a></h2><p class="muted">{esc(hostname)} · {esc(row["id"])}</p></div><span class="badge {color}">● {state}</span></header>'
     if age is None:
         return content + '<p class="empty">Ожидаем первый отчёт агента</p><a class="nav-link" href="' + esc(url) + '">Открыть сервер →</a></article>'
     if age >= 180:
