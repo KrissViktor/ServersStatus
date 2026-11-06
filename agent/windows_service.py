@@ -1,6 +1,10 @@
 """Install from an elevated terminal; config is next to this file."""
 import sys
 import threading
+import os
+import logging
+from logging.handlers import RotatingFileHandler
+import servicemanager
 from pathlib import Path
 
 import win32service
@@ -24,8 +28,22 @@ class ServersStatusService(win32serviceutil.ServiceFramework):
         self.stop.set()
 
     def SvcDoRun(self):
-        run(Path(__file__).with_name('config.json'), self.stop)
+        if getattr(sys, 'frozen', False):
+            data = Path(os.environ['ProgramData']) / 'ServersStatus'
+            handler = RotatingFileHandler(data / 'agent.log', maxBytes=1024 * 1024, backupCount=3, encoding='utf-8')
+            logging.basicConfig(level=logging.INFO, handlers=[handler])
+            config = data / 'config.json'
+        else:
+            config = Path(__file__).with_name('config.json')
+        run(config, self.stop)
 
 
 if __name__ == '__main__':
-    win32serviceutil.HandleCommandLine(ServersStatusService)
+    if getattr(sys, 'frozen', False):
+        ServersStatusService._exe_name_ = sys.executable
+    if len(sys.argv) == 1 and getattr(sys, 'frozen', False):
+        servicemanager.Initialize()
+        servicemanager.PrepareToHostSingle(ServersStatusService)
+        servicemanager.StartServiceCtrlDispatcher()
+    else:
+        win32serviceutil.HandleCommandLine(ServersStatusService)
