@@ -1,0 +1,24 @@
+[Unit]
+Description=ServersStatus Linux monitoring agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=serversstatus-agent
+Group=serversstatus-agent
+WorkingDirectory=/opt/serversstatus-agent/current
+ExecStart=/opt/serversstatus-agent/.venv/bin/python -m agent.linux_service /var/lib/serversstatus-agent/config.json
+StateDirectory=serversstatus-agent
+UMask=0077
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/serversstatus-agent
+
+[Install]
+WantedBy=multi-user.target

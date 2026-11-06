@@ -14,11 +14,17 @@
       document.body.style.minHeight = Math.max(innerHeight, y + innerHeight) + 'px';
       for (const target of targets) {
         const source = next.getElementById(target.id);
-        if (source && source.innerHTML !== target.innerHTML) target.innerHTML = source.innerHTML;
+        if (source && source.innerHTML !== target.innerHTML) {
+          const expanded = [...target.querySelectorAll('details')].map(detail => detail.open);
+          [...source.querySelectorAll('details')].forEach((detail,index) => {
+            if (index < expanded.length) detail.open = expanded[index];
+          });
+          target.innerHTML = source.innerHTML;
+        }
       }
       window.scrollTo({left: x, top: y, behavior: 'instant'});
     } catch (_) {
       // Retain the last successful graph; retry on the next background tick.
     } finally { busy = false; }
-  }, 30000);
+  }, Math.min(...targets.map(target => Number(target.dataset.refreshInterval) || 10000)));
 })();

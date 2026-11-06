@@ -80,7 +80,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('Контроль служб не настроен', details)
         self.assertIn('Папки бэкапов не настроены', details)
         self.assertNotIn('http-equiv="refresh"', content)
-        self.assertIn('30000', content)
+        self.assertIn('10000', content)
 
     def test_agent_management_lifecycle(self):
         import re
@@ -334,3 +334,28 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(history.count('<svg '),8)
         self.assertIn('1.0 Мб/с',history)
         self.assertIn('PhysicalDrive0',history)
+
+    def test_ten_second_snapshots_with_minute_history_and_linux_labels(self):
+        from unittest.mock import patch
+        headers={'Authorization':'Bearer agent-secret'}
+        payload={'hostname':'btrx24','cpu_percent':10,'memory_percent':37.5,'uptime_seconds':1,'disks':[],
+                 'system':{'os':'Linux','distribution':'CentOS Stream 9','memory_total_bytes':16*1024**3,
+                           'memory_available_bytes':10*1024**3,'memory_used_bytes':6*1024**3,'cpu_current_mhz':3200}}
+        for when,cpu in [(1000,10),(1010,20),(1060,30)]:
+            payload['cpu_percent']=cpu
+            with patch('server.app.time.time',return_value=when):
+                reply=self.client.post('/api/report/pc',json=payload,headers=headers)
+                self.assertEqual(reply.status_code,200)
+                self.assertEqual(reply.json()['report_interval_seconds'],10)
+            with module.db() as c:
+                self.assertEqual(json.loads(c.execute('SELECT data FROM current_reports WHERE agent=?',('pc',)).fetchone()[0])['cpu_percent'],cpu)
+        with module.db() as c:
+            self.assertEqual(c.execute('SELECT count(*) FROM reports WHERE agent=?',('pc',)).fetchone()[0],2)
+            self.assertEqual(c.execute('SELECT count(*) FROM latest_reports WHERE agent=?',('pc',)).fetchone()[0],1)
+        self.client.post('/login',data={'username':'admin','password':'test-password-123'})
+        content=self.client.get('/servers/pc').text
+        self.assertIn('CentOS Stream 9',content)
+        self.assertIn('6.0 Гб / 16.0 Гб',content)
+        self.assertIn('3.20 ГГц',content)
+        self.assertNotIn('WINDOWS · АГЕНТ',content)
+        self.assertNotIn('Пользователи RDP',content)

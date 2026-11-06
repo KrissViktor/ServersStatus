@@ -15,7 +15,7 @@ def process_events(db, now=None):
     now = time.time() if now is None else now
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
-        rows = c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1)').fetchall()
+        rows = c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id').fetchall()
         existing = c.execute('SELECT * FROM event_state').fetchall()
         current, valid, checked = evaluate(rows, existing, now)
         states = {s['key']:s for s in existing}

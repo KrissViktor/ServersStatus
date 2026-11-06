@@ -48,7 +48,7 @@ def install():
         config_path = DATA / 'config.json'
         config = json.loads(config_path.read_text(encoding='utf-8-sig')) if config_path.exists() else {}
         config.update(server_url=url.rstrip('/'), agent_id=name, token=key)
-        config.setdefault('interval_seconds', 60)
+        config.setdefault('interval_seconds', 10)
         config.setdefault('services', [])
         config.setdefault('backups', [])
         temporary = DATA / 'config.new'

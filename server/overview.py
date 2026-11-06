@@ -5,7 +5,7 @@ from pathlib import Path
 
 LIVE_SCRIPT = Path(__file__).with_name("overview.js").read_text(encoding="utf-8")
 from urllib.parse import quote
-from .dashboard import esc, page, duration, size, number, meter, server_card, backup_problems
+from .dashboard import esc, page, duration, size, number, meter, server_card, backup_problems, cpu_description, memory_description
 
 
 def issues(row, now):
@@ -60,7 +60,7 @@ def compact_card(row, now):
         return content + '<p class="empty">Ожидаем первый отчёт агента</p><a class="nav-link" href="' + esc(url) + '">Открыть сервер →</a></article>'
     if age >= 180:
         content += '<p class="notice">Данные устарели — нет связи с агентом</p>'
-    content += '<div class="metrics">' + meter('CPU', data.get('cpu_percent'), 'Процессор') + meter('RAM', data.get('memory_percent'), 'Память') + '</div>'
+    content += '<div class="metrics">' + meter('CPU', data.get('cpu_percent'), cpu_description(data)) + meter('RAM', data.get('memory_percent'), memory_description(data)) + '</div>'
     content += '<div class="compact-disks">'
     for disk in data.get('disks', []):
         content += '<p><b>' + esc(disk.get('path', '')) + '</b><span>' + size(disk.get('free_bytes')) + ' свободно · ' + f'{number(disk.get("used_percent")):.1f}% занято' + '</span></p>'
@@ -80,8 +80,8 @@ def detail_page(row, csrf):
     identifier = quote(row['id'], safe='')
     title = dict(row).get('display_name') or ''
     content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/settings/' + esc(identifier) + '">Настройки мониторинга</a><a class="nav-link" href="/servers/' + esc(identifier) + '">Обновить данные</a></header>'
-    content += '<p class="muted detail-note">Подробные данные на момент открытия страницы. Для обновления нажмите «Обновить данные».</p>' + server_card(row, time.time())
+    content += '<p class="muted detail-note">Обновление показателей каждые 10 секунд, без перезагрузки страницы.</p><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time())
     from .forecast import forecast_html
-    content += forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180)
+    content += forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180) + '</div>'
     content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
-    return page(content)
+    return page(content, refresh=True)

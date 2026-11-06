@@ -51,6 +51,26 @@ def meter(label, value, description):
     return f'<div class="metric"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><progress class="{level(percent)}" max="100" value="{percent}" aria-label="{esc(label)}"></progress><p class="muted">{esc(description)}</p></div>'
 
 
+
+def cpu_description(data):
+    system = data.get('system') or {}
+    frequency = number(system.get('cpu_current_mhz'))
+    if frequency:
+        return f'{frequency/1000:.2f} ГГц · частота ОС'
+    maximum = number(system.get('cpu_max_mhz'))
+    return f'До {maximum/1000:.2f} ГГц · максимум ОС' if maximum else 'Частота недоступна'
+
+
+def memory_description(data):
+    system = data.get('system') or {}
+    total = number(system.get('memory_total_bytes'))
+    if not total:
+        return 'Объём RAM недоступен'
+    used = system.get('memory_used_bytes')
+    if used is None:
+        used = max(0, total-number(system.get('memory_available_bytes')))
+    return size(used) + ' / ' + size(total) + ' · занято / всего'
+
 def page(content, refresh=False):
     return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + ('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
@@ -108,14 +128,15 @@ def server_card(row, now):
     title = dict(row).get('display_name') or hostname
     from .overview import issues
     problem_class = ' problem-server' if issues(row, now) else ''
-    content = f'<article class="server{problem_class}"><header class="server-head"><div><p class="eyebrow">WINDOWS · АГЕНТ {esc(row["id"])}</p><h2>{esc(title)}</h2><p class="muted">{esc(hostname)}</p></div><span class="badge {badge}">● {state}</span></header>'
+    os_name = (data.get('system') or {}).get('os') or 'ОС неизвестна'
+    content = f'<article class="server{problem_class}"><header class="server-head"><div><p class="eyebrow">{esc(os_name)} · АГЕНТ {esc(row["id"])}</p><h2>{esc(title)}</h2><p class="muted">{esc(hostname)}</p></div><span class="badge {badge}">● {state}</span></header>'
     content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История нагрузки →</a></p>'
     if age is None:
         return content + '<div class="empty">Ожидаем первый отчёт агента</div></article>'
     content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
     if not online:
         content += '<p class="notice">Данные устарели: агент не присылал отчёт более 3 минут.</p>'
-    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), 'Загрузка CPU') + meter('Оперативная память', data.get('memory_percent'), 'Использование RAM') + '</div><section><h3>Диски <span class="count">' + str(len(data.get('disks', []))) + '</span></h3><div class="disks">'
+    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data)) + meter('Оперативная память', data.get('memory_percent'), memory_description(data)) + '</div><section><h3>Диски <span class="count">' + str(len(data.get('disks', []))) + '</span></h3><div class="disks">'
     for disk in data.get('disks', []):
         percent = min(100, number(disk.get('used_percent')))
         content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'
@@ -165,7 +186,7 @@ def dashboard(rows, q='', view='all'):
         data = json.loads(row['data']) if row['data'] else {}
         if any(number(d.get('used_percent')) >= 85 for d in data.get('disks', [])):
             attention += 1
-    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/events">Журнал событий</a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 30 с</span></div>'
+    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/events">Журнал событий</a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     from .overview import compact_card, matches, search_form
     selected = [row for row in rows if matches(row, now, q, view)]

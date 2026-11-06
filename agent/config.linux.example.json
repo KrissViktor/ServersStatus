@@ -1,0 +1,9 @@
+{
+  "server_url": "https://panel.vikserver.ru",
+  "agent_id": "linux-btrx24",
+  "token": "REPLACE_WITH_INDIVIDUAL_AGENT_KEY",
+  "interval_seconds": 10,
+  "auto_monitor_services": true,
+  "services": [],
+  "backups": []
+}

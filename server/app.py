@@ -35,6 +35,13 @@ def db():
         CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, expires REAL);
         CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY, token TEXT);
         CREATE TABLE IF NOT EXISTS reports (agent TEXT, received REAL, data TEXT);
+        CREATE TABLE IF NOT EXISTS latest_reports (agent TEXT PRIMARY KEY, received REAL NOT NULL, data TEXT NOT NULL);
+        CREATE VIEW IF NOT EXISTS current_reports AS
+            SELECT agent,received,data FROM latest_reports
+            UNION ALL
+            SELECT a.id AS agent,r.received,r.data FROM agents a
+            JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1)
+            WHERE NOT EXISTS(SELECT 1 FROM latest_reports l WHERE l.agent=a.id);
         CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
         CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
@@ -69,7 +76,7 @@ def authenticated(request):
 
 def server_rows():
     with db() as c:
-        return [dict(row) for row in c.execute('SELECT a.id, p.display_name, r.received, r.data FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1) ORDER BY a.id').fetchall()]
+        return [dict(row) for row in c.execute('SELECT a.id, p.display_name, r.received, r.data FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id ORDER BY a.id').fetchall()]
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -147,6 +154,10 @@ class SystemInfo(BaseModel):
     processor: str = Field(default='', max_length=255)
     physical_cores: int | None = Field(default=None, ge=1)
     logical_cores: int | None = Field(default=None, ge=1)
+    distribution: str = Field(default='', max_length=255)
+    cpu_current_mhz: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    cpu_max_mhz: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    memory_used_bytes: int | None = Field(default=None, ge=0)
     memory_total_bytes: int = Field(default=0, ge=0)
     memory_available_bytes: int = Field(default=0, ge=0)
 
@@ -220,13 +231,19 @@ async def report(agent_id: str, request: Request):
         current = c.execute('SELECT token FROM agents WHERE id=?', (agent_id,)).fetchone()
         if not current or not hmac.compare_digest(current['token'], agent['token']):
             raise HTTPException(401)
-        c.execute('INSERT INTO reports VALUES (?,?,?)', (agent_id, time.time(), data.model_dump_json()))
-        c.execute('DELETE FROM reports WHERE received<?', (time.time() - 30 * 86400,))
+        received = time.time()
+        encoded = data.model_dump_json()
+        c.execute('INSERT INTO latest_reports VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data', (agent_id,received,encoded))
+        last = c.execute('SELECT received FROM reports WHERE agent=? ORDER BY received DESC LIMIT 1',(agent_id,)).fetchone()
+        if not last or received-last['received'] >= 60:
+            c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded))
+            c.execute('DELETE FROM reports WHERE received<?',(received-30*86400,))
+
         remote = c.execute('SELECT revision, data FROM agent_settings WHERE agent=?', (agent_id,)).fetchone()
         monitoring = {'revision': remote['revision'], 'settings': json.loads(remote['data'])} if remote else {'revision': 0, 'settings': None}
     if monitoring['settings'] is not None and 'auto_services_v1' not in data.features:
         monitoring['settings'].pop('auto_monitor_services', None)
-    return {'ok': True, 'monitoring': monitoring}
+    return {'ok': True, 'monitoring': monitoring, 'report_interval_seconds': 10}
 
 
 @app.get('/health')
@@ -251,7 +268,7 @@ def csrf_token(request):
 
 def agent_rows():
     with db() as c:
-        return c.execute('SELECT a.id, MAX(r.received) AS received FROM agents a LEFT JOIN reports r ON a.id=r.agent GROUP BY a.id ORDER BY a.id').fetchall()
+        return c.execute('SELECT a.id,r.received FROM agents a LEFT JOIN current_reports r ON a.id=r.agent ORDER BY a.id').fetchall()
 
 
 @app.get('/agents', response_class=HTMLResponse)
@@ -313,6 +330,7 @@ async def change_agent(action: str, request: Request):
                 error, status = 'Имя для подтверждения удаления не совпало.', 400
             else:
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
+                c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 record(c,name,'configuration','Агент удалён')
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
@@ -345,7 +363,7 @@ def settings_state(agent_id):
         if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
             raise HTTPException(404, 'Агент не найден')
         remote = c.execute('SELECT revision, data FROM agent_settings WHERE agent=?', (agent_id,)).fetchone()
-        last = c.execute('SELECT data FROM reports WHERE agent=? ORDER BY received DESC LIMIT 1', (agent_id,)).fetchone()
+        last = c.execute('SELECT data FROM current_reports WHERE agent=?', (agent_id,)).fetchone()
     report = json.loads(last['data']) if last else {}
     if remote:
         values = json.loads(remote['data'])

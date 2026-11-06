@@ -21,7 +21,7 @@ def build_summary(connection,start,end,now):
         stats=connection.execute('''SELECT COUNT(*) AS count,AVG(json_extract(data,'$.cpu_percent')) AS cpu,
              MAX(json_extract(data,'$.cpu_percent')) AS cpu_peak,AVG(json_extract(data,'$.memory_percent')) AS ram
              FROM reports WHERE agent=? AND received>=? AND received<?''',(agent,start,end)).fetchone()
-        latest=connection.execute('SELECT data,received FROM reports WHERE agent=? ORDER BY received DESC LIMIT 1',(agent,)).fetchone()
+        latest=connection.execute('SELECT data,received FROM current_reports WHERE agent=?',(agent,)).fetchone()
         lines.append('\n'+(server['display_name'] or agent))
         if stats['count']:
             lines.append(f'За сутки: отчётов {stats["count"]}; CPU ср. {stats["cpu"]:.1f}%, пик {stats["cpu_peak"]:.1f}%; RAM ср. {stats["ram"]:.1f}%.')

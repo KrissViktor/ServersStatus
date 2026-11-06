@@ -1,5 +1,6 @@
 """System inventory and rates sampled over the CPU measurement interval."""
 import platform
+import math
 import socket
 import time
 
@@ -39,7 +40,19 @@ def extended_metrics(before, after):
     system = {'os': platform.system(), 'release': platform.release(), 'version': platform.version(),
               'architecture': platform.machine(), 'processor': platform.processor(),
               'physical_cores': psutil.cpu_count(logical=False), 'logical_cores': psutil.cpu_count(),
-              'memory_total_bytes': memory.total, 'memory_available_bytes': memory.available}
+              'memory_total_bytes': memory.total, 'memory_available_bytes': memory.available,
+              'memory_used_bytes': max(0, memory.total-memory.available)}
+    try:
+        frequency = psutil.cpu_freq()
+        system['cpu_current_mhz'] = frequency.current if frequency and frequency.current > 0 and math.isfinite(frequency.current) else None
+        system['cpu_max_mhz'] = frequency.max if frequency and frequency.max > 0 and math.isfinite(frequency.max) else None
+    except (OSError, NotImplementedError, AttributeError, psutil.Error):
+        system['cpu_current_mhz'] = system['cpu_max_mhz'] = None
+    if platform.system() == 'Linux':
+        try:
+            system['distribution'] = platform.freedesktop_os_release().get('PRETTY_NAME', 'Linux')
+        except OSError:
+            system['distribution'] = 'Linux'
     if platform.system() == 'Windows':
         system['edition'] = platform.win32_edition()
     network_rates = rates(before, after, 'network', {'bytes_recv': 'receive_bytes_per_second', 'bytes_sent': 'send_bytes_per_second'})

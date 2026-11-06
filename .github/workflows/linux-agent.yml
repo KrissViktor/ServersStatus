@@ -1,0 +1,37 @@
+name: Test Linux agent
+on:
+  push:
+    paths: ['agent/**', 'server/**', 'tests/**', 'deploy/serversstatus-linux-agent.service', 'deploy/LINUX.md', '.github/workflows/linux-agent.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Collect live Linux report
+        run: |
+          python - <<'PY'
+          from agent.client import collect
+          from server.app import Report
+          data=collect({}, {})
+          Report.model_validate(data)
+          assert data['system']['os']=='Linux'
+          assert data['system']['memory_used_bytes']>=0
+          assert data['disks']
+          print('Live Linux report validated')
+          PY
+      - name: Package Linux source agent
+        run: |
+          mkdir -p dist
+          tar --exclude='*/__pycache__' --exclude='*.pyc' --exclude='agent/config.json*' --exclude='agent/agent.log*' -czf dist/ServersStatus-Linux.tar.gz agent deploy/serversstatus-linux-agent.service deploy/LINUX.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ServersStatus-Linux-Python311
+          path: dist/ServersStatus-Linux.tar.gz

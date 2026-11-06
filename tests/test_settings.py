@@ -54,3 +54,24 @@ class AgentSettingsTest(unittest.TestCase):
             self.assertEqual(collect.call_args_list[1].args[0]['services'], ['SQL'])
             self.assertEqual(json.loads(path.read_text())['token'], 'keep')
             self.assertEqual(load_cache(str(path) + '.remote.json')['revision'], 55)
+
+    def test_server_interval_overrides_old_minute_config_and_accounts_for_collection(self):
+        from unittest.mock import patch
+        from agent.client import run
+        class Stop:
+            def __init__(self):self.waits=[]
+            def is_set(self):return len(self.waits)>=2
+            def wait(self,delay):self.waits.append(delay)
+        class Response:
+            status=200
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,maximum):
+                return json.dumps({'ok':True,'report_interval_seconds':10}).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'config.json'
+            path.write_text(json.dumps({'server_url':'https://example.com','agent_id':'pc','token':'keep','interval_seconds':60}))
+            stop=Stop()
+            with patch('agent.client.collect',return_value={'hostname':'pc'}),patch('agent.client.urllib.request.urlopen',return_value=Response()),patch('agent.client.time.monotonic',side_effect=[100,102,110,112]):
+                run(path,stop)
+            self.assertEqual(stop.waits,[8,8])

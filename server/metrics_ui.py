@@ -1,4 +1,4 @@
-from .dashboard import esc, size
+from .dashboard import esc, size, cpu_description, memory_description
 
 
 def rate(value):
@@ -8,12 +8,14 @@ def rate(value):
 def extended_sections(data):
     system = data.get('system')
     if not system:
-        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите Windows-агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data)
+        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data)
     facts = [
-        ('Операционная система', ' '.join(str(system.get(k) or '') for k in ('os', 'release', 'edition'))),
+        ('Операционная система', system.get('distribution') or ' '.join(str(system.get(k) or '') for k in ('os', 'release', 'edition'))),
         ('Версия / сборка', system.get('version') or 'Недоступно'),
         ('Архитектура', system.get('architecture') or 'Недоступно'),
         ('Процессор', system.get('processor') or 'Недоступно'),
+        ('Частота CPU', cpu_description(data)),
+        ('RAM: занято / всего', memory_description(data)),
         ('Ядра / потоки', str(system.get('physical_cores') or '—') + ' / ' + str(system.get('logical_cores') or '—')),
         ('RAM: всего / доступно', size(system.get('memory_total_bytes')) + ' / ' + size(system.get('memory_available_bytes')))]
     content = '<section class="extended"><h3>Система</h3><dl class="system-facts">' + ''.join('<div><dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd></div>' for label, value in facts) + '</dl></section><section class="extended"><h3>Сетевые интерфейсы</h3><div class="table-scroll"><table class="metric-table"><thead><tr><th>Интерфейс / IP</th><th>Состояние</th><th>Линк</th><th>Приём</th><th>Передача</th></tr></thead><tbody>'
@@ -27,12 +29,14 @@ def extended_sections(data):
         content += '<tr><td>' + esc(disk['name']) + '</td><td>' + rate(disk.get('read_bytes_per_second')) + '</td><td>' + rate(disk.get('write_bytes_per_second')) + '</td><td>' + ('—' if disk.get('read_iops') is None else f'{disk["read_iops"]:.1f}') + '</td><td>' + ('—' if disk.get('write_iops') is None else f'{disk["write_iops"]:.1f}') + '</td></tr>'
     content += '</tbody></table></div>'
     if not data.get('disk_io'):
-        content += '<p class="muted">Счётчики дисковых операций недоступны в Windows.</p>'
-    content += '<p class="muted legend">IOPS — операций в секунду. Скорости измерены за ' + esc(f'{data.get("sample_seconds") or 0:.1f}') + ' с перед отправкой отчёта, а не за весь интервал между отчётами. Устройства указаны по именам Windows; соответствие буквам дисков не определялось.</p></section>'
+        content += '<p class="muted">Счётчики дисковых операций недоступны в ОС.</p>'
+    content += '<p class="muted legend">IOPS — операций в секунду. Скорости измерены за ' + esc(f'{data.get("sample_seconds") or 0:.1f}') + ' с перед отправкой отчёта, а не за весь интервал между отчётами. Устройства указаны по именам ОС; соответствие буквам дисков не определялось.</p></section>'
     return content + rdp_section(data)
 
 
 def rdp_section(data):
+    if (data.get('system') or {}).get('os') == 'Linux':
+        return ''
     rdp = data.get('rdp')
     content = '<section class="extended"><h3>Пользователи RDP</h3>'
     if not rdp:

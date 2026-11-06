@@ -92,5 +92,5 @@
   });
   view.addEventListener('change', () => search(false));
   form.addEventListener('submit', event => { event.preventDefault(); search(false); });
-  setInterval(() => search(true), 30000);
+  setInterval(() => search(true), 10000);
 })();
