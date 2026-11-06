@@ -9,6 +9,7 @@ import time
 import urllib.request
 
 import psutil
+from agent.backups import inspect_backup
 
 
 def collect(config, previous):
@@ -19,24 +20,7 @@ def collect(config, previous):
             disks.append({'path': partition.mountpoint, 'free_bytes': usage.free, 'total_bytes': usage.total, 'used_percent': usage.percent})
         except OSError:
             continue
-    backups = []
-    now = time.time()
-    for item in config.get('backups', []):
-        folder = item['path']
-        try:
-            files = [(p, p.stat()) for p in Path(folder).glob(item.get('pattern', '*.bak')) if p.is_file()]
-            if not files:
-                backups.append({'path': folder, 'state': 'missing'})
-                continue
-            path, stat = max(files, key=lambda pair: pair[1].st_mtime)
-            key = str(path)
-            signature = (stat.st_size, stat.st_mtime_ns)
-            stable = previous.get(key) == signature
-            previous[key] = signature
-            state = 'observing' if not stable else ('stale' if now - stat.st_mtime > item.get('max_age_hours', 24) * 3600 else 'fresh')
-            backups.append({'path': folder, 'file': path.name, 'size_bytes': stat.st_size, 'age_seconds': max(0, int(now - stat.st_mtime)), 'state': state})
-        except OSError as error:
-            backups.append({'path': folder, 'state': 'error', 'error': type(error).__name__})
+    backups = [inspect_backup(item, previous) for item in config.get('backups', [])]
     services = []
     if os.name == 'nt':
         for name in config.get('services', []):
@@ -48,7 +32,7 @@ def collect(config, previous):
 
 
 def run(config_path, stop=None):
-    config = json.loads(Path(config_path).read_text(encoding='utf-8'))
+    config = json.loads(Path(config_path).read_text(encoding='utf-8-sig'))
     if not config['server_url'].startswith('https://'):
         raise ValueError('server_url должен использовать HTTPS')
     previous = {}

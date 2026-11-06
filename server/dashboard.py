@@ -90,9 +90,12 @@ def server_card(row, now):
         content += '<p class="empty small">Папки бэкапов не настроены</p>'
     for backup in backups:
         state = backup.get('state', 'error')
-        labels = {'fresh': 'Свежий файл', 'stale': 'Просрочен', 'observing': 'Проверяем стабильность', 'missing': 'Файл не найден', 'error': 'Ошибка чтения'}
-        color = 'normal' if state == 'fresh' else 'danger' if state in ('stale', 'missing', 'error') else 'warning'
-        content += f'<div class="backup"><div class="list-row"><b>{esc(backup.get("path", "—"))}</b><span class="badge {color}">{esc(labels.get(state, state))}</span></div>'
+        labels = {'fresh': 'Свежий файл', 'stale': 'Просрочен', 'observing': 'Проверяем стабильность', 'missing': 'Файл не найден', 'error': 'Ошибка чтения', 'future': 'Дата из будущего', 'empty': 'Пустой файл'}
+        color = 'normal' if state == 'fresh' else 'danger' if state in ('stale', 'missing', 'error', 'future', 'empty') else 'warning'
+        content += f'<div class="backup"><div class="list-row"><b>{esc(backup.get("name") or backup.get("path", "—"))}</b><span class="badge {color}">{esc(labels.get(state, state))}</span></div>'
+        content += f'<p>{esc(backup.get("path", ""))}</p>'
+        if backup.get('expected_since'):
+            content += f'<p>Ожидается копия за 1-е число месяца от {esc(backup["expected_since"])}</p>'
         if backup.get('file'):
             content += f'<p>{esc(backup["file"])} · {size(backup.get("size_bytes"))} · {duration(backup.get("age_seconds"))} назад</p>'
         content += '</div>'

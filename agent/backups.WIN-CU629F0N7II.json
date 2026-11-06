@@ -1,0 +1,36 @@
+[
+  {
+    "name": "ERP · ежедневная",
+    "path": "D:\\backup\\erp\\daily",
+    "pattern": "ERP_backup_*.bak",
+    "schedule": "daily",
+    "date_from_filename": true,
+    "max_age_hours": 26
+  },
+  {
+    "name": "ERP · ежемесячная",
+    "path": "D:\\backup\\erp\\monthly",
+    "pattern": "ERP_backup_*.bak",
+    "schedule": "monthly",
+    "date_from_filename": true,
+    "recursive": true,
+    "grace_hours": 36
+  },
+  {
+    "name": "Бух ERP · ежедневная",
+    "path": "D:\\backup\\erp_buh\\daily",
+    "pattern": "ERP_INTEK_backup_*.bak",
+    "schedule": "daily",
+    "date_from_filename": true,
+    "max_age_hours": 26
+  },
+  {
+    "name": "Бух ERP · ежемесячная",
+    "path": "D:\\backup\\erp_buh\\monthly",
+    "pattern": "ERP_INTEK_backup_*.bak",
+    "schedule": "monthly",
+    "date_from_filename": true,
+    "recursive": true,
+    "grace_hours": 36
+  }
+]
