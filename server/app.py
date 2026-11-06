@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
 from .agents_ui import agents_page
+from .history import PERIODS, load_history, history_page
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 app = FastAPI(title='ServersStatus')
@@ -147,7 +148,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith('/agents'):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -223,3 +224,19 @@ async def change_agent(action: str, request: Request):
     if action == 'delete' and not error:
         return RedirectResponse('/agents', status_code=303)
     return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name), status_code=status)
+
+
+@app.get('/history/{agent_id}', response_class=HTMLResponse)
+def agent_history(agent_id: str, request: Request, period: str = '24h'):
+    if not authenticated(request):
+        return RedirectResponse('/', status_code=303)
+    if period not in PERIODS:
+        raise HTTPException(400, 'Неизвестный период')
+    _, seconds, bucket = PERIODS[period]
+    end = time.time()
+    start = end - seconds
+    with db() as c:
+        if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
+            raise HTTPException(404, 'Агент не найден')
+        points = load_history(c, agent_id, start, end, bucket)
+    return HTMLResponse(history_page(agent_id, points, period, start, end))

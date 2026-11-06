@@ -3,6 +3,7 @@ import html
 import json
 import math
 import time
+from urllib.parse import quote
 from pathlib import Path
 
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')
@@ -65,6 +66,7 @@ def server_card(row, now):
     badge = 'normal' if online else 'danger' if age is not None else 'neutral'
     hostname = data.get('hostname') or row['id']
     content = f'<article class="server"><header class="server-head"><div><p class="eyebrow">WINDOWS · АГЕНТ {esc(row["id"])}</p><h2>{esc(hostname)}</h2></div><span class="badge {badge}">● {state}</span></header>'
+    content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История CPU / RAM →</a></p>'
     if age is None:
         return content + '<div class="empty">Ожидаем первый отчёт агента</div></article>'
     content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'

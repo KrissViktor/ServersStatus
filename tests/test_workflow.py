@@ -106,3 +106,43 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(self.client.post('/api/report/new', json=payload, headers=new_headers).status_code, 401)
         with module.db() as c:
             self.assertEqual(c.execute('SELECT count(*) FROM reports WHERE agent=?', ('new',)).fetchone()[0], 0)
+
+    def test_history_isolation_aggregation_and_gaps(self):
+        from server.history import load_history, chart
+        samples = [(1000, 10, 30), (1020, 30, 50), (1300, 90, 70)]
+        with module.db() as c:
+            for timestamp, cpu, ram in samples:
+                c.execute('INSERT INTO reports VALUES (?,?,?)', ('pc', timestamp, json.dumps({'cpu_percent': cpu, 'memory_percent': ram})))
+            c.execute('INSERT INTO reports VALUES (?,?,?)', ('other', 1010, json.dumps({'cpu_percent': 100, 'memory_percent': 100})))
+            c.execute('INSERT INTO reports VALUES (?,?,?)', ('pc', 500, json.dumps({'cpu_percent': 100, 'memory_percent': 100})))
+            points = load_history(c, 'pc', 900, 1400, 300)
+        self.assertEqual(len(points), 2)
+        self.assertEqual(points[0]['cpu'], 20)
+        self.assertEqual(points[0]['ram'], 40)
+        self.assertEqual(points[0]['cpu_peak'], 30)
+        self.assertEqual(points[0]['samples'], 2)
+        self.assertEqual(points[1]['has_gap'], 1)
+        graph = chart(points, 'cpu', 'CPU', 900, 1400, '#4adeab')
+        self.assertEqual(graph.count('<circle '), 2)
+        self.assertNotIn('stroke-width="2"', graph)  # No line bridging missing reports.
+        self.assertIn('пик 90.0%', graph)
+
+    def test_history_routes(self):
+        self.assertEqual(self.client.get('/history/pc', follow_redirects=False).status_code, 303)
+        self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'})
+        self.assertEqual(self.client.get('/history/pc?period=invalid').status_code, 400)
+        self.assertEqual(self.client.get('/history/missing').status_code, 404)
+        empty = self.client.get('/history/pc')
+        self.assertIn('За выбранный период отчётов нет', empty.text)
+        self.assertEqual(empty.headers['cache-control'], 'no-store')
+        import time
+        payload = {'cpu_percent': 6.8, 'memory_percent': 50.4}
+        with module.db() as c:
+            c.execute('INSERT INTO reports VALUES (?,?,?)', ('pc', time.time(), json.dumps(payload)))
+        for period in ('1h', '6h', '24h', '7d', '30d'):
+            result = self.client.get('/history/pc?period=' + period)
+            self.assertEqual(result.status_code, 200)
+            self.assertIn('6.8%', result.text)
+            self.assertIn('50.4%', result.text)
+            self.assertEqual(result.text.count('<svg '), 2)
+            self.assertIn('МСК', result.text)
