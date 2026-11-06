@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import messagebox
 from urllib.parse import urlsplit, quote
 import urllib.request
+from agent.updater import update_service
 
 ROOT = Path(os.environ.get('ProgramFiles', r'C:\Program Files')) / 'ServersStatus'
 DATA = Path(os.environ.get('ProgramData', r'C:\ProgramData')) / 'ServersStatus'
@@ -43,7 +44,7 @@ def install():
         command('icacls', str(DATA), '/inheritance:r', '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F')
         query = command('sc.exe', 'query', 'ServersStatusAgent', check=False)
         if query.returncode == 0:
-            raise ValueError('Служба уже установлена. Для обновления сначала остановите и удалите её по инструкции README. Текущие настройки сохранены.')
+            raise ValueError('Служба уже установлена. Нажмите «Обновить установленный агент». Имя и ключ повторно вводить не нужно.')
         config_path = DATA / 'config.json'
         config = json.loads(config_path.read_text(encoding='utf-8-sig')) if config_path.exists() else {}
         config.update(server_url=url.rstrip('/'), agent_id=name, token=key)
@@ -69,10 +70,28 @@ def install():
         button.config(state='normal')
 
 
+def update():
+    button.config(state='disabled')
+    update_button.config(state='disabled')
+    status.set('Обновление агента. Ожидайте остановки и запуска службы…')
+    window.update()
+    try:
+        update_service(command, ROOT, Path(sys._MEIPASS) / 'ServersStatusService.exe')
+        status.set('Агент обновлён. Настройки и ключ сохранены.')
+        messagebox.showinfo('ServersStatus', 'Агент обновлён. Ключ, имя и правила бэкапов не изменены. Проверьте панель через 1–2 минуты.')
+    except Exception as error:
+        detail = error.stderr if isinstance(error, subprocess.CalledProcessError) else str(error)
+        status.set('Обновление не завершено')
+        messagebox.showerror('ServersStatus', detail)
+    finally:
+        button.config(state='normal')
+        update_button.config(state='normal')
+
+
 if __name__ == '__main__':
     window = tk.Tk()
     window.title('Установка ServersStatus Agent')
-    window.geometry('610x300')
+    window.geometry('650x410')
     entries = []
     for index, (label, default) in enumerate([('Адрес панели', 'https://panel.vikserver.ru'), ('Имя агента', ''), ('Ключ агента', '')]):
         tk.Label(window, text=label).grid(row=index, column=0, padx=12, pady=12, sticky='w')
@@ -82,6 +101,9 @@ if __name__ == '__main__':
         entries.append(entry)
     button = tk.Button(window, text='Проверить подключение и установить', command=install)
     button.grid(row=3, column=0, columnspan=2, pady=15)
-    status = tk.StringVar(value='Потребуются права администратора Windows.')
-    tk.Label(window, textvariable=status, wraplength=570).grid(row=4, column=0, columnspan=2)
+    update_button = tk.Button(window, text='Обновить установленный агент', command=update)
+    update_button.grid(row=4, column=0, columnspan=2, pady=8)
+    tk.Label(window, text='Для обновления имя и ключ вводить не нужно. Настройки сохраняются.', wraplength=600).grid(row=5, column=0, columnspan=2)
+    status = tk.StringVar(value='Универсальный установщик для всех компьютеров. Нужны права администратора.')
+    tk.Label(window, textvariable=status, wraplength=570).grid(row=6, column=0, columnspan=2)
     window.mainloop()

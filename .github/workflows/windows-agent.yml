@@ -20,6 +20,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_backups.py -v
       - name: Test extended metrics
         run: python -m unittest discover -s tests -p test_metrics.py -v
+      - name: Test universal updater
+        run: python -m unittest discover -s tests -p test_updater.py -v
       - name: Build standalone service
         run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --hidden-import win32timezone --paths . agent/windows_service.py
       - name: Test frozen service registration and startup
@@ -42,7 +44,7 @@ jobs:
             & dist/ServersStatusService.exe remove
           }
       - name: Build graphical installer
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin --name ServersStatusSetup --add-binary "dist/ServersStatusService.exe;." agent/installer.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin --name ServersStatusSetup --paths . --add-binary "dist/ServersStatusService.exe;." agent/installer.py
       - name: Checksums
         shell: pwsh
         run: |
@@ -56,8 +58,14 @@ jobs:
           path: |
             dist/ServersStatusSetup.exe
             dist/ServersStatusService.exe
-            dist/backups.WIN-CU629F0N7II.json
-            dist/Update-BackupAgent.ps1
             dist/Update-Agent.ps1
             dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Backup-rules-WIN-CU629F0N7II
+          path: |
+            dist/backups.WIN-CU629F0N7II.json
+            dist/Update-BackupAgent.ps1
           if-no-files-found: error
