@@ -5,3 +5,4 @@ __pycache__/
 .env
 agent/config.json
 .pytest_cache/
+*.remote.json*

@@ -13,6 +13,8 @@ def inspect_backup(item, previous, now=None):
     now = time.time() if now is None else now
     folder = item['path']
     result = {'path': folder, 'name': item.get('name', folder), 'schedule': item.get('schedule', 'daily'), 'min_size_bytes': item.get('min_size_bytes', 1024**3)}
+    for key, default in [('pattern', '*.bak'), ('recursive', False), ('date_from_filename', False), ('max_age_hours', 30), ('grace_hours', 36)]:
+        result[key] = item.get(key, default)
     try:
         # scandir raises on a missing/inaccessible root; do not call it "no files".
         with os.scandir(folder):

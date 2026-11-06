@@ -11,6 +11,7 @@ import urllib.request
 import psutil
 from agent.backups import inspect_backup
 from agent.metrics import counters, extended_metrics
+from agent.settings import load_cache, save_cache, effective_config
 
 
 def collect(config, previous):
@@ -41,15 +42,24 @@ def run(config_path, stop=None):
     if not config['server_url'].startswith('https://'):
         raise ValueError('server_url должен использовать HTTPS')
     previous = {}
+    cache_path = Path(str(config_path) + '.remote.json')
+    cached = load_cache(cache_path)
     while stop is None or not stop.is_set():
         try:
-            report = collect(config, previous)
+            report = collect(effective_config(config, cached), previous)
+            report['monitoring_revision'] = cached['revision']
             from urllib.parse import quote
             url = config['server_url'].rstrip('/') + '/api/report/' + quote(config['agent_id'], safe='')
             request = urllib.request.Request(url, data=json.dumps(report).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'}, method='POST')
             with urllib.request.urlopen(request, timeout=30) as response:
                 if response.status != 200:
                     raise RuntimeError('Сервер отклонил отчёт')
+                reply = json.loads(response.read(65537))
+                if 'monitoring' in reply:
+                    updated = reply['monitoring']
+                    if updated != cached:
+                        cached = save_cache(cache_path, updated)
+                        previous.clear()
         except Exception:
             logging.error('Не удалось собрать или отправить отчёт; повтор в следующем цикле')
         interval = max(15, int(config.get('interval_seconds', 60)))

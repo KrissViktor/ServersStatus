@@ -185,3 +185,49 @@ class WorkflowTest(unittest.TestCase):
         self.assertNotIn('<Ethernet>', content)
         payload['network'][0]['receive_bytes_per_second'] = -1
         self.assertEqual(self.client.post('/api/report/pc', json=payload, headers=headers).status_code, 422)
+
+    def test_web_monitoring_configuration_delivery_and_reset(self):
+        import re
+        self.assertEqual(self.client.get('/settings/pc', follow_redirects=False).status_code, 303)
+        self.assertEqual(self.client.post('/settings/pc', data={}).status_code, 401)
+        self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'})
+        form_page = self.client.get('/settings/pc')
+        csrf = re.search(r'name="csrf" value="([^"]+)"', form_page.text).group(1)
+        self.assertEqual(self.client.post('/settings/pc', data={'mode': 'save'}).status_code, 403)
+        form = {'csrf': csrf, 'mode': 'save', 'services': 'MSSQLSERVER\nSpooler\nMSSQLSERVER',
+                'name_0': 'ERP', 'path_0': r'D:\backup\daily', 'pattern_0': 'ERP_backup_*.bak',
+                'schedule_0': 'daily', 'date_from_filename_0': 'yes',
+                'max_age_hours_0': '30', 'grace_hours_0': '36', 'min_size_gb_0': '1.5'}
+        saved = self.client.post('/settings/pc', data=form)
+        self.assertEqual(saved.status_code, 200)
+        self.assertIn('Ожидает получения агентом', saved.text)
+        headers = {'Authorization': 'Bearer agent-secret'}
+        payload = {'hostname': 'pc', 'cpu_percent': 1, 'memory_percent': 1, 'uptime_seconds': 1, 'disks': [], 'monitoring_revision': 0}
+        reply = self.client.post('/api/report/pc', json=payload, headers=headers).json()
+        remote = reply['monitoring']
+        self.assertGreater(remote['revision'], 0)
+        self.assertEqual(remote['settings']['services'], ['MSSQLSERVER', 'Spooler'])
+        self.assertEqual(remote['settings']['backups'][0]['min_size_bytes'], int(1.5*1024**3))
+        from agent.settings import validate_remote
+        self.assertEqual(validate_remote(remote), remote)
+        payload['monitoring_revision'] = remote['revision']
+        self.client.post('/api/report/pc', json=payload, headers=headers)
+        self.assertIn('Применено агентом', self.client.get('/settings/pc').text)
+        self.assertEqual(self.client.post('/settings/pc', data=dict(form, min_size_gb_0='nan')).status_code, 400)
+        self.assertEqual(self.client.post('/settings/pc', data=dict(form, max_age_hours_0='-1')).status_code, 400)
+        self.assertEqual(self.client.post('/settings/pc', data={'csrf': csrf, 'mode': 'local'}).status_code, 400)
+        self.assertEqual(self.client.post('/settings/pc', data={'csrf': csrf, 'mode': 'local', 'confirm_local': 'yes'}).status_code, 200)
+        reply = self.client.post('/api/report/pc', json=payload, headers=headers).json()
+        self.assertEqual(reply['monitoring'], {'revision': 0, 'settings': None})
+        self.assertEqual(self.client.get('/settings/unknown').status_code, 404)
+
+    def test_backup_alerts_follow_custom_monitoring_thresholds(self):
+        from server.dashboard import backup_problems
+        backup = {'state': 'fresh', 'schedule': 'daily', 'file': 'copy.bak',
+                  'age_seconds': 25 * 3600, 'size_bytes': int(1.5 * 1024**3),
+                  'max_age_hours': 24, 'min_size_bytes': 2*1024**3}
+        problems = backup_problems(backup)
+        self.assertTrue(any('24 часов' in problem for problem in problems))
+        self.assertTrue(any('меньше 2 Гб' in problem for problem in problems))
+        backup.update(max_age_hours=48, min_size_bytes=1024**3)
+        self.assertEqual(backup_problems(backup), [])

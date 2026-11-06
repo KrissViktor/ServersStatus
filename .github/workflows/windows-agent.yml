@@ -22,6 +22,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_metrics.py -v
       - name: Test universal updater
         run: python -m unittest discover -s tests -p test_updater.py -v
+      - name: Test remote monitoring settings
+        run: python -m unittest discover -s tests -p test_settings.py -v
       - name: Build standalone service
         run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --hidden-import win32timezone --paths . agent/windows_service.py
       - name: Test frozen service registration and startup

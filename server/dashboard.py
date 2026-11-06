@@ -62,16 +62,18 @@ def backup_problems(backup, elapsed=0):
     """Evaluate latest report on every refresh, including time without contact."""
     state = backup.get('state', 'error')
     daily = backup.get('schedule', 'daily') == 'daily'
+    limit_hours = number(backup.get('max_age_hours', 30))
+    minimum = number(backup.get('min_size_bytes', 1024**3))
     age = number(backup.get('age_seconds')) + max(0, elapsed)
     problems = []
     if state == 'missing':
         problems.append('Бэкапы не делаются: файлы копий не найдены')
-    elif daily and backup.get('file') and age > 30 * 3600:
-        problems.append('Бэкапы не делаются: ежедневная копия старше 30 часов (' + duration(age) + ')')
+    elif daily and backup.get('file') and age > limit_hours * 3600:
+        problems.append(f'Бэкапы не делаются: ежедневная копия старше {limit_hours:g} часов (' + duration(age) + ')')
     elif state == 'stale' and not daily:
         problems.append('Нет актуальной ежемесячной копии')
-    if backup.get('file') and number(backup.get('size_bytes')) < 1024**3:
-        problems.append('Ошибка бэкапа: размер файла меньше 1 Гб (' + size(backup.get('size_bytes')) + ')')
+    if backup.get('file') and number(backup.get('size_bytes')) < minimum:
+        problems.append(f'Ошибка бэкапа: размер файла меньше {minimum / 1024**3:g} Гб (' + size(backup.get('size_bytes')) + ')')
     if state == 'error':
         problems.append('Не удаётся проверить бэкапы: папка недоступна или ошибка чтения')
     if state == 'future':

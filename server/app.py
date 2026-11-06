@@ -1,3 +1,4 @@
+import json
 import hashlib
 import hmac
 import os
@@ -13,6 +14,8 @@ from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
 from .agents_ui import agents_page
 from .history import PERIODS, load_history, history_page
+from .configuration import MonitoringSettings
+from .settings_ui import settings_page
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 app = FastAPI(title='ServersStatus')
@@ -29,6 +32,7 @@ def db():
         CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY, token TEXT);
         CREATE TABLE IF NOT EXISTS reports (agent TEXT, received REAL, data TEXT);
         CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
+        CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
         yield connection
@@ -134,6 +138,7 @@ class DiskIO(BaseModel):
 
 
 class Report(BaseModel):
+    monitoring_revision: int | None = Field(default=None, ge=0)
     system: SystemInfo | None = None
     network: list[NetworkInfo] = Field(default_factory=list, max_length=100)
     disk_io: list[DiskIO] = Field(default_factory=list, max_length=100)
@@ -169,7 +174,9 @@ async def report(agent_id: str, request: Request):
             raise HTTPException(401)
         c.execute('INSERT INTO reports VALUES (?,?,?)', (agent_id, time.time(), data.model_dump_json()))
         c.execute('DELETE FROM reports WHERE received<?', (time.time() - 30 * 86400,))
-    return {'ok': True}
+        remote = c.execute('SELECT revision, data FROM agent_settings WHERE agent=?', (agent_id,)).fetchone()
+        monitoring = {'revision': remote['revision'], 'settings': json.loads(remote['data'])} if remote else {'revision': 0, 'settings': None}
+    return {'ok': True, 'monitoring': monitoring}
 
 
 @app.get('/health')
@@ -182,7 +189,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -255,6 +262,7 @@ async def change_agent(action: str, request: Request):
             else:
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
+                c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
     if action == 'delete' and not error:
         return RedirectResponse('/agents', status_code=303)
     return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name), status_code=status)
@@ -274,3 +282,106 @@ def agent_history(agent_id: str, request: Request, period: str = '24h'):
             raise HTTPException(404, 'Агент не найден')
         points = load_history(c, agent_id, start, end, bucket)
     return HTMLResponse(history_page(agent_id, points, period, start, end))
+
+
+def settings_state(agent_id):
+    with db() as c:
+        if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
+            raise HTTPException(404, 'Агент не найден')
+        remote = c.execute('SELECT revision, data FROM agent_settings WHERE agent=?', (agent_id,)).fetchone()
+        last = c.execute('SELECT data FROM reports WHERE agent=? ORDER BY received DESC LIMIT 1', (agent_id,)).fetchone()
+    report = json.loads(last['data']) if last else {}
+    if remote:
+        values = json.loads(remote['data'])
+    else:
+        # Seed the form from the latest observed rules, without changing the agent.
+        rules = []
+        for backup in report.get('backups', []):
+            path = backup.get('path', '')
+            if not path:
+                continue
+            schedule = backup.get('schedule', 'daily')
+            filename = backup.get('file', '')
+            pattern = filename.split('_backup_')[0] + '_backup_*.bak' if '_backup_' in filename else '*.bak'
+            rules.append({'name': backup.get('name') or path, 'path': path,
+                          'pattern': backup.get('pattern', pattern), 'schedule': schedule,
+                          'recursive': backup.get('recursive', schedule == 'monthly'),
+                          'date_from_filename': backup.get('date_from_filename', not filename or '_backup_' in filename),
+                          'min_size_bytes': backup.get('min_size_bytes', 1024**3),
+                          'max_age_hours': backup.get('max_age_hours', 30),
+                          'grace_hours': backup.get('grace_hours', 36)})
+        values = {'backups': rules[:20], 'services': [s['name'] for s in report.get('services', []) if s.get('name')]}
+    return values, remote['revision'] if remote else 0, report.get('monitoring_revision')
+
+
+@app.get('/settings/{agent_id}', response_class=HTMLResponse)
+def monitoring_form(agent_id: str, request: Request):
+    if not authenticated(request):
+        return RedirectResponse('/', status_code=303)
+    values, revision, applied = settings_state(agent_id)
+    return HTMLResponse(settings_page(agent_id, values, csrf_token(request), revision, applied))
+
+
+@app.post('/settings/{agent_id}', response_class=HTMLResponse)
+async def monitoring_save(agent_id: str, request: Request):
+    from urllib.parse import parse_qs
+    from pydantic import ValidationError
+    if not authenticated(request):
+        raise HTTPException(401)
+    values, revision, applied = settings_state(agent_id)
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 64000:
+            raise HTTPException(413)
+    try:
+        form = parse_qs(body.decode())
+    except UnicodeDecodeError:
+        raise HTTPException(400)
+    def value(key, default=''):
+        return form.get(key, [default])[0]
+    if not hmac.compare_digest(value('csrf').encode(), csrf_token(request).encode()):
+        raise HTTPException(403)
+    error = ''
+    try:
+        if value('mode') == 'local':
+            if value('confirm_local') != 'yes':
+                raise ValueError('Подтвердите возврат к локальному файлу.')
+            with db() as c:
+                c.execute('DELETE FROM agent_settings WHERE agent=?', (agent_id,))
+            values, revision, applied = settings_state(agent_id)
+        elif value('mode') == 'save':
+            indices = sorted({int(key[5:]) for key in form if re.fullmatch(r'path_[0-9]{1,6}', key)})
+            if len(indices) > 20:
+                raise ValueError('Допустимо не более 20 правил.')
+            rules = []
+            for i in indices:
+                path = value(f'path_{i}').strip()
+                if not path:
+                    continue
+                minimum = float(value(f'min_size_gb_{i}', '1'))
+                if not 0 <= minimum <= 1048576:
+                    raise ValueError('Некорректный минимальный размер.')
+                rules.append({'name': value(f'name_{i}').strip() or path,
+                              'path': path, 'pattern': value(f'pattern_{i}', '*.bak').strip(),
+                              'schedule': value(f'schedule_{i}', 'daily'),
+                              'recursive': value(f'recursive_{i}') == 'yes',
+                              'date_from_filename': value(f'date_from_filename_{i}') == 'yes',
+                              'max_age_hours': float(value(f'max_age_hours_{i}', '30')),
+                              'grace_hours': float(value(f'grace_hours_{i}', '36')),
+                              'min_size_bytes': round(minimum * 1024**3)})
+            services = list(dict.fromkeys(s.strip() for s in value('services').splitlines() if s.strip()))
+            if any(len(s) > 255 for s in services):
+                raise ValueError('Имя службы слишком длинное.')
+            values = MonitoringSettings(backups=rules, services=services).model_dump()
+            revision = time.time_ns()
+            with db() as c:
+                c.execute('BEGIN IMMEDIATE')
+                if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
+                    raise HTTPException(404)
+                c.execute('INSERT INTO agent_settings VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET revision=excluded.revision, data=excluded.data', (agent_id, revision, json.dumps(values, ensure_ascii=False)))
+        else:
+            raise ValueError('Неизвестное действие.')
+    except (ValueError, OverflowError, ValidationError):
+        error = 'Настройки не сохранены. Проверьте расписание, размеры и числовые пороги (возраст 1–8760 ч, ожидание 0–672 ч).'
+    return HTMLResponse(settings_page(agent_id, values, csrf_token(request), revision, applied, error, not error), status_code=400 if error else 200)
