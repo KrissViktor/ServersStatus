@@ -10,6 +10,7 @@ import urllib.request
 
 import psutil
 from agent.backups import inspect_backup
+from agent.metrics import counters, extended_metrics
 
 
 def collect(config, previous):
@@ -17,7 +18,7 @@ def collect(config, previous):
     for partition in psutil.disk_partitions():
         try:
             usage = psutil.disk_usage(partition.mountpoint)
-            disks.append({'path': partition.mountpoint, 'free_bytes': usage.free, 'total_bytes': usage.total, 'used_percent': usage.percent})
+            disks.append({'path': partition.mountpoint, 'filesystem': partition.fstype, 'device': partition.device, 'free_bytes': usage.free, 'total_bytes': usage.total, 'used_percent': usage.percent})
         except OSError:
             continue
     backups = [inspect_backup(item, previous) for item in config.get('backups', [])]
@@ -28,7 +29,11 @@ def collect(config, previous):
                 services.append({'name': name, 'status': psutil.win_service_get(name).status()})
             except (psutil.Error, OSError):
                 services.append({'name': name, 'status': 'unavailable'})
-    return {'hostname': socket.gethostname(), 'cpu_percent': psutil.cpu_percent(interval=1), 'memory_percent': psutil.virtual_memory().percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
+    before = counters()
+    cpu = psutil.cpu_percent(interval=1)
+    after = counters()
+    extra = extended_metrics(before, after)
+    return {**extra, 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': psutil.virtual_memory().percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
 
 
 def run(config_path, stop=None):

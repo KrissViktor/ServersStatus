@@ -112,7 +112,7 @@ def server_card(row, now):
     content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), 'Загрузка CPU') + meter('Оперативная память', data.get('memory_percent'), 'Использование RAM') + '</div><section><h3>Диски <span class="count">' + str(len(data.get('disks', []))) + '</span></h3><div class="disks">'
     for disk in data.get('disks', []):
         percent = min(100, number(disk.get('used_percent')))
-        content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'
+        content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'
     content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section><div class="secondary"><section><h3>Службы</h3>'
     services = data.get('services', [])
     if not services:
@@ -145,7 +145,8 @@ def server_card(row, now):
         content += '</div>'
     if backups:
         content += '<p class="muted legend">Свежесть файла не подтверждает возможность восстановления SQL.</p>'
-    content += '</section></div><details><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
+    from .metrics_ui import extended_sections
+    content += '</section></div>' + extended_sections(data) + '<details><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
     return content
 
 

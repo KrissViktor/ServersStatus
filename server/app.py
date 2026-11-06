@@ -103,7 +103,41 @@ def logout(request: Request):
     return response
 
 
+class SystemInfo(BaseModel):
+    os: str = Field(default='', max_length=100)
+    release: str = Field(default='', max_length=100)
+    version: str = Field(default='', max_length=200)
+    edition: str = Field(default='', max_length=200)
+    architecture: str = Field(default='', max_length=100)
+    processor: str = Field(default='', max_length=255)
+    physical_cores: int | None = Field(default=None, ge=1)
+    logical_cores: int | None = Field(default=None, ge=1)
+    memory_total_bytes: int = Field(default=0, ge=0)
+    memory_available_bytes: int = Field(default=0, ge=0)
+
+
+class NetworkInfo(BaseModel):
+    name: str = Field(max_length=255)
+    is_up: bool
+    speed_mbps: int = Field(default=0, ge=0)
+    addresses: list[str] = Field(default_factory=list, max_length=20)
+    receive_bytes_per_second: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    send_bytes_per_second: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
+class DiskIO(BaseModel):
+    name: str = Field(max_length=255)
+    read_bytes_per_second: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    write_bytes_per_second: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    read_iops: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    write_iops: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
 class Report(BaseModel):
+    system: SystemInfo | None = None
+    network: list[NetworkInfo] = Field(default_factory=list, max_length=100)
+    disk_io: list[DiskIO] = Field(default_factory=list, max_length=100)
+    sample_seconds: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     hostname: str = Field(max_length=255)
     cpu_percent: float = Field(ge=0, le=100)
     memory_percent: float = Field(ge=0, le=100)

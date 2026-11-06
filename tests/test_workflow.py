@@ -166,3 +166,22 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('старше 30 часов', content)
         self.assertIn('Нет связи с агентом', content)
         self.assertLess(content.index('role="alert"'), content.index('<div class="stats">'))
+
+    def test_extended_report_roundtrip(self):
+        payload = {'hostname': 'windows', 'cpu_percent': 10, 'memory_percent': 20,
+                   'uptime_seconds': 1, 'disks': [], 'sample_seconds': 1.1,
+                   'system': {'os': 'Windows', 'version': '10.0.17763', 'release': 'Server 2019',
+                              'edition': 'ServerStandard', 'memory_total_bytes': 16*1024**3},
+                   'network': [{'name': '<Ethernet>', 'is_up': True, 'addresses': ['192.168.1.10'],
+                                'speed_mbps': 1000, 'receive_bytes_per_second': 1024**2}],
+                   'disk_io': [{'name': 'PhysicalDrive0', 'read_bytes_per_second': 2*1024**2, 'read_iops': 12}]}
+        headers = {'Authorization': 'Bearer agent-secret'}
+        self.assertEqual(self.client.post('/api/report/pc', json=payload, headers=headers).status_code, 200)
+        self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'})
+        content = self.client.get('/').text
+        for text in ('ServerStandard', '10.0.17763', '192.168.1.10', '1.0 МиБ/с', 'PhysicalDrive0'):
+            self.assertIn(text, content)
+        self.assertIn('&lt;Ethernet&gt;', content)
+        self.assertNotIn('<Ethernet>', content)
+        payload['network'][0]['receive_bytes_per_second'] = -1
+        self.assertEqual(self.client.post('/api/report/pc', json=payload, headers=headers).status_code, 422)
