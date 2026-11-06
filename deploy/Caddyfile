@@ -1,9 +1,29 @@
+{
+    servers {
+        max_header_size 16KB
+        timeouts {
+            read_header 5s
+            read_body 15s
+            write 30s
+            idle 30s
+        }
+    }
+}
+
 # Replace with a domain whose DNS A record points to your home IP.
 status.example.com {
     request_body {
         max_size 64KB
     }
-    reverse_proxy 127.0.0.1:8000
+    @scanners path /.env /.git/* /wp-login.php /wp-admin/* /phpmyadmin/*
+    respond @scanners 404
+    reverse_proxy 127.0.0.1:8000 {
+        header_up X-Status-Client-IP {remote_host}
+        transport http {
+            dial_timeout 3s
+            response_header_timeout 15s
+        }
+    }
     header {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY

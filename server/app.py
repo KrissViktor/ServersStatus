@@ -1,3 +1,4 @@
+import asyncio
 import json
 import hashlib
 import hmac
@@ -9,16 +10,18 @@ import time
 from contextlib import contextmanager
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
 from .agents_ui import agents_page
 from .history import PERIODS, load_history, history_page
 from .configuration import MonitoringSettings
 from .settings_ui import settings_page
+from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 app = FastAPI(title='ServersStatus')
+login_slots = asyncio.Semaphore(2)
 
 
 @contextmanager
@@ -34,6 +37,7 @@ def db():
         CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
         CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
+        CREATE TABLE IF NOT EXISTS auth_guard (address TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
         yield connection
@@ -74,30 +78,43 @@ def index(request: Request, q: str = '', view: str = 'all'):
 @app.post('/login')
 async def login(request: Request):
     from urllib.parse import parse_qs
-    raw = await request.body()
-    if len(raw) > 4096:
-        raise HTTPException(413)
-    form = parse_qs(raw.decode())
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > 4096:
+            raise HTTPException(413)
+    try:
+        form = parse_qs(raw.decode())
+    except UnicodeDecodeError:
+        raise HTTPException(400)
     name, password = form.get('username', [''])[0], form.get('password', [''])[0]
-    address = request.client.host
+    address = client_address(request)
     now = time.time()
     with db() as c:
-        c.execute('DELETE FROM attempts WHERE since<?', (now - 900,))
-        attempt = c.execute('SELECT count FROM attempts WHERE address=?', (address,)).fetchone()
-        if attempt and attempt['count'] >= 10:
-            raise HTTPException(429, 'Повторите через 15 минут')
+        wait = blocked_seconds(c, address, now)
+        if wait:
+            raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
         user = c.execute('SELECT * FROM users WHERE name=?', (name,)).fetchone()
-        salt = user['salt'] if user else '00' * 16
-        calculated = password_hash(password, salt)
-        valid = user is not None and hmac.compare_digest(calculated, user['password'])
+    salt = user['salt'] if user else '00' * 16
+    async with login_slots:
+        calculated = await asyncio.to_thread(password_hash, password, salt)
+    valid = user is not None and hmac.compare_digest(calculated, user['password'])
+    with db() as c:
+        c.execute('BEGIN IMMEDIATE')
+        wait = blocked_seconds(c, address, now)
+        if wait:
+            raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
         if not valid:
-            c.execute('INSERT INTO attempts VALUES (?,1,?) ON CONFLICT(address) DO UPDATE SET count=count+1', (address, now))
+            wait = failed_login(c, address, now)
         else:
-            c.execute('DELETE FROM attempts WHERE address=?', (address,))
+            # Successful login clears the error counter, not escalation history.
+            c.execute('UPDATE auth_guard SET failures=0 WHERE address=?', (address,))
             token = secrets.token_urlsafe(32)
             c.execute('DELETE FROM sessions WHERE expires<?', (now,))
             c.execute('INSERT INTO sessions VALUES (?,?)', (digest(token), now + 28800))
     if not valid:
+        if wait:
+            raise HTTPException(429, 'Две ошибки входа: адрес временно заблокирован', headers={'Retry-After': str(wait)})
         raise HTTPException(401, 'Неверный логин или пароль')
     response = RedirectResponse('/', status_code=303)
     response.set_cookie('session', token, httponly=True, secure=os.environ.get('STATUS_INSECURE_LOCAL') != '1', samesite='strict', max_age=28800)
@@ -431,3 +448,35 @@ async def rename_server(agent_id: str, request: Request):
             raise HTTPException(404)
         c.execute('INSERT INTO agent_profiles VALUES (?,?) ON CONFLICT(agent) DO UPDATE SET display_name=excluded.display_name', (agent_id, name))
     return RedirectResponse('/servers/' + quote(agent_id, safe=''), status_code=303)
+
+
+@app.middleware('http')
+async def request_protection(request: Request, call_next):
+    address = client_address(request)
+    allowed, retry = limiter.allow(address)
+    if not allowed:
+        return JSONResponse({'detail': 'Слишком много запросов'}, status_code=429, headers={'Retry-After': str(retry), 'Cache-Control': 'no-store'})
+    if request.method not in ('GET', 'HEAD', 'POST'):
+        return JSONResponse({'detail': 'Метод не разрешён'}, status_code=405)
+    length = request.headers.get('content-length')
+    if length:
+        try:
+            if int(length) > 65536 or int(length) < 0:
+                return JSONResponse({'detail': 'Слишком большой запрос'}, status_code=413)
+        except ValueError:
+            return JSONResponse({'detail': 'Некорректная длина запроса'}, status_code=400)
+    # Do not cut off Windows agents behind the same public NAT as a blocked user.
+    if not request.url.path.startswith('/api/report/'):
+        with db() as c:
+            wait = blocked_seconds(c, address, time.time())
+        if wait:
+            return JSONResponse({'detail': 'Адрес временно заблокирован после ошибок входа'}, status_code=429, headers={'Retry-After': str(wait), 'Cache-Control': 'no-store'})
+    if request.url.path == '/login' and request.method == 'POST':
+        allowed, retry = login_limiter.allow(address)
+        if not allowed:
+            return JSONResponse({'detail': 'Слишком частые попытки входа'}, status_code=429, headers={'Retry-After': str(retry), 'Cache-Control': 'no-store'})
+    response = await call_next(request)
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    return response

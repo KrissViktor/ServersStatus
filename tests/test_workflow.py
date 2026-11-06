@@ -11,6 +11,9 @@ from agent.client import collect
 
 class WorkflowTest(unittest.TestCase):
     def setUp(self):
+        from server.security import limiter, login_limiter
+        limiter.reset()
+        login_limiter.reset()
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         module.DB = str(Path(self.directory.name) / 'test.sqlite3')
@@ -38,8 +41,10 @@ class WorkflowTest(unittest.TestCase):
         headers = {'Authorization': 'Bearer agent-secret'}
         self.assertEqual(self.client.post('/api/report/pc', json={}, headers=headers).status_code, 422)
         self.assertEqual(self.client.post('/api/report/pc', content='x' * 65537, headers=headers).status_code, 413)
-        for _ in range(10):
-            self.assertEqual(self.client.post('/login', data={'username': 'admin', 'password': 'wrong'}).status_code, 401)
+        self.assertEqual(self.client.post('/login', data={'username': 'admin', 'password': 'wrong'}).status_code, 401)
+        blocked = self.client.post('/login', data={'username': 'admin', 'password': 'wrong'})
+        self.assertEqual(blocked.status_code, 429)
+        self.assertEqual(blocked.headers['retry-after'], '900')
         self.assertEqual(self.client.post('/login', data={'username': 'admin', 'password': 'test-password-123'}).status_code, 429)
 
     def test_backup_states(self):
@@ -268,3 +273,39 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(self.client.post('/servers/pc/name', data={'csrf': csrf, 'display_name': 'x'*121}).status_code, 400)
         self.client.post('/servers/pc/name', data={'csrf': csrf, 'display_name': ''})
         self.assertNotIn('SQL — ERP &lt;main&gt;', self.client.get('/servers/pc').text)
+
+    def test_ban_is_per_ip_persists_and_preserves_agent_reports(self):
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+        proxy = TestClient(module.app, base_url='https://testserver', client=('127.0.0.1', 1234))
+        ip1 = {'X-Forwarded-For': '198.51.100.1'}
+        ip2 = {'X-Forwarded-For': '198.51.100.2'}
+        wrong = {'username': 'admin', 'password': 'wrong'}
+        with patch('server.app.time.time', return_value=1000):
+            self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).status_code, 401)
+            self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).headers['retry-after'], '900')
+            self.assertEqual(proxy.get('/', headers=ip1).status_code, 429)
+            self.assertEqual(proxy.get('/', headers=ip2).status_code, 200)
+            headers = dict(ip1, Authorization='Bearer agent-secret')
+            payload = {'hostname': 'pc', 'cpu_percent': 1, 'memory_percent': 2, 'uptime_seconds': 3, 'disks': []}
+            self.assertEqual(proxy.post('/api/report/pc', json=payload, headers=headers).status_code, 200)
+        with patch('server.app.time.time', return_value=1901):
+            self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).status_code, 401)
+            response = proxy.post('/login', data=wrong, headers=ip1)
+            self.assertEqual(response.status_code, 429)
+            self.assertEqual(response.headers['retry-after'], '2700')
+
+    def test_http_flood_rejected_before_handler(self):
+        from server.security import limiter
+        for _ in range(60):
+            limiter.allow('testclient')
+        limiter.refill = 0.0001
+        try:
+            response = self.client.get('/')
+            self.assertEqual(response.status_code, 429)
+            self.assertIn('retry-after', response.headers)
+        finally:
+            limiter.refill = 5
+            limiter.reset()
+        self.assertEqual(self.client.post('/login', content='x'*65537).status_code, 413)
+        self.assertEqual(self.client.request('TRACE', '/').status_code, 405)
