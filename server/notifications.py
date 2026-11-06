@@ -68,9 +68,11 @@ def send_message(token, chat_id, text):
 
 
 from .incidents import incident_key, evaluate
+from .delivery_policy import delivery_window
 
 
 def tick(db, sender, now=None):
+    real_clock = now is None
     now = time.time() if now is None else now
     with db() as c:
         c.execute('''CREATE TABLE IF NOT EXISTS telegram_state (
@@ -78,7 +80,15 @@ def tick(db, sender, now=None):
             sent INTEGER, next_attempt REAL DEFAULT 0)''')
         rows = c.execute('SELECT a.id, r.received, r.data FROM agents a LEFT JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1)').fetchall()
         existing = c.execute('SELECT * FROM telegram_state').fetchall()
-        incidents, valid, checked = evaluate(rows, existing, now)
+        incidents, valid, checked = evaluate(rows, existing, now, disk_threshold=98)
+        c.execute('CREATE TABLE IF NOT EXISTS telegram_policy (name TEXT PRIMARY KEY, value TEXT)')
+        if not c.execute("SELECT 1 FROM telegram_policy WHERE name='disk98'").fetchone():
+            # Do not send recoveries for old 85%-threshold incidents on upgrade.
+            for state in existing:
+                if state['key'].startswith('disk:') and state['key'] not in incidents:
+                    c.execute('DELETE FROM telegram_state WHERE key=?', (state['key'],))
+            existing = [state for state in existing if not state['key'].startswith('disk:') or state['key'] in incidents]
+            c.execute("INSERT INTO telegram_policy VALUES ('disk98','1')")
         for state in existing:
             if state['key'] not in valid:
                 c.execute('DELETE FROM telegram_state WHERE key=?', (state['key'],))
@@ -88,8 +98,12 @@ def tick(db, sender, now=None):
             c.execute('''INSERT INTO telegram_state(key,agent,body,active,sent) VALUES (?,?,?,1,0)
                          ON CONFLICT(key) DO UPDATE SET body=excluded.body, active=1''', (key, agent, text))
         pending = c.execute('SELECT * FROM telegram_state WHERE active!=sent AND next_attempt<=? ORDER BY active DESC, key LIMIT 20', (now,)).fetchall()
+    if not delivery_window(now):
+        return 0, 0
     delivered, failed = 0, 0
     for state in pending:
+        if real_clock and not delivery_window(time.time()):
+            break
         text = ('🔴 ServersStatus · ПРОБЛЕМА\n' if state['active'] else '🟢 ServersStatus · ВОССТАНОВЛЕНО\nПроблема больше не обнаружена:\n') + state['body']
         try:
             sender(text)

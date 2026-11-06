@@ -7,7 +7,7 @@ def incident_key(agent, path):
     return 'backup:' + hashlib.sha256((agent + '\0' + path).encode()).hexdigest()
 
 
-def evaluate(rows, existing, now):
+def evaluate(rows, existing, now, disk_threshold=85):
     incidents, valid, checked = {}, set(), set()
     for row in rows:
         if row['received'] is None:
@@ -46,6 +46,6 @@ def evaluate(rows, existing, now):
             key = 'disk:' + hashlib.sha256((agent+'\\0'+path).encode()).hexdigest()
             valid.add(key)
             checked.add(key)
-            if number(disk.get('used_percent', 0)) >= 85:
+            if number(disk.get('used_percent', 0)) >= disk_threshold:
                 incidents[key] = (agent, f'{name} ({agent}): диск {path} заполнен на {number(disk.get("used_percent")):.1f}%.')
     return incidents, valid, checked

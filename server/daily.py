@@ -5,6 +5,7 @@ import os
 import time
 from .dashboard import backup_problems,size
 from .notification_types import DeliveryError
+from .delivery_policy import delivery_window
 
 MSK=timezone(timedelta(hours=3))
 
@@ -49,7 +50,10 @@ def build_summary(connection,start,end,now):
 
 
 def deliver_daily(db,sender,now=None):
+    real_clock=now is None
     now=time.time() if now is None else now
+    if not delivery_window(now):
+        return 0,0
     if os.environ.get('STATUS_DAILY_REPORT_ENABLED','1')=='0':
         return 0,0
     try:
@@ -70,6 +74,8 @@ def deliver_daily(db,sender,now=None):
     chunks=json.loads(pending['chunks'])
     count=0
     for index in range(pending['next_part'],min(len(chunks),pending['next_part']+5)):
+        if real_clock and not delivery_window(time.time()):
+            break
         try:
             sender(chunks[index])
         except DeliveryError as error:

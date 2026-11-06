@@ -8,6 +8,10 @@ from server.notifications import tick, DeliveryError
 
 class NotificationsTest(unittest.TestCase):
     def setUp(self):
+        from unittest.mock import patch
+        window=patch('server.notifications.delivery_window',return_value=True)
+        window.start()
+        self.addCleanup(window.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         previous = application.DB

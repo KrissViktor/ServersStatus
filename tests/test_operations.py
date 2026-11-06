@@ -42,17 +42,17 @@ class OperationsTest(unittest.TestCase):
         self.assertIn('нет связи',rows[2]['message'])
 
     def test_daily_calendar_period_and_no_duplicate(self):
-        now=datetime(2026,11,7,9,tzinfo=MSK).timestamp()
-        self.report(datetime(2026,11,6,12,tzinfo=MSK).timestamp())
+        now=datetime(2026,11,6,9,tzinfo=MSK).timestamp()
+        self.report(datetime(2026,11,5,12,tzinfo=MSK).timestamp())
         with patch.dict('os.environ',{'STATUS_DAILY_REPORT_ENABLED':'1','STATUS_DAILY_REPORT_HOUR':'9'}):
             self.assertEqual(deliver_daily(application.db,self.sent.append,now-60),(0,0))
             self.assertEqual(deliver_daily(application.db,self.sent.append,now),(1,0))
-            self.assertIn('06.11.2026',self.sent[0])
+            self.assertIn('05.11.2026',self.sent[0])
             self.assertIn('CPU ср. 20.0%',self.sent[0])
             self.assertEqual(deliver_daily(application.db,self.sent.append,now+60),(0,0))
 
     def test_daily_partial_failure_resumes_unsent_chunk(self):
-        now=datetime(2026,11,7,9,tzinfo=MSK).timestamp()
+        now=datetime(2026,11,6,9,tzinfo=MSK).timestamp()
         calls=[]
         def sender(text):
             calls.append(text)
