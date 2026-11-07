@@ -32,13 +32,22 @@ def build_summary(connection,start,end,now):
         lines.append(f'Проблем за сутки: {count}.')
         if latest:
             data=json.loads(latest['data']);elapsed=max(0,now-latest['received'])
-            lines.append('Сейчас: '+('онлайн' if elapsed<180 else 'нет связи'))
+            lines.append('Сейчас: '+('🟢 онлайн' if elapsed<180 else '🔴 нет связи'))
             for disk in monitored_disks(data):
                 lines.append(str(disk.get('path',''))+': свободно '+size(disk.get('free_bytes')))
             bad=sum(bool(backup_problems(b,elapsed)) for b in data.get('backups',[]))
-            lines.append(f'Бэкапы сейчас: ошибок {bad}, проверок {len(data.get("backups",[]))}.')
+            backups=data.get('backups',[])
+            if not backups:lines.append('⚪ Бэкапы: проверки не настроены.')
+            elif bad:lines.append(f'🔴 Бэкапы: ошибок {bad}, проверок {len(backups)}.')
+            elif any(b.get('state')=='observing' for b in backups):lines.append('🟡 Бэкапы: проверяется стабильность файла.')
+            elif elapsed>=180:lines.append('⚪ Бэкапы: свежесть не подтверждена, нет связи с агентом.')
+            else:lines.append(f'🟢 Бэкапы: ошибок не обнаружено, проверок {len(backups)}.')
             services=data.get('services',[])
-            lines.append(f'Службы сейчас: не работают {sum(s.get("status")!="running" for s in services)} из {len(services)}.')
+            failed=sum(s.get('status')!='running' for s in services)
+            if not services:lines.append('⚪ Службы: проверки не настроены.')
+            elif failed:lines.append(f'🔴 Службы: не работают {failed} из {len(services)}.')
+            elif elapsed>=180:lines.append('⚪ Службы: актуальный статус не подтверждён, нет связи с агентом.')
+            else:lines.append(f'🟢 Службы работают: {len(services)} из {len(services)}.')
     chunks=[];text=''
     for line in lines:
         for offset in range(0,max(1,len(line)),3500):

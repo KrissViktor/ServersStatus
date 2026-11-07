@@ -132,7 +132,7 @@ def main():
         notify_systemd('READY=1\nWATCHDOG=1\nSTATUS=Опрос команд Telegram')
         commands=[{'command':name,'description':description} for name,description in [
           ('status','Статус серверов'),('report','Отчёт за 24 часа'),('rdp','RDP-пользователи'),
-          ('warnings','Предупреждения'),('panel','Открыть панель'),('help','Кнопки и помощь')]]
+          ('backup','Свежесть и файлы бэкапов'),('warnings','Предупреждения'),('panel','Открыть панель'),('help','Кнопки и помощь')]]
         registered=False
         while not stop.is_set():
             heartbeat()

@@ -75,7 +75,7 @@ def inspect_backup(item, previous, now=None):
             state = 'stale'
         elif not stable:
             state = 'observing'
-        return dict(result, state=state, file=path.name, relative_path=str(path.relative_to(folder)),
+        return dict(result, state=state, created_at=timestamp, file=path.name, relative_path=str(path.relative_to(folder)),
                     size_bytes=stat.st_size, age_seconds=max(0, int(now-timestamp)),
                     backup_date=datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'))
     except (OSError, ValueError, OverflowError) as error:

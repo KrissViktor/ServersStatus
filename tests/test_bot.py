@@ -131,3 +131,41 @@ class BotTest(unittest.TestCase):
             with patch.dict(os.environ,{'NOTIFY_SOCKET':address}):
                 notify_systemd('READY=1\nWATCHDOG=1')
             self.assertEqual(receiver.recv(100),b'READY=1\nWATCHDOG=1')
+
+    def test_backup_button_dates_exact_age_and_old_agent_compatibility(self):
+        from server.bot_reports import command_name
+        backup={'name':'ERP daily','path':'D:/backup/erp/daily','file':'ERP_backup_2026_11_07_003000_1.bak',
+                'state':'fresh','size_bytes':2*1024**3,'age_seconds':3661,
+                'backup_date':'2026-11-07 00:30:00','date_from_filename':True,'schedule':'daily'}
+        with application.db() as c:
+            row=c.execute('SELECT data FROM reports').fetchone()
+            data=json.loads(row[0]);data['backups']=[backup]
+            c.execute('UPDATE reports SET data=?',(json.dumps(data),))
+            output='\n'.join(render(c,'backup',1005))
+        self.assertIn('🟢 Свежая копия',output)
+        self.assertIn('ERP_backup_2026_11_07_003000_1.bak',output)
+        self.assertIn('2026-11-07 00:30:00 (время агента)',output)
+        self.assertIn('1 ч 1 мин 6 с',output)
+        self.assertIn('2.0 Гб',output)
+        self.assertEqual(command_name('Бэкап'),'backup')
+        self.assertEqual(command_name('/backup@MyBot'),'backup')
+        self.assertIn(['Бэкап','RDP'],KEYBOARD['keyboard'])
+
+    def test_backup_problems_and_status_circles(self):
+        with application.db() as c:
+            data=json.loads(c.execute('SELECT data FROM reports').fetchone()[0])
+            data['backups']=[{'name':'ERP','path':'D:/backup','file':'bad.bak','state':'too_small',
+                              'size_bytes':512,'age_seconds':31*3600,'schedule':'daily'}]
+            data['services']=[{'name':'SQL','status':'stopped'}]
+            data['rdp']['sessions'].append({'username':'old','domain':'DOMAIN','session_id':2,'state':'disconnected'})
+            c.execute('UPDATE reports SET data=?',(json.dumps(data),))
+            backup='\n'.join(render(c,'backup',1000))
+            rdp='\n'.join(render(c,'rdp',1000))
+            report='\n'.join(render(c,'report',1000))
+        self.assertIn('🔴 Ошибка',backup)
+        self.assertIn('31 ч 0 мин 0 с',backup)
+        self.assertIn('🟢 подключён',rdp)
+        self.assertIn('🔴 отключён',rdp)
+        self.assertIn('🟢 онлайн',report)
+        self.assertIn('🔴 Службы: не работают 1 из 1',report)
+        self.assertIn('🔴 Бэкапы:',report)

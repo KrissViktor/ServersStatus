@@ -3,12 +3,14 @@ from .disks import monitored_disks
 import json
 import os
 from urllib.parse import urlsplit
+from datetime import datetime
+from .delivery_policy import MSK
 from .dashboard import duration,size,number,cpu_description,memory_description,backup_problems
 from .overview import issues
 from .daily import build_summary
 from .history import stamp
 
-KEYBOARD={'keyboard':[['Статус','Отчет'],['RDP','Предупреждения'],['Панель','Помощь']],
+KEYBOARD={'keyboard':[['Статус','Отчет'],['Бэкап','RDP'],['Предупреждения','Панель'],['Помощь']],
           'resize_keyboard':True,'is_persistent':True}
 
 
@@ -40,7 +42,7 @@ def status_report(servers,now):
         if row['received'] is None:
             lines.append('\n⚪ '+name+' — ещё нет отчётов');continue
         age=max(0,now-row['received'])
-        lines.append('\n'+('🟢 ' if age<180 else '🔴 ')+name+' · '+('онлайн' if age<180 else 'нет связи'))
+        lines.append('\n'+name+' · '+('🟢 онлайн' if age<180 else '🔴 нет связи'))
         lines.append('Последний отчёт: '+duration(age)+' назад')
         lines.append(f'CPU {number(data.get("cpu_percent")):.1f}% · '+cpu_description(data))
         lines.append(f'RAM {number(data.get("memory_percent")):.1f}% · '+memory_description(data))
@@ -61,12 +63,12 @@ def rdp_report(servers,now):
         if row['received'] is None:
             lines.append('Нет отчётов агента.');continue
         age=max(0,now-row['received'])
-        if age>=180:lines.append('⚠ Устаревшие данные: '+duration(age)+' назад')
+        if age>=180:lines.append('🔴 Нет связи. Устаревшие данные: '+duration(age)+' назад')
         rdp=data.get('rdp')
         if not rdp:
             lines.append('Обновите агент для списка RDP.');continue
         if rdp.get('status')!='available':
-            lines.append('Список сессий недоступен (платформа/права).');continue
+            lines.append('🔴 Список сессий недоступен (платформа/права).');continue
         sessions=rdp.get('sessions',[])
         active=[session for session in sessions if session.get('state')=='active']
         users={(s.get('domain',''),s.get('username','')) for s in active}
@@ -74,7 +76,7 @@ def rdp_report(servers,now):
         if not sessions:lines.append('RDP-сессий нет.')
         for session in sessions:
             user=(str(session.get('domain'))+'\\' if session.get('domain') else '')+str(session.get('username',''))
-            state={'active':'подключён','disconnected':'отключён, сессия сохранена'}.get(session.get('state'),'другое состояние')
+            state={'active':'🟢 подключён','disconnected':'🔴 отключён, сессия сохранена'}.get(session.get('state'),'другое состояние')
             lines.append(user+' · ID '+str(session.get('session_id',''))+' · '+state)
     if not count:lines.append('Windows-серверов с данными RDP пока нет.')
     return split_text('\n'.join(lines))
@@ -88,13 +90,74 @@ def warning_report(servers,now):
         problems=issues(row,now)
         if not problems:continue
         count+=1;lines.append('\n'+title(row,data))
-        lines.extend('• '+problem for problem in problems if not problem.startswith('Ошибка бэкапа:'))
+        lines.extend('🔴 '+problem for problem in problems if not problem.startswith('Ошибка бэкапа:'))
         elapsed=max(0,now-row['received']) if row['received'] is not None else 0
         for backup in data.get('backups',[]):
             for problem in backup_problems(backup,elapsed):
-                lines.append('• '+str(backup.get('name') or backup.get('path','Бэкап'))+': '+problem)
-    if not count:lines.append('Проблем по полученным данным не обнаружено.')
+                lines.append('🔴 '+str(backup.get('name') or backup.get('path','Бэкап'))+': '+problem)
+    if not count:lines.append('🟢 Проблем по полученным данным не обнаружено.')
     lines.append('\nРучной запрос показывает все предупреждения панели (диски от 85%). Автоматические сообщения о дисках — только от 98%.')
+    return split_text('\n'.join(lines))
+
+
+
+def exact_age(seconds):
+    seconds=int(max(0,number(seconds)))
+    hours,remainder=divmod(seconds,3600)
+    minutes,seconds=divmod(remainder,60)
+    return f'{hours} ч {minutes} мин {seconds} с'
+
+
+def backup_report(servers,now):
+    lines=['💾 Бэкапы · '+stamp(now)]
+    found=False
+    for row in servers:
+        data=json.loads(row['data'] or '{}')
+        backups=data.get('backups',[])
+        if not backups:
+            continue
+        found=True
+        elapsed=max(0,now-row['received']) if row['received'] is not None else 0
+        online=row['received'] is not None and elapsed<180
+        lines.append('\n'+title(row,data)+' · '+('🟢 онлайн' if online else '🔴 нет связи'))
+        if not online:lines.append('Свежесть не подтверждена: последний отчёт '+exact_age(elapsed)+' назад.')
+        for backup in backups:
+            problems=backup_problems(backup,elapsed)
+            state=backup.get('state')
+            label='🔴 Ошибка' if problems else '🟡 Проверяем стабильность файла' if state=='observing' else '🟢 Свежая копия' if state=='fresh' and online and backup.get('file') else '⚪ Свежесть не подтверждена'
+            lines.append('\n'+str(backup.get('name') or backup.get('path','Бэкап'))+' · '+label)
+            lines.append('Папка: '+str(backup.get('path','—')))
+            if not backup.get('file'):
+                lines.append('Файл: не найден' if state=='missing' else 'Файл: нет данных')
+                lines.extend('🔴 '+problem for problem in problems)
+                continue
+            lines.append('Файл: '+str(backup['file']))
+            lines.append('Размер: '+size(backup.get('size_bytes')))
+            created=backup.get('created_at')
+            if isinstance(created,(int,float)) and number(created)>0:
+                try:
+                    date=datetime.fromtimestamp(created,MSK).strftime('%d.%m.%Y %H:%M:%S МСК')
+                    age=now-created
+                except (ValueError,OverflowError,OSError):
+                    date=None
+                    age=None
+            else:
+                date=backup.get('backup_date')
+                age=number(backup.get('age_seconds'))+elapsed if backup.get('age_seconds') is not None else None
+                if date:date=str(date)+' (время агента)'
+                elif age is not None:
+                    date=datetime.fromtimestamp(now-age,MSK).strftime('%d.%m.%Y %H:%M:%S МСК')+' (оценка по возрасту)'
+            source='из имени файла' if backup.get('date_from_filename') else 'метка изменения файла'
+            lines.append('Дата копии ('+source+'): '+str(date or 'нет данных'))
+            if state=='future' or (age is not None and age<0):
+                lines.append('🔴 Дата в будущем: проверьте часы сервера.')
+            elif age is not None:
+                lines.append('Прошло: '+exact_age(age))
+            else:
+                lines.append('Прошло: нет данных')
+            lines.extend('🔴 '+problem for problem in problems)
+    if not found:lines.append('⚪ Проверки бэкапов ещё не настроены или агент не передал данные.')
+    lines.append('\nСвежесть и размер файла не подтверждают возможность восстановления SQL.')
     return split_text('\n'.join(lines))
 
 
@@ -102,7 +165,7 @@ def command_name(text):
     first=text.strip().split(maxsplit=1)[0] if text.strip() else ''
     first=first.split('@',1)[0].casefold().replace('ё','е')
     return {'статус':'status','/status':'status','отчет':'report','/report':'report',
-            'rdp':'rdp','/rdp':'rdp','предупреждения':'warnings','/warnings':'warnings',
+            'бэкап':'backup','бекап':'backup','бэкапы':'backup','/backup':'backup','/backups':'backup','rdp':'rdp','/rdp':'rdp','предупреждения':'warnings','/warnings':'warnings',
             'панель':'panel','/panel':'panel','помощь':'help','/help':'help','/start':'help'}.get(first)
 
 
@@ -118,6 +181,6 @@ def render(connection,command,now):
             return ['Адрес панели не настроен корректно.']
         return ['🌐 Панель статусов:\n'+url]
     if command=='help':
-        return ['Выберите кнопку:\nСтатус — доступность, CPU, RAM и диски.\nОтчет — сводка за последние 24 часа прямо сейчас.\nRDP — пользователи и состояния RDP-сессий.\nПредупреждения — все текущие проблемы панели.\nПанель — ссылка на сайт.\n\nОтветы на кнопки доступны круглосуточно. Автоуведомления: будни 08–20, выходные 12–20 МСК. Команды только читают данные и не управляют серверами.']
+        return ['Выберите кнопку:\nСтатус — доступность, CPU, RAM и диски.\nОтчет — сводка за последние 24 часа прямо сейчас.\nБэкап — свежесть, файл, дата и точный возраст копий.\nRDP — пользователи и состояния RDP-сессий.\nПредупреждения — все текущие проблемы панели.\nПанель — ссылка на сайт.\n\nОтветы на кнопки доступны круглосуточно. Автоуведомления: будни 08–20, выходные 12–20 МСК. Команды только читают данные и не управляют серверами.']
     servers=rows(connection)
-    return {'status':status_report,'rdp':rdp_report,'warnings':warning_report}[command](servers,now)
+    return {'status':status_report,'rdp':rdp_report,'warnings':warning_report,'backup':backup_report}[command](servers,now)
