@@ -753,3 +753,18 @@ Chromium проверил отправку формы/очередь, появл
 Windows Job Object/PowerShell в Linux не исполнялись: те же платформенные
 engine-тесты добавлены в Windows CI. Пользовательские серверы не изменялись:
 нужны обновление панели/агентов и локальное включение. Compileall/diff --check прошли.
+
+## 2026-11-08 — исправление Windows CI мини-консоли
+
+Пользователь прислал точный traceback Windows workflow dbe8f14: оба реальных
+console-теста завершались на win32job.CreateJobObject(None,None) с TypeError:
+None is not a valid string in this context. Эта сборка не дошла до упаковки EXE.
+
+Исправление: для безымянного Job Object передаётся пустая строка имени вместо
+None, как требует используемая pywin32. Kill-on-close, назначение Job Object
+до команды, ограничение времени и все Windows-тесты сохранены.
+
+Язык: Python. Проверки в Linux: 4 теста console-agent прошли, compileall и
+ git diff --check прошли. Реальный pywin32-вызов проверяется повторным Windows CI
+после push; доступа к Windows executor в этой среде нет. Получение Actions API
+было недоступно (Forbidden); основание исправления — traceback пользователя.

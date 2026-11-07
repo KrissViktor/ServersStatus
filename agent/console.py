@@ -46,7 +46,8 @@ def execute(command,timeout,cwd):
     try:
         if os.name=='nt':
             import win32job,win32api
-            job=win32job.CreateJobObject(None,None)
+            # pywin32 requires a string even for an unnamed Job Object.
+            job=win32job.CreateJobObject(None,'')
             limits=win32job.QueryInformationJobObject(job,win32job.JobObjectExtendedLimitInformation)
             limits['BasicLimitInformation']['LimitFlags'] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
             win32job.SetInformationJobObject(job,win32job.JobObjectExtendedLimitInformation,limits)
