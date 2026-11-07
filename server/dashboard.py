@@ -1,4 +1,5 @@
 """Server-rendered dashboard; all agent-provided text is escaped."""
+from .disks import monitored_disks
 import html
 import json
 import math
@@ -120,6 +121,7 @@ def backup_alerts(rows, now):
 
 def server_card(row, now):
     data = json.loads(row['data']) if row['data'] else {}
+    data['disks'] = monitored_disks(data)
     age = max(0, now - row['received']) if row['received'] is not None else None
     online = age is not None and age < 180
     state = 'Нет данных' if age is None else 'Онлайн' if online else 'Нет связи'
@@ -136,8 +138,8 @@ def server_card(row, now):
     content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
     if not online:
         content += '<p class="notice">Данные устарели: агент не присылал отчёт более 3 минут.</p>'
-    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data)) + meter('Оперативная память', data.get('memory_percent'), memory_description(data)) + '</div><section><h3>Диски <span class="count">' + str(len(data.get('disks', []))) + '</span></h3><div class="disks">'
-    for disk in data.get('disks', []):
+    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data)) + meter('Оперативная память', data.get('memory_percent'), memory_description(data)) + '</div><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
+    for disk in monitored_disks(data):
         percent = min(100, number(disk.get('used_percent')))
         content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'
     content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section><div class="secondary"><section><h3>Службы</h3>'
@@ -184,7 +186,7 @@ def dashboard(rows, q='', view='all'):
     attention = 0
     for row in rows:
         data = json.loads(row['data']) if row['data'] else {}
-        if any(number(d.get('used_percent')) >= 85 for d in data.get('disks', [])):
+        if any(number(d.get('used_percent')) >= 85 for d in monitored_disks(data)):
             attention += 1
     header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/bot">Бот</a><a class="nav-link" href="/events">Журнал событий</a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'

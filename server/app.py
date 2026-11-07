@@ -18,6 +18,7 @@ from .history import PERIODS, load_history, history_page
 from .configuration import MonitoringSettings
 from .settings_ui import settings_page
 from .events import record
+from .disks import monitored_disks
 from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
@@ -225,6 +226,7 @@ async def report(agent_id: str, request: Request):
                 raise HTTPException(413)
         try:
             data = Report.model_validate_json(body)
+            data.disks = monitored_disks(data.model_dump())
         except ValueError:
             raise HTTPException(422, 'Некорректный отчёт')
         c.execute('BEGIN IMMEDIATE')
@@ -473,7 +475,7 @@ def server_detail(agent_id: str, request: Request):
         raise HTTPException(404)
     from .forecast import load_forecasts
     with db() as c:
-        current_disks = {d.get('path') for d in json.loads(row['data'] or '{}').get('disks', [])}
+        current_disks = {d.get('path') for d in monitored_disks(json.loads(row['data'] or '{}'))}
         row['forecasts'] = {path: value for path,value in load_forecasts(c, agent_id, time.time()).items() if path in current_disks}
     return HTMLResponse(detail_page(row, csrf_token(request)))
 

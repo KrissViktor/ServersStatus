@@ -19,11 +19,15 @@ from agent.settings import load_cache, save_cache, effective_config
 def collect(config, previous):
     disks = []
     for partition in psutil.disk_partitions():
+        if sys.platform.startswith('linux') and partition.mountpoint != '/':
+            continue
         try:
             usage = psutil.disk_usage(partition.mountpoint)
             disks.append({'path': partition.mountpoint, 'filesystem': partition.fstype, 'device': partition.device, 'free_bytes': usage.free, 'total_bytes': usage.total, 'used_percent': usage.percent})
         except OSError:
             continue
+        if sys.platform.startswith('linux'):
+            break
     if not disks and sys.platform.startswith('linux'):
         usage = psutil.disk_usage('/')
         disks.append({'path':'/','free_bytes':usage.free,'total_bytes':usage.total,'used_percent':usage.percent})

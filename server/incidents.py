@@ -1,10 +1,15 @@
 """Shared incident evaluation for events and Telegram."""
+from .disks import monitored_disks, is_linux
 import hashlib
 import json
 from .dashboard import backup_problems, number
 
 def incident_key(agent, path):
     return 'backup:' + hashlib.sha256((agent + '\0' + path).encode()).hexdigest()
+
+
+def disk_key(agent,path):
+    return 'disk:' + hashlib.sha256((agent+'\\0'+path).encode()).hexdigest()
 
 
 def evaluate(rows, existing, now, disk_threshold=85):
@@ -22,7 +27,7 @@ def evaluate(rows, existing, now, disk_threshold=85):
         if elapsed >= 180:
             incidents[connection] = (agent, f'{name} ({agent}): нет связи более 3 минут.')
             # Do not claim recovery of backup problems using stale reports.
-            valid.update(s['key'] for s in existing if s['agent'] == agent and not s['key'].startswith('connection:'))
+            valid.update(s['key'] for s in existing if s['agent'] == agent and not s['key'].startswith('connection:') and (not is_linux(report) or not s['key'].startswith('disk:') or s['key']==disk_key(agent,'/')))
             continue
         for backup in report.get('backups', []):
             key = incident_key(agent, backup.get('path', backup.get('name', '')))
@@ -41,9 +46,9 @@ def evaluate(rows, existing, now, disk_threshold=85):
             checked.add(key)
             if service.get('status') != 'running':
                 incidents[key] = (agent, f'{name} ({agent}): служба {service_name} не работает ({service.get("status", "unavailable")}).')
-        for disk in report.get('disks', []):
+        for disk in monitored_disks(report):
             path = str(disk.get('path', ''))
-            key = 'disk:' + hashlib.sha256((agent+'\\0'+path).encode()).hexdigest()
+            key = disk_key(agent,path)
             valid.add(key)
             checked.add(key)
             if number(disk.get('used_percent', 0)) >= disk_threshold:

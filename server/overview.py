@@ -1,4 +1,5 @@
 """Compact overview and detailed server pages."""
+from .disks import monitored_disks
 import json
 import time
 from pathlib import Path
@@ -18,7 +19,7 @@ def issues(row, now):
         problems.append('Высокая загрузка CPU')
     if number(data.get('memory_percent')) >= 95:
         problems.append('Мало свободной RAM')
-    for disk in data.get('disks', []):
+    for disk in monitored_disks(data):
         if number(disk.get('used_percent')) >= 85:
             problems.append('Заполнен диск ' + str(disk.get('path', '')))
     for backup in data.get('backups', []):
@@ -62,7 +63,7 @@ def compact_card(row, now):
         content += '<p class="notice">Данные устарели — нет связи с агентом</p>'
     content += '<div class="metrics">' + meter('CPU', data.get('cpu_percent'), cpu_description(data)) + meter('RAM', data.get('memory_percent'), memory_description(data)) + '</div>'
     content += '<div class="compact-disks">'
-    for disk in data.get('disks', []):
+    for disk in monitored_disks(data):
         content += '<p><b>' + esc(disk.get('path', '')) + '</b><span>' + size(disk.get('free_bytes')) + ' свободно · ' + f'{number(disk.get("used_percent")):.1f}% занято' + '</span></p>'
     content += '</div>'
     problems = issues(row, now)

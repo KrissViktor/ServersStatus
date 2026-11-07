@@ -1,3 +1,4 @@
+from .disks import monitored_disks
 """Read-only reports for the authorized Telegram chat."""
 import json
 import os
@@ -43,7 +44,7 @@ def status_report(servers,now):
         lines.append('Последний отчёт: '+duration(age)+' назад')
         lines.append(f'CPU {number(data.get("cpu_percent")):.1f}% · '+cpu_description(data))
         lines.append(f'RAM {number(data.get("memory_percent")):.1f}% · '+memory_description(data))
-        for disk in data.get('disks',[]):
+        for disk in monitored_disks(data):
             lines.append(str(disk.get('path',''))+': '+f'{number(disk.get("used_percent")):.1f}% занято · '+size(disk.get('free_bytes'))+' свободно')
     if not servers:lines.append('Серверы ещё не зарегистрированы.')
     return split_text('\n'.join(lines))

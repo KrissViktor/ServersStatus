@@ -1,3 +1,4 @@
+from .disks import monitored_disks
 """Calendar-day Moscow summary with a persistent multipart delivery queue."""
 from datetime import datetime,timedelta,timezone
 import json
@@ -32,7 +33,7 @@ def build_summary(connection,start,end,now):
         if latest:
             data=json.loads(latest['data']);elapsed=max(0,now-latest['received'])
             lines.append('Сейчас: '+('онлайн' if elapsed<180 else 'нет связи'))
-            for disk in data.get('disks',[]):
+            for disk in monitored_disks(data):
                 lines.append(str(disk.get('path',''))+': свободно '+size(disk.get('free_bytes')))
             bad=sum(bool(backup_problems(b,elapsed)) for b in data.get('backups',[]))
             lines.append(f'Бэкапы сейчас: ошибок {bad}, проверок {len(data.get("backups",[]))}.')
