@@ -768,3 +768,11 @@ None, как требует используемая pywin32. Kill-on-close, н�
  git diff --check прошли. Реальный pywin32-вызов проверяется повторным Windows CI
 после push; доступа к Windows executor в этой среде нет. Получение Actions API
 было недоступно (Forbidden); основание исправления — traceback пользователя.
+
+Подтверждение после push: публичная страница Windows Actions #17
+https://github.com/KrissViktor/ServersStatus/actions/runs/42422928277
+показала success для всех шагов: Test remote console engine, PowerShell syntax,
+реальная проверка file-lock/rollback, сборка EXE-службы, frozen service startup/
+self-update, сборка GUI-установщика, артефакты и Publish public GitHub release.
+Версия успешно опубликованного Windows-агента: cd6a6b57604a. Таким образом,
+исправленный pywin32-вызов подтверждён реальным Windows runner, не только Linux.
