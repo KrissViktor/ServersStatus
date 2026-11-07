@@ -5,8 +5,13 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: windows-agent-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
+    permissions:
+      contents: write
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -90,3 +95,15 @@ jobs:
             dist/backups.WIN-CU629F0N7II.json
             dist/Update-BackupAgent.ps1
           if-no-files-found: error
+
+      - name: Publish public GitHub release
+        if: github.ref == 'refs/heads/main' && github.repository == 'KrissViktor/ServersStatus'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content dist/VERSION.txt -Raw).Trim()
+          python -m agent.release_manifest windows-x64 $version dist/ServersStatusService.exe dist/update-windows.json
+          if ($LASTEXITCODE -ne 0) { throw 'Manifest generation failed' }
+          python -m agent.publish_release dist/update-windows.json dist/ServersStatusService.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }

@@ -5,8 +5,13 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: linux-agent-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
+    permissions:
+      contents: write
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +43,11 @@ jobs:
         with:
           name: ServersStatus-Linux-Python311
           path: dist/*
+
+      - name: Publish public GitHub release
+        if: github.ref == 'refs/heads/main' && github.repository == 'KrissViktor/ServersStatus'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m agent.release_manifest linux-source "$(cat dist/VERSION.txt)" dist/ServersStatus-Linux.tar.gz dist/update-linux.json
+          python -m agent.publish_release dist/update-linux.json dist/ServersStatus-Linux.tar.gz

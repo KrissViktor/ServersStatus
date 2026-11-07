@@ -45,6 +45,9 @@ def validate(job,platform):
         raise ValueError('Invalid package platform or checksum')
     if not isinstance(job.get('size'),int) or not 1<=job['size']<=MAX_PACKAGE:
         raise ValueError('Invalid package size')
+    if job.get('download_url'):
+        from agent.github_releases import validate_manifest
+        validate_manifest({**job,'schema':1},platform)
     return job
 
 
@@ -53,7 +56,12 @@ def download(config,job,destination):
     temporary=destination.with_suffix('.partial')
     digest=hashlib.sha256();size=0
     try:
-        with request(config,endpoint(config)+'/'+str(job['id'])+'/package') as response,temporary.open('wb') as file:
+        if job.get('download_url'):
+            from agent.github_releases import open_public
+            source=open_public(job['download_url'])
+        else:
+            source=request(config,endpoint(config)+'/'+str(job['id'])+'/package')
+        with source as response,temporary.open('wb') as file:
             while True:
                 chunk=response.read(128*1024)
                 if not chunk:break

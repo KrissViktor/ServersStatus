@@ -62,6 +62,8 @@ def db():
         connection.executescript(SCHEMA)
         from .processes import SCHEMA as PROCESS_SCHEMA
         connection.executescript(PROCESS_SCHEMA)
+        from .github_updates import SCHEMA as GITHUB_SCHEMA
+        connection.executescript(GITHUB_SCHEMA)
         yield connection
         connection.commit()
     finally:

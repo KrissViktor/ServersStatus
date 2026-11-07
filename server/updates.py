@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import parse_qs
 from fastapi import HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
 from .dashboard import page, esc
 
 SCHEMA='''
@@ -23,7 +23,7 @@ PACKAGE_ROOT=Path(os.environ.get('STATUS_PACKAGES','/var/lib/serversstatus-packa
 def pending(c,agent):
     now=time.time()
     c.execute("UPDATE agent_update_jobs SET status='failed',message='Нет подтверждения за 15 минут; проверьте службу перед повтором',updated=? WHERE agent=? AND status IN ('queued','running') AND created<?",(now,agent,now-900))
-    row=c.execute("SELECT j.id,p.platform,p.version,p.sha256,p.size FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package WHERE j.agent=? AND j.status IN ('queued','running') ORDER BY j.id DESC LIMIT 1",(agent,)).fetchone()
+    row=c.execute("SELECT j.id,p.platform,p.version,p.sha256,p.size,g.url AS download_url FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package LEFT JOIN github_packages g ON g.package=p.id WHERE j.agent=? AND j.status IN ('queued','running') ORDER BY j.id DESC LIMIT 1",(agent,)).fetchone()
     return dict(row) if row else None
 
 
@@ -42,7 +42,8 @@ def register(app,db,authenticated,csrf_token,digest):
     @app.get('/updates',response_class=HTMLResponse)
     def updates(request:Request):
         if not authenticated(request):return RedirectResponse('/',303)
-        content='<header class="topbar"><a href="/">← Все серверы</a></header><h1>Обновление агентов</h1><p>Пакеты предварительно размещаются администратором на Raspberry Pi. Конфигурация и ключ сохраняются. Первое обновление старого агента выполняется вручную.</p>'
+        content='<header class="topbar"><a href="/">← Все серверы</a></header><h1>Обновление агентов</h1><p>Проверьте новые версии на GitHub и назначьте обновление выбранному агенту. Конфигурация и ключ сохраняются. Первое обновление старого агента выполняется вручную.</p>'
+        content+=f'<section class="server"><h2>GitHub Releases</h2><p>Публичные сборки KrissViktor/ServersStatus. Установка запускается только по вашей команде.</p><form method="post" action="/updates/github/check"><input type="hidden" name="csrf" value="{esc(csrf_token(request))}"><button>Проверить GitHub</button></form></section>'
         with db() as c:
             packages=c.execute('SELECT * FROM update_packages ORDER BY id DESC').fetchall()
             for row in c.execute('SELECT a.id,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id').fetchall():
@@ -62,6 +63,20 @@ def register(app,db,authenticated,csrf_token,digest):
                     content+=f'<p>#{job["id"]} → {esc(job["version"])}: {esc({"queued":"В очереди","running":"Установка","applied":"Установлено","failed":"Ошибка"}.get(job["status"],job["status"]))} — {esc(job["message"])}</p>'
                 content+='</section>'
         return HTMLResponse(page(content))
+
+    @app.post('/updates/github/check')
+    async def check_github(request:Request):
+        if not authenticated(request):raise HTTPException(401)
+        body=await request.body()
+        if len(body)>4096:raise HTTPException(413)
+        form=parse_qs(body.decode())
+        if not hmac.compare_digest(form.get('csrf',[''])[0].encode(),csrf_token(request).encode()):raise HTTPException(403)
+        import asyncio
+        from .github_updates import sync
+        try:await asyncio.to_thread(sync,db)
+        except Exception:
+            return HTMLResponse(page('<h1>Не удалось проверить GitHub</h1><p>Проверьте доступ к github.com и наличие успешных опубликованных сборок для Windows и Linux. Каталог не изменён.</p><a href="/updates">Вернуться к обновлениям</a>'),status_code=502)
+        return RedirectResponse('/updates',303)
 
     @app.post('/updates/{agent}')
     async def enqueue(agent:str,request:Request):
@@ -97,8 +112,25 @@ def register(app,db,authenticated,csrf_token,digest):
             job=pending(c,agent)
             if not job or job['id']!=job_id:raise HTTPException(404)
             row=c.execute('SELECT path FROM update_packages WHERE sha256=?',(job['sha256'],)).fetchone()
-            path=Path(row['path']).resolve()
-            if not path.is_relative_to(PACKAGE_ROOT.resolve()) or not path.is_file():raise HTTPException(404)
+        # No SQLite write lock is held while connecting to GitHub or streaming a binary.
+        if job.get('download_url'):
+            from agent.github_releases import open_public
+            try:source=open_public(job['download_url'])
+            except Exception:raise HTTPException(502,'GitHub недоступен')
+            def stream():
+                size=0
+                try:
+                    while True:
+                        chunk=source.read(128*1024)
+                        if not chunk:break
+                        size+=len(chunk)
+                        if size>job['size']:raise ValueError('Unexpected package size')
+                        yield chunk
+                    if size!=job['size']:raise ValueError('Incomplete package')
+                finally:source.close()
+            return StreamingResponse(stream(),media_type='application/octet-stream',headers={'Cache-Control':'no-store'})
+        path=Path(row['path']).resolve()
+        if not path.is_relative_to(PACKAGE_ROOT.resolve()) or not path.is_file():raise HTTPException(404)
         return FileResponse(path,media_type='application/octet-stream',filename='package')
 
     @app.post('/api/agent-update/{agent}/status')
