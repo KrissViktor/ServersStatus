@@ -51,7 +51,9 @@ def collect(config, previous):
     extra = extended_metrics(before, after)
     memory = extra['system']
     memory_percent = round(memory['memory_used_bytes']/memory['memory_total_bytes']*100,1) if memory['memory_total_bytes'] else 0
-    return {**extra, 'features': ['auto_services_v1', 'rdp_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1'], 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
+    from agent.version import version, agent_platform
+    from agent.remote_update import enabled
+    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1']), 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
 
 
 def run(config_path, stop=None):
@@ -74,6 +76,13 @@ def run(config_path, stop=None):
                 if response.status != 200:
                     raise RuntimeError('Сервер отклонил отчёт')
                 reply = json.loads(response.read(65537))
+                if os.name == 'nt':
+                    from agent.remote_update import enabled, request as update_request, endpoint, launch_windows
+                    if enabled():
+                        with update_request(config, endpoint(config)) as update_response:
+                            job = json.loads(update_response.read(65536)).get('job')
+                        if job:
+                            launch_windows(config, config_path, job)
                 requested_interval = reply.get('report_interval_seconds')
                 if isinstance(requested_interval, int) and 5 <= requested_interval <= 3600:
                     interval = requested_interval

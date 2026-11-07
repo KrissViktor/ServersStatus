@@ -58,6 +58,8 @@ def db():
         CREATE TABLE IF NOT EXISTS auth_guard (address TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
+        from .updates import SCHEMA
+        connection.executescript(SCHEMA)
         yield connection
         connection.commit()
     finally:
@@ -206,6 +208,9 @@ class RdpInfo(BaseModel):
 
 
 class Report(BaseModel):
+    agent_version: str = Field(default="dev", max_length=80)
+    agent_platform: str = Field(default="unknown", max_length=40)
+    portal: dict | None = None
     auto_services_enabled: bool | None = None
     manual_services: list[str] | None = Field(default=None, max_length=100)
     features: list[str] = Field(default_factory=list, max_length=20)
@@ -251,6 +256,8 @@ async def report(agent_id: str, request: Request):
         c.execute('INSERT INTO latest_reports VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data', (agent_id,received,encoded))
         c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded))
         cleanup(c,received)
+        from .updates import confirm
+        confirm(c,agent_id,data)
 
         remote = c.execute('SELECT revision, data FROM agent_settings WHERE agent=?', (agent_id,)).fetchone()
         monitoring = {'revision': remote['revision'], 'settings': json.loads(remote['data'])} if remote else {'revision': 0, 'settings': None}
@@ -345,6 +352,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
+                c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
                 record(c,name,'configuration','Агент удалён')
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
@@ -536,7 +544,7 @@ async def request_protection(request: Request, call_next):
         except ValueError:
             return JSONResponse({'detail': 'Некорректная длина запроса'}, status_code=400)
     # Do not cut off Windows agents behind the same public NAT as a blocked user.
-    if not request.url.path.startswith('/api/report/'):
+    if not request.url.path.startswith(('/api/report/','/api/agent-update/')):
         with db() as c:
             wait = blocked_seconds(c, address, time.time())
         if wait:
@@ -569,3 +577,8 @@ def bot_status(request: Request):
     from .bot_health import health_page
     with db() as c:
         return HTMLResponse(health_page(c))
+
+from .updates import register as register_updates
+register_updates(app,db,authenticated,csrf_token,digest)
+from .host_ui import register as register_host_ui
+register_host_ui(app,db,authenticated)

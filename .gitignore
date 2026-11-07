@@ -6,3 +6,5 @@ __pycache__/
 agent/config.json
 .pytest_cache/
 *.remote.json*
+
+agent/VERSION

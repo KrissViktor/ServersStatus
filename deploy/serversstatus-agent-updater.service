@@ -1,0 +1,16 @@
+[Unit]
+Description=ServersStatus privileged Linux agent updater
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/serversstatus-agent/update.json
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/serversstatus-agent/current
+ExecStart=/opt/serversstatus-agent/.venv/bin/python -m agent.update_worker
+TimeoutStartSec=300
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

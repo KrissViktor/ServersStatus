@@ -1,0 +1,21 @@
+[Unit]
+Description=ServersStatus Raspberry Pi monitoring
+After=network.target serversstatus.service
+
+[Service]
+Type=simple
+User=serversstatus
+Group=serversstatus
+WorkingDirectory=/opt/ServersStatus
+Environment=STATUS_DB=/var/lib/serversstatus/status.sqlite3
+ExecStart=/opt/ServersStatus/.venv/bin/python -m server.host_monitor
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serversstatus
+
+[Install]
+WantedBy=multi-user.target

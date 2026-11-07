@@ -1,0 +1,10 @@
+[Unit]
+Description=Check approved ServersStatus agent updates
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=30
+Unit=serversstatus-agent-updater.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,130 @@
+# Raspberry Pi и обновления агентов из панели
+
+## 1. Обновление панели и мониторинг Raspberry Pi
+
+На Raspberry Pi:
+
+    cd /opt/ServersStatus
+    sudo git pull --ff-only origin main
+    sudo cp deploy/serversstatus-host-monitor.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl restart serversstatus
+    sudo systemctl enable --now serversstatus-host-monitor
+    sudo systemctl status serversstatus-host-monitor --no-pager
+
+Служба работает от пользователя serversstatus и использует существующую базу.
+Каждые 10 секунд сохраняет CPU, ОЗУ, корневой диск, сеть, дисковые операции,
+время работы, состояние установленных служб панели и бота. Температура читается
+из sysfs; при отсутствии датчика показывается «датчик недоступен».
+Размер базы включает SQLite WAL/SHM. История хранится по общей политике 186 дней.
+В меню появятся «Raspberry Pi» и «Обновления». Raspberry Pi также видна в общем
+списке, графиках и Telegram. Не создавайте вручную агент с ID raspi-portal:
+этот ID резервирует локальная служба. При конфликте она завершится с ошибкой.
+
+Проверка журнала:
+
+    sudo journalctl -u serversstatus-host-monitor -n 50 --no-pager
+
+Raspberry Pi не обновляется как удалённый агент: её код обновляется вместе с порталом.
+Если Pi полностью выключится, её бот тоже остановится: для оповещения о полном
+отказе Pi нужен отдельный внешний монитор.
+
+## 2. Один раз подготовить агенты
+
+Старые версии не умеют устанавливать обновления. Поэтому сначала обновите их
+обычным способом. После этого последующие совместимые версии можно ставить из панели.
+
+### Windows Server 2019 / Windows 10 x64
+
+В GitHub Actions откройте успешный запуск **Build Windows agent** после этого
+изменения, скачайте **ServersStatus-Windows-x64**. Распакуйте на Windows в
+C:\ServersStatusUpdate. В PowerShell от администратора:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\ServersStatusUpdate\Update-Agent.ps1
+
+Используйте универсальный Update-Agent.ps1 на всех компьютерах.
+Update-BackupAgent.ps1 предназначен только для правил бэкапов на WIN-CU629F0N7II.
+Установленная служба должна находиться в стандартном каталоге
+C:\Program Files\ServersStatus\ServersStatusService.exe. Конфигурация остаётся
+в C:\ProgramData\ServersStatus\config.json. Агент должен работать как LocalSystem,
+как его устанавливает штатный установщик.
+
+После нового отчёта в «Обновлениях» появится версия и возможность обновления.
+SHA256SUMS.txt и VERSION.txt из того же артефакта понадобятся для размещения пакета на Pi.
+Сам файл для удалённого обновления — **ServersStatusService.exe**, не Setup.exe.
+
+### Linux (включая CentOS Stream 9)
+
+На Linux-сервере под root обновите исходный checkout (до первого удалённого обновления):
+
+    cd /opt/serversstatus-agent/current
+    git pull --ff-only origin main
+    /opt/serversstatus-agent/.venv/bin/python -m pip install -r agent/requirements-linux.txt
+    install -d -o root -g root -m 755 /etc/serversstatus-agent
+    install -o root -g root -m 600 /var/lib/serversstatus-agent/config.json /etc/serversstatus-agent/update.json
+    cp deploy/serversstatus-agent-updater.service deploy/serversstatus-agent-updater.timer /etc/systemd/system/
+    systemctl daemon-reload
+    systemctl restart serversstatus-agent
+    systemctl enable --now serversstatus-agent-updater.timer
+
+Это отдельный root-updater. Обычный агент остаётся непривилегированным.
+Код в /opt/serversstatus-agent и root-конфигурация не должны быть доступны на запись
+пользователю serversstatus-agent. Не меняйте владельца этих каталогов на агента.
+update.json содержит копию адреса панели, имени и ключа. После перевыпуска ключа
+обновляйте обе конфигурации, сохраняя update.json root:root 600.
+Таймер проверяет задания раз в 30 секунд.
+
+После удалённой установки current становится ссылкой на каталог releases.
+Для дальнейших обновлений используйте панель; git pull внутри этого каталога
+уже не применяется. Смена зависимостей Python требует ручного обновления venv:
+root-updater отклоняет пакет, если requirements-linux.txt отличается.
+
+## 3. Разместить проверенный пакет на Raspberry Pi
+
+Пакеты заранее скачивает администратор из успешной сборки GitHub Actions и
+передаёт на Pi, например через SCP. Панель не принимает произвольные URL и
+не загружает исполняемые файлы через веб-форму. Каталог пакетов root-owned,
+веб-служба может только читать его. По HTTPS пакет получают только агенты,
+которым администратор назначил именно это обновление.
+
+Для Windows загрузите на Pi ServersStatusService.exe, VERSION.txt и SHA256SUMS.txt
+из одного артефакта. Для Linux — ServersStatus-Linux.tar.gz и соответствующие файлы
+из **ServersStatus-Linux-Python311**. VERSION.txt содержит 12 символов commit SHA.
+Сверьте контрольную сумму с артефактом. Выполните на Pi, подставляя реальные
+версию, путь и SHA256 (64 шестнадцатеричных символа):
+
+    cd /opt/ServersStatus
+    sudo env STATUS_DB=/var/lib/serversstatus/status.sqlite3 .venv/bin/python -m server.updates windows-x64 VERSION /home/admin/ServersStatusService.exe SHA256
+
+Для Linux:
+
+    sudo env STATUS_DB=/var/lib/serversstatus/status.sqlite3 .venv/bin/python -m server.updates linux-source VERSION /home/admin/ServersStatus-Linux.tar.gz SHA256
+
+Не меняйте существующий STATUS_DB, если у вас используется другой путь.
+SHA256 проверяется перед регистрацией. Повторная регистрация одинакового файла
+не нужна. Храните только доверенные сборки своего репозитория: этот код выполняется
+с правами службы агента (LocalSystem на Windows, root-helper при установке Linux).
+
+Откройте **Обновления**, выберите подходящую версию у нужного сервера и нажмите
+**Обновить агент**. Устанавливайте сначала на одном сервере. Будет короткий перерыв
+в отчётах. Windows получает задание примерно за 10 секунд, Linux — до 30 секунд.
+Обновляется программа агента; Windows/Linux и приложения 1C/SQL не обновляются.
+
+Состояния: «В очереди» → «Установка» → «Установлено». Последнее появляется только
+после отчёта с ожидаемой версией и платформой. Через 15 минут без подтверждения —
+«Ошибка», а не ложный успех. Обновите страницу «Обновления», чтобы увидеть результат.
+
+При ошибке запуска helper пытается вернуть предыдущую версию. Windows сохраняет
+EXE рядом со службой с расширением .job-ID.previous. Linux сохраняет previous-ID
+в /opt/serversstatus-agent. Старые версии автоматически не удаляются: после проверки
+можно удалить ненужные резервные копии вручную. При отключении питания посреди
+замены или ошибке восстановления проверьте службу локально перед повторной попыткой.
+
+Linux-журнал:
+
+    journalctl -u serversstatus-agent-updater -n 50 --no-pager
+    systemctl status serversstatus-agent --no-pager
+
+На Windows проверьте службу ServersStatusAgent и журнал агента в
+C:\ProgramData\ServersStatus. Настройки мониторинга и ключи при штатной установке
+не перезаписываются.
