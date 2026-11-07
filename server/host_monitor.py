@@ -52,6 +52,8 @@ def main():
     while True:
         started=time.monotonic()
         try:
+            from agent.processes import begin,finish
+            before=begin()
             data=collect({'auto_monitor_services':False},{})
             data.update(agent_platform='portal',features=['host_monitor_v1'],services=[],discovered_services=[],auto_services_enabled=False)
             units=['serversstatus.service','serversstatus-bot.service','serversstatus-notify.timer','serversstatus-host-monitor.service','serversstatus-events.timer','serversstatus-hysteria.service']
@@ -59,7 +61,12 @@ def main():
             data['services']=systemd_services(units)
             data['portal']={'temperature_c':temperature(),'database_bytes':database_size(DB)}
             data=Report.model_validate(data).model_dump()
+            processes=finish(before)
             if not store(db,agent,data,time.time()):return
+            from .processes import store as store_processes
+            with db() as c:
+                if c.execute('SELECT 1 FROM agents WHERE id=?',(agent,)).fetchone():
+                    store_processes(c,agent,processes)
         except Exception:
             logging.exception('Local telemetry collection failed')
         time.sleep(max(.5,10-(time.monotonic()-started)))

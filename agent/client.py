@@ -53,7 +53,7 @@ def collect(config, previous):
     memory_percent = round(memory['memory_used_bytes']/memory['memory_total_bytes']*100,1) if memory['memory_total_bytes'] else 0
     from agent.version import version, agent_platform
     from agent.remote_update import enabled
-    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1']), 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
+    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1']), 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
 
 
 def run(config_path, stop=None):
@@ -67,7 +67,10 @@ def run(config_path, stop=None):
     while stop is None or not stop.is_set():
         cycle_started = time.monotonic()
         try:
+            from agent.processes import begin, finish
+            process_before = begin()
             report = collect(effective_config(config, cached), previous)
+            process_snapshot = finish(process_before)
             report['monitoring_revision'] = cached['revision']
             from urllib.parse import quote
             url = config['server_url'].rstrip('/') + '/api/report/' + quote(config['agent_id'], safe='')
@@ -91,6 +94,14 @@ def run(config_path, stop=None):
                     if updated != cached:
                         cached = save_cache(cache_path, updated)
                         previous.clear()
+            # Failure of optional process upload must not discard monitoring settings.
+            try:
+                process_url = config['server_url'].rstrip('/') + '/api/processes/' + quote(config['agent_id'], safe='')
+                process_request = urllib.request.Request(process_url, data=json.dumps(process_snapshot,ensure_ascii=False).encode('utf-8'), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'}, method='POST')
+                with urllib.request.urlopen(process_request, timeout=15) as response:
+                    response.read(4096)
+            except Exception:
+                logging.warning('Не удалось отправить список процессов; повтор в следующем цикле')
         except Exception:
             logging.error('Не удалось собрать или отправить отчёт; повтор в следующем цикле')
         delay = max(0.5, interval-(time.monotonic()-cycle_started))

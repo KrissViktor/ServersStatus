@@ -60,6 +60,8 @@ def db():
         ''')
         from .updates import SCHEMA
         connection.executescript(SCHEMA)
+        from .processes import SCHEMA as PROCESS_SCHEMA
+        connection.executescript(PROCESS_SCHEMA)
         yield connection
         connection.commit()
     finally:
@@ -200,9 +202,15 @@ class RdpSession(BaseModel):
     username: str = Field(max_length=255)
     domain: str = Field(default='', max_length=255)
     state: str = Field(pattern='^(active|disconnected|other)$')
+    client_name: str | None = Field(default=None,max_length=255)
+    client_address: str | None = Field(default=None,max_length=100)
+    logon_at: float | None = Field(default=None,ge=0,allow_inf_nan=False)
+    duration_seconds: float | None = Field(default=None,ge=0,allow_inf_nan=False)
+    idle_seconds: float | None = Field(default=None,ge=0,allow_inf_nan=False)
 
 
 class RdpInfo(BaseModel):
+    partial: bool = False
     status: str = Field(pattern='^(available|unavailable|unsupported)$')
     sessions: list[RdpSession] = Field(default_factory=list, max_length=200)
 
@@ -351,6 +359,7 @@ async def change_agent(action: str, request: Request):
             else:
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
+                c.execute('DELETE FROM latest_processes WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
                 record(c,name,'configuration','Агент удалён')
@@ -539,12 +548,13 @@ async def request_protection(request: Request, call_next):
     length = request.headers.get('content-length')
     if length:
         try:
-            if int(length) > 65536 or int(length) < 0:
+            limit = 2*1024**2 if request.url.path.startswith('/api/processes/') else 65536
+            if int(length) > limit or int(length) < 0:
                 return JSONResponse({'detail': 'Слишком большой запрос'}, status_code=413)
         except ValueError:
             return JSONResponse({'detail': 'Некорректная длина запроса'}, status_code=400)
     # Do not cut off Windows agents behind the same public NAT as a blocked user.
-    if not request.url.path.startswith(('/api/report/','/api/agent-update/')):
+    if not request.url.path.startswith(('/api/report/','/api/agent-update/','/api/processes/')):
         with db() as c:
             wait = blocked_seconds(c, address, time.time())
         if wait:
@@ -582,3 +592,6 @@ from .updates import register as register_updates
 register_updates(app,db,authenticated,csrf_token,digest)
 from .host_ui import register as register_host_ui
 register_host_ui(app,db,authenticated)
+
+from .processes import register as register_processes
+register_processes(app,db,authenticated,digest)

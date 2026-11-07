@@ -12,7 +12,12 @@
 
 # Replace with a domain whose DNS A record points to your home IP.
 status.example.com {
-    request_body {
+    @processes path /api/processes/*
+    request_body @processes {
+        max_size 2MB
+    }
+    @standard not path /api/processes/*
+    request_body @standard {
         max_size 64KB
     }
     @scanners path /.env /.git/* /wp-login.php /wp-admin/* /phpmyadmin/*

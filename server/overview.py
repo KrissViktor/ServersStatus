@@ -85,5 +85,7 @@ def detail_page(row, csrf):
     content += '<p class="muted detail-note">Обновление показателей каждые 10 секунд, без перезагрузки страницы.</p><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time())
     from .forecast import forecast_html
     content += forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180) + '</div>'
+    from .processes_ui import process_section
+    content += process_section(row['id'])
     content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
     return page(content, refresh=True)

@@ -1,4 +1,5 @@
-from .dashboard import esc, size, cpu_description, memory_description
+from .dashboard import esc, size, cpu_description, memory_description, duration
+from datetime import datetime, timezone, timedelta
 
 
 def rate(value):
@@ -46,13 +47,18 @@ def rdp_section(data):
     elif not rdp.get('sessions'):
         content += '<p class="muted">Пользователей RDP нет.</p>'
     else:
+        if rdp.get('partial'):content += '<p class="notice">Часть сеансов недоступна для чтения.</p>'
         active = [s for s in rdp['sessions'] if s.get('state') == 'active']
         unique = {(s.get('domain', ''), s.get('username', '')) for s in active}
         content += f'<p class="muted">Подключённых пользователей: {len(unique)} · Активных сессий: {len(active)}</p>'
-        content += '<div class="table-scroll"><table class="metric-table"><tr><th>Пользователь</th><th>Сессия</th><th>Состояние</th></tr>'
+        content += '<div class="table-scroll"><table class="metric-table"><tr><th>Пользователь</th><th>Сессия</th><th>Состояние</th><th>Вход (МСК)</th><th>Длительность</th><th>Простой</th><th>Компьютер клиента</th><th>IP клиента</th></tr>'
         for session in rdp['sessions']:
-            user = (str(session.get('domain'))+'\\\\' if session.get('domain') else '') + str(session.get('username', ''))
-            state = {'active':'Подключён','disconnected':'Отключён (сессия сохранена)'}.get(session.get('state'), 'Другое')
-            content += '<tr><td>'+esc(user)+'</td><td>'+esc(session.get('session_id',''))+'</td><td>'+state+'</td></tr>'
+            user = (str(session.get('domain'))+'\\' if session.get('domain') else '') + str(session.get('username', ''))
+            state = {'active':'🟢 Подключён','disconnected':'🔴 Отключён (сессия сохранена)'}.get(session.get('state'), 'Другое')
+            try:
+                logon=datetime.fromtimestamp(session['logon_at'],timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S') if session.get('logon_at') is not None else '—'
+            except (ValueError,OverflowError,OSError):logon='—'
+            extra=[logon, duration(session['duration_seconds']) if session.get('duration_seconds') is not None else '—',duration(session['idle_seconds']) if session.get('idle_seconds') is not None else '—',session.get('client_name') or '—',session.get('client_address') or '—']
+            content += '<tr><td>'+esc(user)+'</td><td>'+esc(session.get('session_id',''))+'</td><td>'+state+'</td>'+''.join('<td>'+esc(v)+'</td>' for v in extra)+'</tr>'
         content += '</table></div>'
     return content + '</section>'

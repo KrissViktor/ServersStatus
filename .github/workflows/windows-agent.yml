@@ -26,6 +26,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_settings.py -v
       - name: Test Windows inventory
         run: python -m unittest discover -s tests -p test_windows_inventory.py -v
+      - name: Test process inventory and RDP details
+        run: python -m unittest discover -s tests -p test_process_inventory.py -v
       - name: Stamp agent version
         shell: pwsh
         run: |

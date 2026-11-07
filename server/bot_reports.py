@@ -78,6 +78,15 @@ def rdp_report(servers,now):
             user=(str(session.get('domain'))+'\\' if session.get('domain') else '')+str(session.get('username',''))
             state={'active':'🟢 подключён','disconnected':'🔴 отключён, сессия сохранена'}.get(session.get('state'),'другое состояние')
             lines.append(user+' · ID '+str(session.get('session_id',''))+' · '+state)
+            details=[]
+            if session.get('logon_at') is not None:
+                try:details.append('Вход: '+datetime.fromtimestamp(session['logon_at'],MSK).strftime('%d.%m %H:%M:%S')+' МСК')
+                except (ValueError,OverflowError,OSError):pass
+            for key,label in [('duration_seconds','Длительность'),('idle_seconds','Простой')]:
+                if session.get(key) is not None:details.append(label+': '+duration(session[key]))
+            if session.get('client_name'):details.append('Клиент: '+str(session['client_name']))
+            if session.get('client_address'):details.append('IP: '+str(session['client_address']))
+            if details:lines.append('  '+' · '.join(details))
     if not count:lines.append('Windows-серверов с данными RDP пока нет.')
     return split_text('\n'.join(lines))
 
