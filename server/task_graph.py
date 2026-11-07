@@ -1,0 +1,47 @@
+"""Small Windows Task Manager style graphs for current CPU and RAM."""
+from datetime import datetime,timedelta,timezone
+import html
+import math
+
+WINDOW=300
+
+
+def graph(points,field,now):
+    start=now-WINDOW
+    samples=[]
+    for point in points:
+        timestamp=point.get('timestamp')
+        value=point.get(field)
+        if not isinstance(timestamp,(int,float)) or not isinstance(value,(int,float)):
+            continue
+        if not math.isfinite(timestamp) or not math.isfinite(value) or not start<=timestamp<=now:
+            continue
+        samples.append((timestamp,min(100,max(0,value))))
+    samples.sort()
+    intervals=[b[0]-a[0] for a,b in zip(samples,samples[1:]) if b[0]>a[0]]
+    max_gap=min(180,max(35,min(intervals,default=10)*3))
+    x=lambda timestamp:(timestamp-start)/WINDOW*320
+    y=lambda value:98-value*.96
+    content='<svg class="task-graph" viewBox="0 0 320 100" preserveAspectRatio="none" role="img" aria-label="'+('Загрузка процессора' if field=='cpu' else 'Использование памяти')+' за последние 5 минут">'
+    for position in (0,40,80,120,160,200,240,280,320):
+        content+=f'<line class="task-grid" x1="{position}" x2="{position}" y1="0" y2="100"/>'
+    for position in (2,26,50,74,98):
+        content+=f'<line class="task-grid" x1="0" x2="320" y1="{position}" y2="{position}"/>'
+    segments=[]
+    for sample in samples:
+        if not segments or sample[0]-segments[-1][-1][0]>max_gap:
+            segments.append([])
+        segments[-1].append(sample)
+    for segment in segments:
+        line='M '+' L '.join(f'{x(t):.2f},{y(value):.2f}' for t,value in segment)
+        if len(segment)>1:
+            fill=f'M {x(segment[0][0]):.2f},100 L '+' L '.join(f'{x(t):.2f},{y(value):.2f}' for t,value in segment)+f' L {x(segment[-1][0]):.2f},100 Z'
+            content+=f'<path class="task-fill" d="{fill}"/>'
+        content+=f'<path class="task-line" d="{line}"/>'
+    for timestamp,value in samples:
+        stamp=datetime.fromtimestamp(timestamp,timezone(timedelta(hours=3))).strftime('%H:%M:%S МСК')
+        content+=f'<circle class="task-point" cx="{x(timestamp):.2f}" cy="{y(value):.2f}" r="2"><title>{html.escape(stamp)} · {value:.1f}%</title></circle>'
+    content+='</svg>'
+    if not samples:
+        content+='<span class="task-empty">Нет измерений за последние 5 минут</span>'
+    return content

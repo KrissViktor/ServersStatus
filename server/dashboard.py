@@ -47,9 +47,20 @@ def level(percent):
     return 'danger' if percent >= 95 else 'warning' if percent >= 85 else 'normal'
 
 
-def meter(label, value, description):
-    percent = min(100, number(value))
-    return f'<div class="metric"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><progress class="{level(percent)}" max="100" value="{percent}" aria-label="{esc(label)}"></progress><p class="muted">{esc(description)}</p></div>'
+def meter(label,value,description,points=None,field='cpu',now=None):
+    from .task_graph import graph
+    percent=min(100,number(value))
+    now=time.time() if now is None else now
+    return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now) + '</div><div class="task-axis"><span>5 минут</span><span>Сейчас</span></div><p class="muted task-description">' + esc(description) + '</p></div>'
+
+
+def resource_points(row,data):
+    cached=dict(row).get('sparkline')
+    if cached is not None:
+        return cached
+    if row['received'] is None:
+        return []
+    return [{'timestamp':row['received'],'cpu':data.get('cpu_percent'),'ram':data.get('memory_percent')}]
 
 
 
@@ -138,7 +149,8 @@ def server_card(row, now):
     content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
     if not online:
         content += '<p class="notice">Данные устарели: агент не присылал отчёт более 3 минут.</p>'
-    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data)) + meter('Оперативная память', data.get('memory_percent'), memory_description(data)) + '</div><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
+    points=resource_points(row,data)
+    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data),points,'cpu',now) + meter('Оперативная память', data.get('memory_percent'), memory_description(data),points,'ram',now) + '</div><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
     for disk in monitored_disks(data):
         percent = min(100, number(disk.get('used_percent')))
         content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'

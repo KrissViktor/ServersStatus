@@ -6,7 +6,7 @@ from pathlib import Path
 
 LIVE_SCRIPT = Path(__file__).with_name("overview.js").read_text(encoding="utf-8")
 from urllib.parse import quote
-from .dashboard import esc, page, duration, size, number, meter, server_card, backup_problems, cpu_description, memory_description
+from .dashboard import esc, page, duration, size, number, meter, server_card, backup_problems, cpu_description, memory_description, resource_points
 
 
 def issues(row, now):
@@ -61,7 +61,8 @@ def compact_card(row, now):
         return content + '<p class="empty">Ожидаем первый отчёт агента</p><a class="nav-link" href="' + esc(url) + '">Открыть сервер →</a></article>'
     if age >= 180:
         content += '<p class="notice">Данные устарели — нет связи с агентом</p>'
-    content += '<div class="metrics">' + meter('CPU', data.get('cpu_percent'), cpu_description(data)) + meter('RAM', data.get('memory_percent'), memory_description(data)) + '</div>'
+    points=resource_points(row,data)
+    content += '<div class="metrics">' + meter('CPU', data.get('cpu_percent'), cpu_description(data),points,'cpu',now) + meter('RAM', data.get('memory_percent'), memory_description(data),points,'ram',now) + '</div>'
     content += '<div class="compact-disks">'
     for disk in monitored_disks(data):
         content += '<p><b>' + esc(disk.get('path', '')) + '</b><span>' + size(disk.get('free_bytes')) + ' свободно · ' + f'{number(disk.get("used_percent")):.1f}% занято' + '</span></p>'
