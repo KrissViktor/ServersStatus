@@ -256,7 +256,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -548,3 +548,11 @@ def journal(request: Request, agent: str = '', level: str = '', before: int = 0)
     with db() as c:
         rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before)).fetchall()
     return HTMLResponse(event_page(rows,agent,level,before))
+
+@app.get('/bot', response_class=HTMLResponse)
+def bot_status(request: Request):
+    if not authenticated(request):
+        return RedirectResponse('/', status_code=303)
+    from .bot_health import health_page
+    with db() as c:
+        return HTMLResponse(health_page(c))

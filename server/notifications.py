@@ -25,9 +25,9 @@ def proxy_request(token, method, payload, proxy):
             response = client.post('https://api.telegram.org/bot' + token + '/' + method, json=payload)
             result = response.json()
             if response.status_code == 429:
-                raise DeliveryError(int(result.get('parameters', {}).get('retry_after', 60)))
+                raise DeliveryError(int(result.get('parameters', {}).get('retry_after', 60)), status=429)
             if response.status_code != 200 or not result.get('ok'):
-                raise DeliveryError()
+                raise DeliveryError(status=response.status_code)
             return result['result']
     except ImportError:
         raise DeliveryError() from None
@@ -46,7 +46,7 @@ def telegram_request(token, method, payload):
                                      data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'}, method='POST')
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
-            result = json.loads(response.read(65536))
+            result = json.loads(response.read(1024*1024 if method == 'getUpdates' else 65536))
         if not result.get('ok'):
             raise DeliveryError()
         return result['result']
@@ -57,7 +57,7 @@ def telegram_request(token, method, payload):
                 retry = int(json.loads(error.read(65536)).get('parameters', {}).get('retry_after', 60))
             except (ValueError, TypeError):
                 pass
-        raise DeliveryError(retry) from None
+        raise DeliveryError(retry,status=error.code) from None
     except (OSError, ValueError, KeyError):
         # Never expose the URL: it contains the bot credential.
         raise DeliveryError() from None

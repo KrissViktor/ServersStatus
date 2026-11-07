@@ -1,0 +1,29 @@
+[Unit]
+Description=ServersStatus interactive Telegram bot
+After=network-online.target serversstatus-hysteria.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=serversstatus
+Group=serversstatus
+WorkingDirectory=/opt/ServersStatus
+Environment=STATUS_DB=/var/lib/serversstatus/status.sqlite3
+EnvironmentFile=/etc/serversstatus-telegram.env
+ExecStart=/opt/ServersStatus/.venv/bin/python -m server.bot
+Restart=always
+RestartSec=10
+WatchdogSec=120
+TimeoutStartSec=45
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serversstatus
+
+[Install]
+WantedBy=multi-user.target
