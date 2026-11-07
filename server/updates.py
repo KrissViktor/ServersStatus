@@ -95,6 +95,7 @@ def register(app,db,authenticated,csrf_token,digest):
             if not p or not row or time.time()-row['received']>120 or 'remote_update_v1' not in data.get('features',[]) or data.get('agent_platform')!=p['platform'] or data.get('agent_version')==p['version']:
                 raise HTTPException(400,'Агент не готов или пакет не подходит')
             if pending(c,agent):raise HTTPException(409,'Уже выполняется обновление')
+            if c.execute("SELECT 1 FROM windows_commands WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Сначала завершите команду управления Windows')
             now=time.time()
             c.execute("INSERT INTO agent_update_jobs(agent,package,status,message,created,updated) VALUES (?,?,'queued','Ожидание агента',?,?)",(agent,package,now,now))
         return RedirectResponse('/updates',303)

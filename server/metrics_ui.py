@@ -7,9 +7,11 @@ def rate(value):
 
 
 def extended_sections(data):
+    from .windows_ui import section as windows_section
+    windows_html=windows_section(data)
     system = data.get('system')
     if not system:
-        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data)
+        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data) + windows_html
     facts = [
         ('Операционная система', system.get('distribution') or ' '.join(str(system.get(k) or '') for k in ('os', 'release', 'edition'))),
         ('Версия / сборка', system.get('version') or 'Недоступно'),
@@ -32,7 +34,7 @@ def extended_sections(data):
     if not data.get('disk_io'):
         content += '<p class="muted">Счётчики дисковых операций недоступны в ОС.</p>'
     content += '<p class="muted legend">IOPS — операций в секунду. Скорости измерены за ' + esc(f'{data.get("sample_seconds") or 0:.1f}') + ' с перед отправкой отчёта, а не за весь интервал между отчётами. Устройства указаны по именам ОС; соответствие буквам дисков не определялось.</p></section>'
-    return content + rdp_section(data)
+    return content + rdp_section(data) + windows_html
 
 
 def rdp_section(data):

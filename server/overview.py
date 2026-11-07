@@ -87,5 +87,8 @@ def detail_page(row, csrf):
     content += forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180) + '</div>'
     from .processes_ui import process_section
     content += process_section(row['id'])
+    data=json.loads(row['data'] or '{}')
+    if data.get('windows_updates'):
+        content += '<section class="server"><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
     content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
     return page(content, refresh=True)

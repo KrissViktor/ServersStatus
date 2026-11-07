@@ -25,7 +25,7 @@ def request(config,path,data=None):
     headers={'Authorization':'Bearer '+config['token']}
     if data is not None:
         headers['Content-Type']='application/json'
-    call=urllib.request.Request(base+path,headers=headers,data=json.dumps(data).encode() if data is not None else None)
+    call=urllib.request.Request(base+path,headers=headers,data=json.dumps(data,ensure_ascii=False).encode('utf-8') if data is not None else None)
     return urllib.request.build_opener(NoRedirect()).open(call,timeout=45)
 
 

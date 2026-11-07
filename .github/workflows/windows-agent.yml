@@ -33,6 +33,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_windows_inventory.py -v
       - name: Test process inventory and RDP details
         run: python -m unittest discover -s tests -p test_process_inventory.py -v
+      - name: Test Windows management inventory and commands
+        run: python -m unittest discover -s tests -p test_windows_management_agent.py -v
       - name: Stamp agent version
         shell: pwsh
         run: |
@@ -47,8 +49,12 @@ jobs:
           $parseTokens = $null
           [System.Management.Automation.Language.Parser]::ParseFile("$PWD/agent/apply_update.ps1", [ref]$parseTokens, [ref]$parseErrors) | Out-Null
           if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/agent/windows_management.ps1", [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/agent/Enable-WindowsManagement.ps1", [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
       - name: Build standalone service
-        run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --add-data "agent/VERSION;agent" --add-data "agent/apply_update.ps1;agent" --hidden-import win32timezone --hidden-import win32ts --paths . agent/windows_service.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --add-data "agent/VERSION;agent" --add-data "agent/apply_update.ps1;agent" --add-data "agent/windows_management.ps1;agent" --hidden-import win32timezone --hidden-import win32ts --paths . agent/windows_service.py
       - name: Test frozen service registration and startup
         shell: pwsh
         run: |
@@ -76,7 +82,7 @@ jobs:
           Get-ChildItem dist/ServersStatus*.exe | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $_.Name } | Set-Content dist/SHA256SUMS.txt
       - name: Stage backup host update files
         shell: pwsh
-        run: Copy-Item agent/backups.WIN-CU629F0N7II.json, agent/Update-BackupAgent.ps1, agent/Update-Agent.ps1 dist/
+        run: Copy-Item agent/backups.WIN-CU629F0N7II.json, agent/Update-BackupAgent.ps1, agent/Update-Agent.ps1, agent/Enable-WindowsManagement.ps1 dist/
       - uses: actions/upload-artifact@v4
         with:
           name: ServersStatus-Windows-x64
@@ -84,6 +90,7 @@ jobs:
             dist/ServersStatusSetup.exe
             dist/ServersStatusService.exe
             dist/Update-Agent.ps1
+            dist/Enable-WindowsManagement.ps1
             dist/SHA256SUMS.txt
             dist/VERSION.txt
           if-no-files-found: error

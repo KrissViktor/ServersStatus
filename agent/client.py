@@ -53,7 +53,9 @@ def collect(config, previous):
     memory_percent = round(memory['memory_used_bytes']/memory['memory_total_bytes']*100,1) if memory['memory_total_bytes'] else 0
     from agent.version import version, agent_platform
     from agent.remote_update import enabled
-    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1','github_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1']), 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
+    from agent.windows_management import inventory
+    extra['windows_updates']=inventory(config)
+    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1','github_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1', 'windows_management_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1']), 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
 
 
 def run(config_path, stop=None):
@@ -74,7 +76,7 @@ def run(config_path, stop=None):
             report['monitoring_revision'] = cached['revision']
             from urllib.parse import quote
             url = config['server_url'].rstrip('/') + '/api/report/' + quote(config['agent_id'], safe='')
-            request = urllib.request.Request(url, data=json.dumps(report).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'}, method='POST')
+            request = urllib.request.Request(url, data=json.dumps(report,ensure_ascii=False).encode('utf-8'), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'}, method='POST')
             with urllib.request.urlopen(request, timeout=30) as response:
                 if response.status != 200:
                     raise RuntimeError('Сервер отклонил отчёт')
@@ -94,6 +96,9 @@ def run(config_path, stop=None):
                     if updated != cached:
                         cached = save_cache(cache_path, updated)
                         previous.clear()
+            if os.name == 'nt':
+                from agent.windows_management import handle
+                handle(config,config_path)
             # Failure of optional process upload must not discard monitoring settings.
             try:
                 process_url = config['server_url'].rstrip('/') + '/api/processes/' + quote(config['agent_id'], safe='')
