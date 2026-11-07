@@ -55,7 +55,9 @@ def collect(config, previous):
     from agent.remote_update import enabled
     from agent.windows_management import inventory
     extra['windows_updates']=inventory(config)
-    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1','github_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1', 'windows_management_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1']), 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
+    from agent.console import info as console_info
+    extra['console']=console_info(config)
+    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1','github_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1', 'windows_management_v1','console_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1','console_v1']), 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
 
 
 def run(config_path, stop=None):
@@ -96,6 +98,8 @@ def run(config_path, stop=None):
                     if updated != cached:
                         cached = save_cache(cache_path, updated)
                         previous.clear()
+            from agent.console import handle as handle_console
+            handle_console(config,config_path)
             if os.name == 'nt':
                 from agent.windows_management import handle
                 handle(config,config_path)

@@ -66,6 +66,8 @@ def db():
         connection.executescript(GITHUB_SCHEMA)
         from .windows import SCHEMA as WINDOWS_SCHEMA
         connection.executescript(WINDOWS_SCHEMA)
+        from .console import SCHEMA as CONSOLE_SCHEMA
+        connection.executescript(CONSOLE_SCHEMA)
         yield connection
         connection.commit()
     finally:
@@ -221,7 +223,10 @@ class RdpInfo(BaseModel):
 
 from .windows import WindowsInfo
 
+from .console import ConsoleInfo
+
 class Report(BaseModel):
+    console: ConsoleInfo | None = None
     windows_updates: WindowsInfo | None = None
     agent_version: str = Field(default="dev", max_length=80)
     agent_platform: str = Field(default="unknown", max_length=40)
@@ -368,6 +373,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_processes WHERE agent=?', (name,))
                 c.execute('DELETE FROM windows_commands WHERE agent=?', (name,))
+                c.execute('DELETE FROM console_jobs WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
                 record(c,name,'configuration','Агент удалён')
@@ -562,7 +568,7 @@ async def request_protection(request: Request, call_next):
         except ValueError:
             return JSONResponse({'detail': 'Некорректная длина запроса'}, status_code=400)
     # Do not cut off Windows agents behind the same public NAT as a blocked user.
-    if not request.url.path.startswith(('/api/report/','/api/agent-update/','/api/processes/','/api/windows/')):
+    if not request.url.path.startswith(('/api/report/','/api/agent-update/','/api/processes/','/api/windows/','/api/console/')):
         with db() as c:
             wait = blocked_seconds(c, address, time.time())
         if wait:
@@ -606,3 +612,6 @@ register_processes(app,db,authenticated,digest)
 
 from .windows import register as register_windows
 register_windows(app,db,authenticated,csrf_token,digest)
+
+from .console import register as register_console
+register_console(app,db,authenticated,csrf_token,digest)
