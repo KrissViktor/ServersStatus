@@ -9,7 +9,7 @@ import time
 from urllib.parse import parse_qs
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
-from .dashboard import page, esc
+from .dashboard import page
 
 SCHEMA='''
 CREATE TABLE IF NOT EXISTS update_packages (id INTEGER PRIMARY KEY,platform TEXT,version TEXT,sha256 TEXT UNIQUE,size INTEGER,path TEXT);
@@ -22,6 +22,9 @@ PACKAGE_ROOT=Path(os.environ.get('STATUS_PACKAGES','/var/lib/serversstatus-packa
 
 def pending(c,agent):
     now=time.time()
+    stale=c.execute("SELECT id FROM agent_update_jobs WHERE agent=? AND status IN ('queued','running') AND created<?",(agent,now-900)).fetchall()
+    from .update_versions import event
+    for job in stale:event(c,job['id'],'failed','Нет подтверждения за 15 минут; проверьте службу перед повтором',now)
     c.execute("UPDATE agent_update_jobs SET status='failed',message='Нет подтверждения за 15 минут; проверьте службу перед повтором',updated=? WHERE agent=? AND status IN ('queued','running') AND created<?",(now,agent,now-900))
     row=c.execute("SELECT j.id,p.platform,p.version,p.sha256,p.size,g.url AS download_url FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package LEFT JOIN github_packages g ON g.package=p.id WHERE j.agent=? AND j.status IN ('queued','running') ORDER BY j.id DESC LIMIT 1",(agent,)).fetchone()
     return dict(row) if row else None
@@ -30,7 +33,10 @@ def pending(c,agent):
 def confirm(c,agent,data):
     job=pending(c,agent)
     if job and data.agent_version==job['version'] and data.agent_platform==job['platform']:
-        c.execute("UPDATE agent_update_jobs SET status='applied',message='Версия подтверждена отчётом агента',updated=? WHERE id=?",(time.time(),job['id']))
+        now=time.time()
+        c.execute("UPDATE agent_update_jobs SET status='applied',message='Версия подтверждена отчётом агента',updated=? WHERE id=?",(now,job['id']))
+        from .update_versions import event
+        event(c,job['id'],'applied','Версия подтверждена отчётом агента',now)
 
 
 def register(app,db,authenticated,csrf_token,digest):
@@ -42,27 +48,10 @@ def register(app,db,authenticated,csrf_token,digest):
     @app.get('/updates',response_class=HTMLResponse)
     def updates(request:Request):
         if not authenticated(request):return RedirectResponse('/',303)
-        content='<header class="topbar"><a href="/">← Все серверы</a></header><h1>Обновление агентов</h1><p>Проверьте новые версии на GitHub и назначьте обновление выбранному агенту. Конфигурация и ключ сохраняются. Первое обновление старого агента выполняется вручную.</p>'
-        content+=f'<section class="server"><h2>GitHub Releases</h2><p>Публичные сборки KrissViktor/ServersStatus. Установка запускается только по вашей команде.</p><form method="post" action="/updates/github/check"><input type="hidden" name="csrf" value="{esc(csrf_token(request))}"><button>Проверить GitHub</button></form></section>'
+        from .updates_ui import render
+        csrf=csrf_token(request)
         with db() as c:
-            packages=c.execute('SELECT * FROM update_packages ORDER BY id DESC').fetchall()
-            for row in c.execute('SELECT a.id,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id').fetchall():
-                data=json.loads(row['data'] or '{}'); platform=data.get('agent_platform'); agent=row['id']
-                active=pending(c,agent)
-                content+=f'<section class="server"><h2>{esc(agent)}</h2><p>Версия: {esc(data.get("agent_version") or "старый агент")} · {esc(platform or "платформа неизвестна")}</p>'
-                if platform=='portal':
-                    content+='<p>Локальный монитор обновляется вместе с кодом портала на Raspberry Pi.</p>'
-                elif active:
-                    content+='<p>Обновление уже назначено. Обновите страницу для проверки результата.</p>'
-                elif 'remote_update_v1' in data.get('features',[]):
-                    options=''.join(f'<option value="{p["id"]}">{esc(p["version"])}</option>' for p in packages if p['platform']==platform and p['version']!=data.get('agent_version'))
-                    if options:content+=f'<form method="post" action="/updates/{esc(agent)}"><input type="hidden" name="csrf" value="{esc(csrf_token(request))}"><label>Версия<select name="package">{options}</select></label><label class="check"><input type="checkbox" required> Согласен на короткий перезапуск службы агента</label><button>Обновить агент</button></form>'
-                    else:content+='<p>Подходящих новых пакетов пока нет.</p>'
-                else:content+='<p>Удалённое обновление не включено. Выполните первоначальную настройку по инструкции.</p>'
-                for job in c.execute('SELECT j.*,p.version FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package WHERE agent=? ORDER BY j.id DESC LIMIT 5',(agent,)):
-                    content+=f'<p>#{job["id"]} → {esc(job["version"])}: {esc({"queued":"В очереди","running":"Установка","applied":"Установлено","failed":"Ошибка"}.get(job["status"],job["status"]))} — {esc(job["message"])}</p>'
-                content+='</section>'
-        return HTMLResponse(page(content))
+            return HTMLResponse(render(c,csrf))
 
     @app.post('/updates/github/check')
     async def check_github(request:Request):
@@ -98,7 +87,10 @@ def register(app,db,authenticated,csrf_token,digest):
             if c.execute("SELECT 1 FROM windows_commands WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Сначала завершите команду управления Windows')
             if c.execute("SELECT 1 FROM console_jobs WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Сначала завершите команду консоли')
             now=time.time()
-            c.execute("INSERT INTO agent_update_jobs(agent,package,status,message,created,updated) VALUES (?,?,'queued','Ожидание агента',?,?)",(agent,package,now,now))
+            job_id=c.execute("INSERT INTO agent_update_jobs(agent,package,status,message,created,updated) VALUES (?,?,'queued','Ожидание агента',?,?)",(agent,package,now,now)).lastrowid
+            c.execute('INSERT INTO update_job_context VALUES (?,?)',(job_id,data.get('agent_version','неизвестна')))
+            from .update_versions import event
+            event(c,job_id,'queued','Ожидание агента',now)
         return RedirectResponse('/updates',303)
 
     @app.get('/api/agent-update/{agent}')
@@ -157,11 +149,17 @@ def register(app,db,authenticated,csrf_token,digest):
                    'start':'Не удалось запустить обновлённую службу',
                    'health':'Обновлённая служба остановилась после запуска'}
             message='Установка выполняется; ожидается отчёт новой версии' if data['status']=='running' else codes.get(data.get('error_code') if isinstance(data.get('error_code'),str) else '','Агент сообщил об ошибке установки; проверьте журнал службы')
+            if data['status']=='running' and data.get('message') in ('Скачивание проверенного пакета','Скачивание Linux-пакета'):
+                message='Скачивание пакета и проверка SHA256'
             if data['status']=='failed':
                 if data.get('rollback')=='restored':message+='; предыдущий EXE восстановлен'
                 elif data.get('rollback')=='failed':message+='; восстановление не завершено, проверьте службу локально'
                 elif data.get('message')=='Не удалось скачать или проверить пакет; служба не заменена':message='Не удалось скачать пакет или проверить SHA256; EXE службы не заменён'
-            c.execute("UPDATE agent_update_jobs SET status=?,message=?,updated=? WHERE id=? AND agent=? AND status IN ('queued','running')",(data['status'],message,time.time(),data['job_id'],agent))
+            now=time.time()
+            changed=c.execute("UPDATE agent_update_jobs SET status=?,message=?,updated=? WHERE id=? AND agent=? AND status IN ('queued','running')",(data['status'],message,now,data['job_id'],agent))
+            if changed.rowcount:
+                from .update_versions import event
+                event(c,data['job_id'],data['status'],message,now)
         return {'ok':True}
 
 

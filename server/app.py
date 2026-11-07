@@ -68,6 +68,8 @@ def db():
         connection.executescript(WINDOWS_SCHEMA)
         from .console import SCHEMA as CONSOLE_SCHEMA
         connection.executescript(CONSOLE_SCHEMA)
+        from .update_versions import SCHEMA as VERSION_SCHEMA
+        connection.executescript(VERSION_SCHEMA)
         yield connection
         connection.commit()
     finally:

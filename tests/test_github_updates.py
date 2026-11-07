@@ -114,6 +114,7 @@ class ReleasePublicationTest(unittest.TestCase):
             calls=[]
             def gh(*args,**kwargs):
                 calls.append(args)
+                if args[:2]==('release','download'):return SimpleNamespace(returncode=1,stdout='')
                 return SimpleNamespace(returncode=0,stdout=json.dumps({'assets':[]}) if '--json' in args else '')
             with patch('sys.argv',argv),patch.dict(os.environ,{'GITHUB_REPOSITORY':'KrissViktor/ServersStatus','GITHUB_REF':'refs/heads/main','GITHUB_SHA':data['version']+'0'*28}),patch('agent.publish_release.gh',side_effect=gh):
                 publish_release.main()
@@ -142,3 +143,28 @@ class ReleasePublicationTest(unittest.TestCase):
                 publish_release.main()
             uploads=[args for args in calls if args[:2]==('release','upload')]
             self.assertEqual(len(uploads),1);self.assertEqual(uploads[0][2],'agents-stable')
+
+    def test_channel_keeps_one_previous_release(self):
+        from agent import publish_release
+        from types import SimpleNamespace
+        import os
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);data=release('windows-x64');data.update(built_at=1700000200,commit_at=1700000100)
+            older={**data,'version':'111111111111','download_url':data['download_url'].replace(data['version'],'111111111111'),'commit_at':1700000000}
+            oldest={**older,'version':'000000000000','download_url':older['download_url'].replace('111111111111','000000000000')}
+            older['previous']=oldest
+            manifest_path=root/'update-windows.json';manifest_path.write_text(json.dumps(data))
+            package=root/'ServersStatusService.exe';package.write_bytes(b'package')
+            uploads=[]
+            def gh(*args,**kwargs):
+                if '--json' in args:return SimpleNamespace(returncode=0,stdout=json.dumps({'assets':[]}))
+                if args[:3]==('release','download','agents-stable'):
+                    (Path(args[args.index('--dir')+1])/manifest_path.name).write_text(json.dumps(older))
+                if args[:2]==('release','upload'):
+                    uploads.append((args[2],json.loads(Path(args[-2] if args[-1]=='--clobber' else args[-1]).read_text())))
+                return SimpleNamespace(returncode=0,stdout='')
+            with patch('sys.argv',['publish',str(manifest_path),str(package)]),patch.dict(os.environ,{'GITHUB_REPOSITORY':'KrissViktor/ServersStatus','GITHUB_REF':'refs/heads/main','GITHUB_SHA':data['version']+'0'*28}),patch('agent.publish_release.gh',side_effect=gh):
+                publish_release.main()
+            self.assertNotIn('previous',uploads[0][1])
+            self.assertEqual(uploads[1][1]['previous']['version'],'111111111111')
+            self.assertNotIn('previous',uploads[1][1]['previous'])

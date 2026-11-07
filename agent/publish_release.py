@@ -45,6 +45,19 @@ def main():
             stable.write_text(json.dumps(data,indent=2),encoding='utf-8')
             gh('release','upload',tag,str(args.file),str(stable))
         ensure('agents-stable',commit)
+        # Keep one predecessor so a fresh panel can offer rollback without a long catalog.
+        channel_dir=Path(directory)/'channel';channel_dir.mkdir()
+        previous_download=gh('release','download','agents-stable','--pattern',manifest_name,'--dir',str(channel_dir),check=False)
+        channel=json.loads(stable.read_text())
+        if previous_download.returncode==0:
+            previous=json.loads((channel_dir/manifest_name).read_text())
+            validate_manifest(previous,data['platform'])
+            if previous.get('commit_at') and channel.get('commit_at') and previous['commit_at']>channel['commit_at']:return
+            if previous['version']!=channel['version']:
+                channel['previous']={key:value for key,value in previous.items() if key!='previous'}
+            elif previous.get('previous'):
+                channel['previous']=previous['previous']
+        stable.write_text(json.dumps(channel,indent=2),encoding='utf-8')
         gh('release','upload','agents-stable',str(stable),'--clobber')
 
 if __name__=='__main__':main()

@@ -1,5 +1,6 @@
 """Public GitHub release downloads. Panel credentials are never used here."""
 import json
+import math
 import re
 import urllib.parse
 import urllib.request
@@ -40,6 +41,9 @@ def validate_manifest(data,platform):
     if not isinstance(version,str) or not re.fullmatch(r'[a-f0-9]{12}',version):raise ValueError('Invalid release version')
     if not isinstance(data.get('sha256'),str) or not re.fullmatch(r'[a-f0-9]{64}',data['sha256']):raise ValueError('Invalid checksum')
     if type(data.get('size')) is not int or not 1<=data['size']<=MAX_PACKAGE:raise ValueError('Invalid release size')
+    for key in ('built_at','commit_at'):
+        value=data.get(key)
+        if value is not None and (type(value) not in (int,float) or not math.isfinite(value) or not 0<value<4102444800):raise ValueError('Invalid version timestamp')
     kind,filename=PLATFORMS[platform]
     expected=BASE+'agent-'+kind+'-'+version+'/'+filename
     if data.get('download_url')!=expected:raise ValueError('Unexpected release path')
@@ -51,4 +55,8 @@ def manifest(platform):
     with open_public(BASE+'agents-stable/update-'+kind+'.json') as response:
         body=response.read(16385)
     if len(body)>16384:raise ValueError('Manifest too large')
-    return validate_manifest(json.loads(body),platform)
+    data=validate_manifest(json.loads(body),platform)
+    if data.get('previous') is not None:
+        previous=validate_manifest(data['previous'],platform)
+        if previous.get('previous') is not None or previous['version']==data['version']:raise ValueError('Invalid previous release')
+    return data
