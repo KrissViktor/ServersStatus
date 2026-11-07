@@ -176,3 +176,47 @@ Linux-журнал:
 На Windows проверьте службу ServersStatusAgent и журнал агента в
 C:\ProgramData\ServersStatus. Настройки мониторинга и ключи при штатной установке
 не перезаписываются.
+
+## Восстановление Windows после ошибки замены EXE
+
+Старый встроенный PowerShell-помощник мог пытаться заменить EXE сразу после
+SCM Stopped, пока родительский процесс PyInstaller ещё удерживал файл.
+Исправленный помощник ждёт завершения процессов/освобождения файла, повторяет
+копирование и записывает этап ошибки в update.log. Это возможная причина общей
+ошибки Windows; при ошибке скачивания или запуска нужны соответствующие журналы.
+Новая панель показывает отдельные сообщения download/verify/stop/wait_exit/
+backup/replace/start/health и результат восстановления, не раскрывая токены.
+
+Сначала обновите код панели и дождитесь успешной новой Windows-сборки:
+
+    cd /opt/ServersStatus
+    sudo git pull --ff-only origin main
+    sudo systemctl restart serversstatus
+
+Если обновление через панель продолжает падать, в старом EXE остался прежний
+помощник. Ему нужен один локальный переход на исправленную версию. На каждом
+таком Windows-сервере в PowerShell **от администратора**:
+
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/KrissViktor/ServersStatus/main/agent/Repair-WindowsAgent.ps1' -OutFile "$env:ProgramData\ServersStatus\Repair-WindowsAgent.ps1"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:ProgramData\ServersStatus\Repair-WindowsAgent.ps1"
+
+Скрипт скачивает только публичную Windows-сборку вашего репозитория с
+updater_protocol=2, проверяет размер/SHA256, использует исправленный помощник,
+сохраняет резервный EXE и перезапускает только службу агента. Если новая сборка
+ещё не опубликована, скрипт завершится до изменения установленной службы.
+Конфигурация, имя, ключ и правила бэкапов сохраняются; ОС не перезагружается.
+Код помощника берётся из main вашего доверенного репозитория по HTTPS.
+После перехода следующие обновления можно снова назначать из панели.
+
+Локальный журнал восстановления:
+
+    Get-ChildItem "$env:ProgramData\ServersStatus\repair-*\update.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Get-Content
+
+Новые обновления через портал пишут журнал в
+C:\ProgramData\ServersStatus\updates\ID_ЗАДАНИЯ\update.log. Старые версии такого
+журнала не создавали. Журнал agent.log дополнительно фиксирует этап ошибки
+скачивания/подготовки без текста исключения с URL или ключом.
+
+Запасной способ: скачать полный новый Windows artifact из GitHub Actions,
+распаковать EXE, apply_update.ps1 и Update-Agent.ps1 в один каталог и запустить
+Update-Agent.ps1 от администратора. Не смешивайте файлы разных сборок.

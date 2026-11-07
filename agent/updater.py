@@ -2,6 +2,7 @@
 from datetime import datetime
 from pathlib import Path
 import shutil
+import os
 import time
 
 
@@ -17,6 +18,27 @@ def stop(command):
     wait(command, 'Stopped')
 
 
+def wait_unlocked(executable,timeout=90):
+    if os.name!='nt':return
+    deadline=time.monotonic()+timeout
+    while True:
+        try:
+            with Path(executable).open('r+b'):return
+        except OSError:
+            if time.monotonic()>=deadline:raise RuntimeError('EXE remains locked or is not writable after service stop')
+            time.sleep(.5)
+
+
+def copy_retry(source,destination,timeout=30):
+    deadline=time.monotonic()+timeout
+    while True:
+        try:return shutil.copy2(source,destination)
+        except OSError as error:
+            if getattr(error,'winerror',None) not in (5,32,33) and not isinstance(error,PermissionError):raise
+            if time.monotonic()>=deadline:raise
+            time.sleep(.5)
+
+
 def update_service(command, root, bundled_executable):
     executable = Path(root) / 'ServersStatusService.exe'
     source = Path(bundled_executable)
@@ -29,8 +51,9 @@ def update_service(command, root, bundled_executable):
     backup = executable.with_name(executable.name + '.' + datetime.now().strftime('%Y%m%d%H%M%S%f') + '.previous')
     stop(command)
     try:
-        shutil.copy2(executable, backup)
-        shutil.copy2(source, executable)
+        wait_unlocked(executable)
+        copy_retry(executable, backup)
+        copy_retry(source, executable)
         command('sc.exe', 'start', 'ServersStatusAgent')
         wait(command, 'Running')
         time.sleep(2)
@@ -40,7 +63,8 @@ def update_service(command, root, bundled_executable):
         try:
             stop(command)
             if backup.exists():
-                shutil.copy2(backup, executable)
+                wait_unlocked(executable)
+                copy_retry(backup, executable)
             command('sc.exe', 'start', 'ServersStatusAgent')
             wait(command, 'Running')
         except Exception as rollback_error:

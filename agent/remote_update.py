@@ -1,6 +1,7 @@
 """Download only an assigned package from the configured HTTPS panel."""
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -33,8 +34,10 @@ def endpoint(config):
     return '/api/agent-update/'+urllib.parse.quote(config['agent_id'],safe='')
 
 
-def acknowledge(config,job,status,message):
-    with request(config,endpoint(config)+'/status',{'job_id':job,'status':status,'message':message}) as response:
+def acknowledge(config,job,status,message,error_code=None):
+    body={'job_id':job,'status':status,'message':message}
+    if error_code:body['error_code']=error_code
+    with request(config,endpoint(config)+'/status',body) as response:
         response.read(4096)
 
 
@@ -89,17 +92,22 @@ def launch_windows(config,config_path,job):
     marker=folder/'requested'
     if marker.exists():return
     acknowledge(config,job['id'],'running','Скачивание проверенного пакета')
+    stage='download'
     try:
         package=folder/'ServersStatusService.exe'
         download(config,job,package)
+        stage='helper_missing'
         script=Path(__file__).with_name('apply_update.ps1')
         target=folder/'apply_update.ps1'
         target.write_bytes(script.read_bytes())
         manifest=folder/'manifest.json'
         manifest.write_text(json.dumps({'job_id':job['id'],'sha256':job['sha256'],'config_path':str(Path(config_path).resolve())}),encoding='utf-8')
-        subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(target),'-Manifest',str(manifest)],
-                         creationflags=subprocess.CREATE_NO_WINDOW,close_fds=True)
+        stage='helper_launch'
+        powershell=Path(os.environ.get('SystemRoot',r'C:\Windows'))/'System32/WindowsPowerShell/v1.0/powershell.exe'
+        subprocess.Popen([str(powershell),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(target),'-Manifest',str(manifest)],
+                         creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),close_fds=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         marker.write_text('launched')
-    except Exception:
-        acknowledge(config,job['id'],'failed','Не удалось скачать или проверить пакет; служба не заменена')
+    except Exception as error:
+        logging.error('Agent update failed: stage=%s exception=%s winerror=%s',stage,type(error).__name__,getattr(error,'winerror',None))
+        acknowledge(config,job['id'],'failed','Не удалось подготовить обновление; служба не заменена',error_code=stage)
         raise

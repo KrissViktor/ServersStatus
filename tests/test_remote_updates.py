@@ -125,3 +125,22 @@ class PackageTest(unittest.TestCase):
                         self.assertEqual((root/'releases').stat().st_mode & 0o777,0o755)
                         self.assertIn('OLD',(root/'previous-1/agent/client.py').read_text())
                 self.assertTrue(any('stop' in args for args in calls))
+
+class UpdateDiagnosticsTest(unittest.TestCase):
+    def test_fixed_codes_are_shown_but_raw_exceptions_are_not(self):
+        from server import app as application
+        with tempfile.TemporaryDirectory() as directory:
+            prior=application.DB;application.DB=str(Path(directory)/'db.sqlite3')
+            try:
+                client=TestClient(application.app)
+                from server.security import limiter
+                limiter.reset()
+                with application.db() as c:
+                    c.execute('INSERT INTO agents VALUES (?,?)',('pc',application.digest('key')))
+                    now=time.time()
+                    c.execute("INSERT INTO agent_update_jobs VALUES (1,'pc',1,'running','',?,?)",(now,now))
+                response=client.post('/api/agent-update/pc/status',headers={'Authorization':'Bearer key'},json={'job_id':1,'status':'failed','error_code':'wait_exit','rollback':'restored','message':'TOKEN=SECRET'})
+                self.assertEqual(response.status_code,200)
+                with application.db() as c:message=c.execute('SELECT message FROM agent_update_jobs').fetchone()[0]
+                self.assertIn('EXE',message);self.assertIn('восстановлен',message);self.assertNotIn('SECRET',message)
+            finally:application.DB=prior

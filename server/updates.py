@@ -143,8 +143,22 @@ def register(app,db,authenticated,csrf_token,digest):
             try:data=json.loads(raw)
             except ValueError:raise HTTPException(400)
             if not isinstance(data,dict) or data.get('status') not in ('running','failed') or not isinstance(data.get('job_id'),int):raise HTTPException(400)
-            # Messages are fixed locally; never reflect arbitrary remote text or secrets.
-            message='Установка выполняется; ожидается отчёт новой версии' if data['status']=='running' else 'Агент сообщил об ошибке установки; проверьте журнал службы'
+            # Never reflect raw exceptions, paths or download URLs from the agent.
+            codes={'download':'Не удалось скачать пакет или проверить SHA256',
+                   'helper_missing':'В сборке отсутствует помощник установки Windows',
+                   'helper_launch':'Не удалось запустить помощник PowerShell',
+                   'verify':'Проверка файла перед установкой не пройдена',
+                   'stop':'Не удалось остановить службу агента',
+                   'wait_exit':'EXE остаётся занят процессом или недоступен на запись',
+                   'backup':'Не удалось сохранить резервную копию EXE',
+                   'replace':'Не удалось заменить EXE или проверить установленный файл',
+                   'start':'Не удалось запустить обновлённую службу',
+                   'health':'Обновлённая служба остановилась после запуска'}
+            message='Установка выполняется; ожидается отчёт новой версии' if data['status']=='running' else codes.get(data.get('error_code') if isinstance(data.get('error_code'),str) else '','Агент сообщил об ошибке установки; проверьте журнал службы')
+            if data['status']=='failed':
+                if data.get('rollback')=='restored':message+='; предыдущий EXE восстановлен'
+                elif data.get('rollback')=='failed':message+='; восстановление не завершено, проверьте службу локально'
+                elif data.get('message')=='Не удалось скачать или проверить пакет; служба не заменена':message='Не удалось скачать пакет или проверить SHA256; EXE службы не заменён'
             c.execute("UPDATE agent_update_jobs SET status=?,message=?,updated=? WHERE id=? AND agent=? AND status IN ('queued','running')",(data['status'],message,time.time(),data['job_id'],agent))
         return {'ok':True}
 

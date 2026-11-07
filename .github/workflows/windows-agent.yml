@@ -53,6 +53,8 @@ jobs:
           if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
           [System.Management.Automation.Language.Parser]::ParseFile("$PWD/agent/Enable-WindowsManagement.ps1", [ref]$parseTokens, [ref]$parseErrors) | Out-Null
           if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+      - name: Test real Windows helper file replacement and rollback
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-WindowsUpdateHelper.ps1
       - name: Build standalone service
         run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --add-data "agent/VERSION;agent" --add-data "agent/apply_update.ps1;agent" --add-data "agent/windows_management.ps1;agent" --hidden-import win32timezone --hidden-import win32ts --paths . agent/windows_service.py
       - name: Test frozen service registration and startup
@@ -62,17 +64,23 @@ jobs:
           $data = "$env:ProgramData\ServersStatus"
           New-Item -ItemType Directory -Force $data | Out-Null
           Copy-Item agent/config.example.json "$data\config.json"
-          & dist/ServersStatusService.exe --startup auto install
+          $installed = "$env:ProgramFiles\ServersStatus\ServersStatusService.exe"
+          New-Item -ItemType Directory -Force (Split-Path $installed) | Out-Null
+          Copy-Item dist/ServersStatusService.exe $installed
+          & $installed --startup auto install
           if ($LASTEXITCODE -ne 0) { throw 'Service install failed' }
           try {
-            & dist/ServersStatusService.exe start
+            & $installed start
             if ($LASTEXITCODE -ne 0) { throw 'Service start failed' }
             Start-Sleep -Seconds 8
             if ((Get-Service ServersStatusAgent).Status -ne 'Running') { throw 'Service not running' }
+            $hash = (Get-FileHash dist/ServersStatusService.exe -Algorithm SHA256).Hash
+            & agent/apply_update.ps1 -Package "$PWD/dist/ServersStatusService.exe" -Sha256 $hash
+            if ((Get-Service ServersStatusAgent).Status -ne 'Running') { throw 'Frozen self-update smoke failed' }
           } finally {
-            & dist/ServersStatusService.exe stop
+            & $installed stop
             Start-Sleep -Seconds 3
-            & dist/ServersStatusService.exe remove
+            & $installed remove
           }
       - name: Build graphical installer
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin --name ServersStatusSetup --paths . --add-binary "dist/ServersStatusService.exe;." agent/installer.py
@@ -82,7 +90,7 @@ jobs:
           Get-ChildItem dist/ServersStatus*.exe | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $_.Name } | Set-Content dist/SHA256SUMS.txt
       - name: Stage backup host update files
         shell: pwsh
-        run: Copy-Item agent/backups.WIN-CU629F0N7II.json, agent/Update-BackupAgent.ps1, agent/Update-Agent.ps1, agent/Enable-WindowsManagement.ps1 dist/
+        run: Copy-Item agent/backups.WIN-CU629F0N7II.json, agent/Update-BackupAgent.ps1, agent/Update-Agent.ps1, agent/Enable-WindowsManagement.ps1, agent/apply_update.ps1, agent/Repair-WindowsAgent.ps1 dist/
       - uses: actions/upload-artifact@v4
         with:
           name: ServersStatus-Windows-x64
@@ -90,6 +98,8 @@ jobs:
             dist/ServersStatusSetup.exe
             dist/ServersStatusService.exe
             dist/Update-Agent.ps1
+            dist/apply_update.ps1
+            dist/Repair-WindowsAgent.ps1
             dist/Enable-WindowsManagement.ps1
             dist/SHA256SUMS.txt
             dist/VERSION.txt

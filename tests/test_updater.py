@@ -44,3 +44,9 @@ class UpdaterTest(unittest.TestCase):
                 update_service(command, root, source)
             self.assertEqual(installed.read_bytes(), b'old')
             self.assertEqual(starts, 2)
+
+    def test_transient_file_lock_is_retried(self):
+        from agent.updater import copy_retry
+        with patch('agent.updater.shutil.copy2',side_effect=[PermissionError('sharing violation'),'done']) as copy,patch('agent.updater.time.sleep'):
+            self.assertEqual(copy_retry('new','installed'),'done')
+            self.assertEqual(copy.call_count,2)
