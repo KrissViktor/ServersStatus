@@ -335,13 +335,13 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('1.0 Мб/с',history)
         self.assertIn('PhysicalDrive0',history)
 
-    def test_ten_second_snapshots_with_minute_history_and_linux_labels(self):
+    def test_all_ten_second_reports_are_retained_with_linux_labels(self):
         from unittest.mock import patch
         headers={'Authorization':'Bearer agent-secret'}
         payload={'hostname':'btrx24','cpu_percent':10,'memory_percent':37.5,'uptime_seconds':1,'disks':[],
                  'system':{'os':'Linux','distribution':'CentOS Stream 9','memory_total_bytes':16*1024**3,
                            'memory_available_bytes':10*1024**3,'memory_used_bytes':6*1024**3,'cpu_current_mhz':3200}}
-        for when,cpu in [(1000,10),(1010,20),(1060,30)]:
+        for when,cpu in [(1000,10),(1010,99),(1060,30)]:
             payload['cpu_percent']=cpu
             with patch('server.app.time.time',return_value=when):
                 reply=self.client.post('/api/report/pc',json=payload,headers=headers)
@@ -350,8 +350,9 @@ class WorkflowTest(unittest.TestCase):
             with module.db() as c:
                 self.assertEqual(json.loads(c.execute('SELECT data FROM current_reports WHERE agent=?',('pc',)).fetchone()[0])['cpu_percent'],cpu)
         with module.db() as c:
-            self.assertEqual(c.execute('SELECT count(*) FROM reports WHERE agent=?',('pc',)).fetchone()[0],2)
+            self.assertEqual(c.execute('SELECT count(*) FROM reports WHERE agent=?',('pc',)).fetchone()[0],3)
             self.assertEqual(c.execute('SELECT count(*) FROM latest_reports WHERE agent=?',('pc',)).fetchone()[0],1)
+            self.assertEqual(c.execute("SELECT MAX(json_extract(data,'$.cpu_percent')) FROM reports WHERE agent=?",('pc',)).fetchone()[0],99)
         self.client.post('/login',data={'username':'admin','password':'test-password-123'})
         content=self.client.get('/servers/pc').text
         self.assertIn('CentOS Stream 9',content)

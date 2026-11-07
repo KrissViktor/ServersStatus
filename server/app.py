@@ -19,6 +19,7 @@ from .configuration import MonitoringSettings
 from .settings_ui import settings_page
 from .events import record
 from .disks import monitored_disks
+from .retention import cleanup
 from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
@@ -44,6 +45,9 @@ def db():
             JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1)
             WHERE NOT EXISTS(SELECT 1 FROM latest_reports l WHERE l.agent=a.id);
         CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
+        CREATE INDEX IF NOT EXISTS reports_time ON reports(received);
+        CREATE INDEX IF NOT EXISTS reports_resource_metrics ON reports(agent,received,json_extract(data,'$.cpu_percent'),json_extract(data,'$.memory_percent'));
+        CREATE TABLE IF NOT EXISTS report_maintenance (name TEXT PRIMARY KEY,next_run REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT,received REAL,agent TEXT,category TEXT,level TEXT,message TEXT);
@@ -236,10 +240,8 @@ async def report(agent_id: str, request: Request):
         received = time.time()
         encoded = data.model_dump_json()
         c.execute('INSERT INTO latest_reports VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data', (agent_id,received,encoded))
-        last = c.execute('SELECT received FROM reports WHERE agent=? ORDER BY received DESC LIMIT 1',(agent_id,)).fetchone()
-        if not last or received-last['received'] >= 60:
-            c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded))
-            c.execute('DELETE FROM reports WHERE received<?',(received-30*86400,))
+        c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded))
+        cleanup(c,received)
 
         remote = c.execute('SELECT revision, data FROM agent_settings WHERE agent=?', (agent_id,)).fetchone()
         monitoring = {'revision': remote['revision'], 'settings': json.loads(remote['data'])} if remote else {'revision': 0, 'settings': None}

@@ -18,7 +18,7 @@ def load_history(connection, agent_id, start, end, bucket):
                    json_extract(data, '$.cpu_percent') AS cpu,
                    json_extract(data, '$.memory_percent') AS ram,
                    received - LAG(received) OVER (ORDER BY received) AS gap
-            FROM reports WHERE agent=? AND received>=? AND received<=?
+            FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<=?
         )
         SELECT CAST(received / ? AS INTEGER) AS bucket,
                AVG(received) AS timestamp, MIN(received) AS first,
@@ -79,4 +79,4 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         content += chart(points, 'cpu', 'Процессор · CPU', start, end, '#4adeab')
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
     content += extra_html
-    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><footer>История хранится 30 дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
+    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><footer>История хранится 186 дней (не менее 6 месяцев). Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
