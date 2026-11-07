@@ -148,6 +148,7 @@ def register(app,db,authenticated,csrf_token,digest):
             codes={'download':'Не удалось скачать пакет или проверить SHA256',
                    'helper_missing':'В сборке отсутствует помощник установки Windows',
                    'helper_launch':'Не удалось запустить помощник PowerShell',
+                   'helper_startup':'PowerShell завершился с ошибкой до установки; проверьте helper-launch.log',
                    'verify':'Проверка файла перед установкой не пройдена',
                    'stop':'Не удалось остановить службу агента',
                    'wait_exit':'EXE остаётся занят процессом или недоступен на запись',

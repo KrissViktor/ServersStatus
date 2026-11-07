@@ -220,3 +220,10 @@ C:\ProgramData\ServersStatus\updates\ID_ЗАДАНИЯ\update.log. Старые 
 Запасной способ: скачать полный новый Windows artifact из GitHub Actions,
 распаковать EXE, apply_update.ps1 и Update-Agent.ps1 в один каталог и запустить
 Update-Agent.ps1 от администратора. Не смешивайте файлы разных сборок.
+
+Если EXE скачан, но update.log отсутствует: проверьте состав каталога задания
+(должны быть apply_update.ps1 и manifest.json) и agent.log. В новом launcher
+дополнительно сохраняется helper-launch.log со stdout/stderr PowerShell, а ранний
+ненулевой exit code отображается как helper_startup вместо ожидания 15 минут.
+Сам helper начинает update.log до чтения manifest/config; ошибка их разбора
+записывается без исходного JSON, чтобы не раскрывать ключ.

@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,6 +13,8 @@ class WindowsLaunchTest(unittest.TestCase):
             config={'agent_id':'pc','token':'SECRET'};path=Path(directory)/'config.json'
             job={'id':1,'platform':'windows-x64','version':'v2','sha256':'0'*64,'size':1}
             with patch('agent.remote_update.acknowledge'),patch('agent.remote_update.download'),patch('agent.remote_update.subprocess.Popen') as popen:
+                popen.return_value.wait.side_effect=subprocess.TimeoutExpired('powershell',1)
+                popen.return_value.poll.return_value=None
                 launch_windows(config,path,job)
                 launch_windows(config,path,job)
             self.assertEqual(popen.call_count,1)
@@ -27,3 +30,13 @@ class WindowsLaunchTest(unittest.TestCase):
             job={'id':1,'platform':'windows-x64','version':'v2','sha256':'0'*64,'size':1}
             with self.assertRaises(ValueError):launch_windows({'agent_id':'pc'},Path(directory)/'config.json',job)
             self.assertEqual(ack.call_args.kwargs['error_code'],'download');popen.assert_not_called()
+
+    def test_early_powershell_exit_is_reported_without_waiting_15_minutes(self):
+        with tempfile.TemporaryDirectory() as directory,patch('agent.remote_update.download'),patch('agent.remote_update.acknowledge') as ack,patch('agent.remote_update.subprocess.Popen') as popen:
+            popen.return_value.wait.return_value=1
+            job={'id':101,'platform':'windows-x64','version':'v2','sha256':'0'*64,'size':1}
+            with self.assertRaises(RuntimeError):launch_windows({'agent_id':'pc'},Path(directory)/'config.json',job)
+            self.assertEqual(ack.call_args.kwargs['error_code'],'helper_startup')
+            folder=Path(directory)/'updates/101'
+            self.assertTrue((folder/'helper-launch.log').exists())
+            self.assertFalse((folder/'requested').exists())

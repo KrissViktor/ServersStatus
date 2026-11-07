@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 
 MAX_PACKAGE=200*1024**2
+_WINDOWS_HELPERS={}
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -90,7 +91,11 @@ def launch_windows(config,config_path,job):
     folder=Path(config_path).parent/'updates'/str(job['id'])
     folder.mkdir(parents=True,exist_ok=True)
     marker=folder/'requested'
-    if marker.exists():return
+    if marker.exists():
+        child=_WINDOWS_HELPERS.get(job['id'])
+        if child is not None and child.poll() not in (None,0):
+            acknowledge(config,job['id'],'failed','PowerShell helper exited before installation',error_code='helper_startup')
+        return
     acknowledge(config,job['id'],'running','Скачивание проверенного пакета')
     stage='download'
     try:
@@ -104,8 +109,18 @@ def launch_windows(config,config_path,job):
         manifest.write_text(json.dumps({'job_id':job['id'],'sha256':job['sha256'],'config_path':str(Path(config_path).resolve())}),encoding='utf-8')
         stage='helper_launch'
         powershell=Path(os.environ.get('SystemRoot',r'C:\Windows'))/'System32/WindowsPowerShell/v1.0/powershell.exe'
-        subprocess.Popen([str(powershell),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(target),'-Manifest',str(manifest)],
-                         creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),close_fds=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        # Preserve failures that occur before the script can create update.log.
+        with (folder/'helper-launch.log').open('ab') as launch_log:
+            child=subprocess.Popen([str(powershell),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(target),'-Manifest',str(manifest)],
+                             creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),close_fds=True,stdin=subprocess.DEVNULL,stdout=launch_log,stderr=subprocess.STDOUT)
+        _WINDOWS_HELPERS[job['id']]=child
+        stage='helper_startup'
+        try:
+            code=child.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            pass
+        else:
+            if code!=0:raise RuntimeError('PowerShell helper failed before installation')
         marker.write_text('launched')
     except Exception as error:
         logging.error('Agent update failed: stage=%s exception=%s winerror=%s',stage,type(error).__name__,getattr(error,'winerror',None))
