@@ -80,11 +80,35 @@ class ToolsTest(unittest.TestCase):
         s=self.session(internet_access=True)
         with a.db() as c:messages=ai_chat.context(c,s.job)
         def handler(request):
-            payload=json.loads(request.content);self.assertIn('Search unavailable',payload['messages'][-1]['content'])
+            payload=json.loads(request.content);self.assertTrue(any('Search unavailable' in str(message.get('content','')) for message in payload['messages'] if message['role']=='tool'))
             return httpx.Response(200,content=b'data: {"choices":[{"delta":{"content":"Search unavailable"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
-        with patch('server.ai_tools.search',new_callable=AsyncMock,side_effect=ai_web.WebError('Search unavailable')):
+        with patch('server.ai_tools.search',new_callable=AsyncMock,side_effect=ai_web.WebError('Search unavailable')),patch('server.ai_navigation.discover',new_callable=AsyncMock,return_value=[]):
             self.assertEqual(self.generate(handler,s.job,messages)['status'],'completed')
         self.assertEqual(self.client.get('/api/ai/chat/'+self.chat).json()['turns'][0]['tools'][0]['status'],'failed')
+
+    def test_google_failure_discovers_site_and_model_follows_page_link(self):
+        import httpx
+        s=self.session(internet_access=True,portal_access=True,question='Найди инструкцию по установке Python')
+        with a.db() as c:messages=ai_chat.context(c,s.job)
+        messages.insert(1,{'role':'assistant','content':'PORTAL_HISTORY_PRIVATE'})
+        main_calls=[]
+        def handler(request):
+            payload=json.loads(request.content)
+            if not payload['stream']:
+                self.assertNotIn('PORTAL_HISTORY_PRIVATE',json.dumps(payload));self.assertEqual(len(payload['messages']),2)
+                return httpx.Response(200,json={'choices':[{'message':{'content':'{"urls":["https://docs.example.com/"]}'}}]})
+            main_calls.append(payload)
+            if len(main_calls)==1:
+                self.assertIn('W2',payload['messages'][-1]['content'])
+                delta={'tool_calls':[{'index':0,'id':'follow','function':{'name':'web_page','arguments':'{"source_id":"W2"}'}}]}
+            else:
+                self.assertIn('Install Python',payload['messages'][-1]['content']);delta={'content':'Инструкция прочитана [S4]'}
+            return httpx.Response(200,content=('data: '+json.dumps({'choices':[{'delta':delta,'finish_reason':'stop'}]})+'\n\ndata: [DONE]\n\n').encode())
+        pages=[{'url':'https://docs.example.com/','type':'text/html','text':'<a href="/install">Установка</a>'},{'url':'https://docs.example.com/install','type':'text/html','text':'<h1>Install Python</h1><p>Steps</p>'}]
+        with patch('server.ai_tools.search',new_callable=AsyncMock,side_effect=ai_web.WebError('Google unavailable')),patch('server.ai_tools.fetch',new_callable=AsyncMock,side_effect=pages) as fetch:
+            result=self.generate(handler,s.job,messages)
+        self.assertEqual(result['status'],'completed');self.assertEqual(fetch.await_count,2);self.assertEqual(len(main_calls),2)
+        tools=self.client.get('/api/ai/chat/'+self.chat).json()['turns'][0]['tools'];self.assertEqual(tools[-1]['url'],'https://docs.example.com/install')
 
     def test_stream_tool_round_trip(self):
         import httpx

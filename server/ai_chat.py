@@ -93,15 +93,22 @@ async def generate(db,job,messages,api_key):
     reply='';done=False;last_save=0
     from .ai_tools import Session
     session=Session(db,job,messages)
+    from .ai_tools import MAX_CALLS
     definitions=session.definitions()
     if definitions:
         messages=[dict(m) for m in messages];messages[0]['content']+=' '+session.instructions()
     async def consume():
         nonlocal reply,done,last_save
-        rounds=3 if definitions else 1
+        rounds=4 if definitions else 1
         # Fetch current public context before generation: small local models may
         # answer from training data instead of choosing a tool themselves.
         if session.internet:
+            from .ai_currency import requested as currency_requested,answer as currency_answer
+            if currency_requested(session.query) and not session.direct_source:
+                currency=await session.execute('currency',{})
+                if 'error' in currency:reply='Не удалось получить курс ЦБ: '+currency['error']+' ['+currency['source']+'].'
+                else:reply=currency_answer(json.loads(currency['data']),currency['source'])
+                done=True;return
             from .ai_weather import requested,answer
             if requested(session.query) and not session.direct_source:
                 weather=await session.execute('weather',{})
@@ -114,9 +121,14 @@ async def generate(db,job,messages,api_key):
             result=await session.execute(name,args)
             messages.append({'role':'assistant','content':None,'tool_calls':[{'id':'automatic_web','type':'function','function':{'name':name,'arguments':json.dumps(args)}}]})
             messages.append({'role':'tool','tool_call_id':'automatic_web','content':json.dumps(result,ensure_ascii=False)})
+            if name=='web_search' and 'error' in result:
+                discovery=await session.execute('web_discover',{})
+                messages.append({'role':'assistant','content':None,'tool_calls':[{'id':'automatic_discovery','type':'function','function':{'name':'web_discover','arguments':'{}'}}]})
+                messages.append({'role':'tool','tool_call_id':'automatic_discovery','content':json.dumps(discovery,ensure_ascii=False)})
+                session.search_sources.extend(session.discovery_sources)
             # Search snippets alone often do not contain the requested fact.
-            # Read up to two actual result pages, within the same four-call budget.
-            if name=='web_search' and 'error' not in result:
+            # Read up to two actual result pages, within the shared bounded tool budget.
+            if name=='web_search' and session.search_sources:
                 for index,source in enumerate(session.search_sources[:2]):
                     args={'source_id':source};page=await session.execute('web_page',args)
                     identifier='automatic_page_'+str(index)
@@ -126,7 +138,7 @@ async def generate(db,job,messages,api_key):
             for step in range(rounds):
                 calls={};content='';finished=False
                 payload={'model':'serversstatus-local','messages':messages,'stream':True,'max_tokens':512,'temperature':0.6}
-                if definitions:payload.update(tools=definitions,tool_choice='auto' if step<rounds-1 and session.calls<4 else 'none')
+                if definitions:payload.update(tools=definitions,tool_choice='auto' if step<rounds-1 and session.calls<MAX_CALLS else 'none')
                 async with client.stream('POST',ORIGIN+'/v1/chat/completions',headers={'Authorization':'Bearer '+api_key},json=payload) as response:
                     if response.status_code in (401,403):raise ModelError('Модель отклонила ключ доступа. Обратитесь к администратору.')
                     if response.status_code==503:raise ModelError('Модель загружается или приостановлена. Попробуйте позже.')
@@ -156,7 +168,7 @@ async def generate(db,job,messages,api_key):
                         if time.monotonic()-last_save>.5:
                             _save(db,job['id'],reply);last_save=time.monotonic()
                 if calls:
-                    if not definitions or step>=rounds-1 or session.calls>=4:raise ModelError('Лимит инструментов исчерпан. Уточните вопрос.')
+                    if not definitions or step>=rounds-1 or session.calls>=MAX_CALLS:raise ModelError('Лимит инструментов исчерпан. Уточните вопрос.')
                     ordered=[calls[i] for i in sorted(calls)]
                     for index,call in enumerate(ordered):
                         if not call['id']:call['id']='source_'+str(step)+'_'+str(index)

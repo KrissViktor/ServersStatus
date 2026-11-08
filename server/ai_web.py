@@ -133,6 +133,29 @@ def page_text(content,kind):
     return '\n'.join(re.sub(r'[ \t]+',' ',line).strip() for line in content.splitlines() if line.strip())[:4000]
 
 
+class Links(HTMLParser):
+    def __init__(self):super().__init__(convert_charrefs=True);self.href=None;self.label=[];self.items=[]
+    def handle_starttag(self,tag,attrs):
+        if tag=='a':self.href=dict(attrs).get('href');self.label=[]
+    def handle_data(self,data):
+        if self.href:self.label.append(data)
+    def handle_endtag(self,tag):
+        if tag=='a' and self.href:
+            self.items.append((self.href,' '.join(' '.join(self.label).split())[:100]));self.href=None
+
+
+def page_links(content,base):
+    parser=Links();parser.feed(content);values=[];seen=set()
+    for href,label in parser.items:
+        if not label or href.startswith('#'):continue
+        try:url=normalize_url(urljoin(base,href))
+        except WebError:continue
+        if url in seen or url==base:continue
+        seen.add(url);values.append({'url':url,'title':label})
+        if len(values)==8:break
+    return values
+
+
 class GoogleResults(HTMLParser):
     """Extract result headings and adjacent snippets without CSS class coupling."""
     def __init__(self):
