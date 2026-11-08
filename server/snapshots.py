@@ -4,7 +4,7 @@ import zlib
 from datetime import datetime,timezone,timedelta
 from fastapi import HTTPException,Request,Query
 from fastapi.responses import JSONResponse
-from .dashboard import esc,size,server_card
+from .dashboard import esc,size,server_card,resource_points
 from .memory import RAM_USED_SQL,RAM_TOTAL_SQL
 
 
@@ -37,6 +37,15 @@ def missing_process_reason(c,agent,received):
     return 'Для этого отчёта список процессов не был сохранён. Проверьте журнал агента и доступность /api/processes/. Текущие процессы в прошлый момент не подставляются.'
 
 
+def surrounding_points(c,agent,received):
+    # Two bounded scans retain the nearest reports on each side without loading
+    # full JSON reports/inventories or letting another agent enter the snapshot.
+    fields=f"rowid AS report_id,received AS timestamp,json_extract(data,'$.cpu_percent') AS cpu,json_extract(data,'$.memory_percent') AS ram,{RAM_USED_SQL} AS ram_used_bytes,{RAM_TOTAL_SQL} AS ram_total_bytes"
+    before=c.execute(f"SELECT {fields} FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<? ORDER BY received DESC,rowid DESC LIMIT 450",(agent,received-300,received)).fetchall()
+    after=c.execute(f"SELECT {fields} FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<=? ORDER BY received,rowid LIMIT 450",(agent,received,received+300)).fetchall()
+    return sorted([dict(point) for point in before]+[dict(point) for point in after],key=lambda point:point['timestamp'])
+
+
 def snapshot(c,agent,identifier):
     row=c.execute('SELECT rowid,received,data FROM reports WHERE rowid=? AND agent=?',(identifier,agent)).fetchone()
     if not row:raise HTTPException(404,'Отчёт не найден: он мог быть удалён по сроку хранения')
@@ -44,7 +53,10 @@ def snapshot(c,agent,identifier):
     data['features']=[feature for feature in data.get('features',[]) if not feature.startswith('console')]
     name=c.execute('SELECT display_name FROM agent_profiles WHERE agent=?',(agent,)).fetchone()
     stamp=datetime.fromtimestamp(row['received'],timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S МСК')
-    card={'id':agent,'received':row['received'],'data':json.dumps(data),'display_name':name[0] if name else ''}
+    card={'id':agent,'received':row['received'],'data':json.dumps(data),'display_name':name[0] if name else '','sparkline':surrounding_points(c,agent,row['received'])}
+    center=resource_points({'received':row['received']},data)[0]
+    center['report_id']=identifier
+    card['sparkline']=sorted([point for point in card['sparkline'] if point['timestamp']!=row['received']]+[center],key=lambda point:point['timestamp'])
     content='<header class="snapshot-heading"><h2>Снимок · '+esc(stamp)+'</h2><p class="muted">Исходный отчёт #'+str(identifier)+'. Состояние на момент измерения.</p></header>'+server_card(card,row['received'],historical=True)
     process=c.execute('SELECT data,process_received FROM process_history WHERE report=? AND agent=? AND received=?',(identifier,agent,row['received'])).fetchone()
     compact=json.loads(zlib.decompress(process['data']).decode('utf-8')) if process else None

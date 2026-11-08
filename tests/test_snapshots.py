@@ -33,6 +33,20 @@ class HistoricalSnapshotsTest(unittest.TestCase):
     def processes(self,report,name='<SQL>',count=1):
         return self.client.post('/api/processes/pc',headers=self.headers,json={'status':'available','report_id':report['report_id'],'report_received':report['report_received'],'total':count,'items':[{'pid':i+1,'name':name+str(i),'username':'user','cpu_percent':i%100,'memory_bytes':(i+1)*1024**2} for i in range(count)]})
 
+    def test_snapshot_charts_center_selected_report_and_show_five_minutes_each_side(self):
+        with a.db() as c:
+            for offset,cpu in [(-301,99),(-300,10),(-10,20),(0,75),(10,30),(300,40),(301,98)]:
+                c.execute('INSERT INTO reports VALUES (?,?,?)',('pc',self.now+offset,json.dumps({**self.data,'cpu_percent':cpu})))
+                if offset==0:identifier=c.execute('SELECT last_insert_rowid()').fetchone()[0]
+            c.execute('INSERT INTO reports VALUES (?,?,?)',('other',self.now,json.dumps({**self.data,'cpu_percent':97})))
+        value=self.client.get('/api/history/pc/snapshot',params={'report_id':identifier}).json()['html']
+        self.assertEqual(value.count('class="task-snapshot-marker"'),2)
+        self.assertEqual(value.count('data-snapshot-point="true"'),2)
+        self.assertIn('cx="160.00"',value);self.assertIn('−5 минут',value);self.assertIn('+5 минут',value)
+        self.assertIn('10.0%',value);self.assertIn('40.0%',value)
+        self.assertNotIn('99.0%',value);self.assertNotIn('98.0%',value);self.assertNotIn('97.0%',value)
+        self.assertIn('8.0 Гб / 20.0 Гб',value)
+
     def test_snapshot_keeps_original_values_and_processes_without_live_controls(self):
         first=self.report();self.assertEqual(self.processes(first).status_code,200)
         self.data.update(cpu_percent=1,memory_percent=5);second=self.report();self.processes(second,'CURRENT')
