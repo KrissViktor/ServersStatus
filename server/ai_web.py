@@ -11,6 +11,7 @@ from urllib.parse import urlsplit,urlunsplit,urljoin,quote,parse_qs
 import httpx
 
 class WebError(Exception):pass
+class WebConnectionError(WebError):pass
 MAX_BYTES=512*1024
 
 
@@ -75,10 +76,10 @@ def connection_error(exc,host,proxied):
     elif isinstance(exc,httpx.TimeoutException):reason='истекло время сетевого запроса'
     else:reason='ошибка HTTP-соединения'
     # Never expose exception text: it may contain URL query strings or credentials.
-    return WebError(f'{host}: {reason} ({route})')
+    return WebConnectionError(f'{host}: {reason} ({route})')
 
 
-async def fetch(value):
+async def fetch(value,*,direct=False):
     current=normalize_url(value)
     for hop in range(4):
         parsed=urlsplit(current);port=443 if parsed.scheme=='https' else 80
@@ -86,7 +87,7 @@ async def fetch(value):
         # Connect to the validated IP snapshot, never resolve the hostname again.
         # Host and TLS SNI retain the original hostname/certificate verification.
         pinned=httpx.URL(current).copy_with(host=ips[0])
-        proxy=web_proxy()
+        proxy=None if direct else web_proxy()
         options={'trust_env':False,'follow_redirects':False,'timeout':httpx.Timeout(15,connect=8)}
         if proxy:options['proxy']=proxy
         try:
@@ -110,7 +111,7 @@ async def fetch(value):
                     encoding=charset.group(1) if charset else 'utf-8'
                     try:text=bytes(data).decode(encoding,errors='replace')
                     except LookupError:text=bytes(data).decode('utf-8',errors='replace')
-                    return {'url':current,'type':kind,'text':text}
+                    return {'url':current,'type':kind,'text':text,'transport':'local_proxy' if proxy else 'direct'}
         except httpx.HTTPError as exc:raise connection_error(exc,parsed.hostname,bool(proxy)) from None
     raise WebError('Слишком много перенаправлений')
 

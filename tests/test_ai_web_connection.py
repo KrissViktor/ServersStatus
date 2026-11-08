@@ -19,6 +19,16 @@ class ConnectionTest(unittest.TestCase):
             message=str(web.connection_error(error,'example.com',True));self.assertIn(expected,message);self.assertIn('example.com',message);self.assertIn('прокси',message);self.assertNotIn('SECRET',message)
         error=httpx.ConnectError('secret');error.__cause__=ssl.SSLCertVerificationError('CERTIFICATE_VERIFY_FAILED')
         message=str(web.connection_error(error,'example.com',False));self.assertIn('TLS-сертификата',message);self.assertIn('напрямую',message);self.assertNotIn('secret',message)
+    def test_direct_retry_ignores_configured_proxy_but_keeps_security(self):
+        original=httpx.AsyncClient
+        class Stream(httpx.AsyncByteStream):
+            async def __aiter__(self):yield b'hello'
+        def client(**kwargs):
+            self.assertNotIn('proxy',kwargs);self.assertFalse(kwargs['trust_env']);self.assertNotIn('verify',kwargs)
+            return original(transport=httpx.MockTransport(lambda request:httpx.Response(200,headers={'content-type':'text/plain'},stream=Stream())),**kwargs)
+        with patch.dict(os.environ,{'STATUS_AI_WEB_PROXY':'socks5h://127.0.0.1:1080'}),patch('server.ai_web.addresses',new_callable=AsyncMock,return_value=['8.8.8.8']),patch('server.ai_web.httpx.AsyncClient',side_effect=client):
+            self.assertEqual(asyncio.run(web.fetch('https://example.com/',direct=True))['transport'],'direct')
+
     def test_proxy_keeps_dns_pin_sni_and_certificate_verification(self):
         original=httpx.AsyncClient;seen=[]
         class Stream(httpx.AsyncByteStream):
