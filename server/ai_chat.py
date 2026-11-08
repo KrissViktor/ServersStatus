@@ -25,18 +25,30 @@ ORIGIN='http://127.0.0.1:18091'
 MAX_RUNTIME=180
 MAX_REPLY=16384
 _lock=threading.Lock()
-SYSTEM='Ты локальный помощник портала мониторинга. Отвечай по-русски, понятно и по существу. У тебя нет инструментов, доступа к интернету, 1С, файлам, консоли и текущим метрикам серверов. Не утверждай, что ты проверил или изменил что-либо. Если для ответа нужны данные, попроси пользователя предоставить их. Не выдумывай результаты проверок.'
+SYSTEM='Ты локальный помощник портала мониторинга. Отвечай по-русски, понятно и по существу. Используй только разрешённые для вопроса инструменты чтения. Не выдумывай результаты проверок, даты и источники. Не выполняй команды, не меняй настройки, не запрашивай секреты. Доступ к 1С, файловой системе и консоли не предоставлен.'
 
 class Ask(BaseModel):
     csrf:str=Field(max_length=128)
     chat:str=Field(pattern='^[a-f0-9]{32}$')
     nonce:str=Field(pattern='^[a-f0-9]{32}$')
     question:str=Field(min_length=1,max_length=4000)
+    portal_access:bool=False
+    internet_access:bool=False
+    web_query:str=Field(default='',max_length=300)
 
 class Action(BaseModel):
     csrf:str=Field(max_length=128)
 
 class ModelError(Exception):pass
+
+
+def initialize(c):
+    from .ai_tools import SCHEMA as TOOL_SCHEMA
+    c.executescript(SCHEMA+TOOL_SCHEMA)
+    columns={row[1] for row in c.execute('PRAGMA table_info(ai_turns)')}
+    for name,definition in [('portal_access','INTEGER NOT NULL DEFAULT 0'),('internet_access','INTEGER NOT NULL DEFAULT 0'),('web_query',"TEXT NOT NULL DEFAULT ''")]:
+        if name not in columns:c.execute('ALTER TABLE ai_turns ADD COLUMN '+name+' '+definition)
+    c.commit()
 
 
 def key():
@@ -50,12 +62,14 @@ def key():
 def clean(c,now):
     c.execute("UPDATE ai_turns SET status='failed',error='Запрос прерван после перезапуска или потери связи',updated=? WHERE status='running' AND updated<?",(now,now-30))
     c.execute("UPDATE ai_turns SET status='failed',error='Время ожидания в очереди истекло',updated=? WHERE status='queued' AND created<?",(now,now-600))
+    c.execute('DELETE FROM ai_tool_runs WHERE turn IN (SELECT id FROM ai_turns WHERE created<?)',(now-186*86400,))
     c.execute('DELETE FROM ai_turns WHERE created<?',(now-186*86400,))
 
 
 def context(c,job):
-    messages=[{'role':'system','content':SYSTEM}]
-    budget=8000-len(SYSTEM)-len(job['question']);previous=[]
+    system=SYSTEM+' Чтение портала: '+('разрешено' if job.get('portal_access') else 'выключено')+'. Интернет: '+('разрешён' if job.get('internet_access') else 'выключен')+'.'
+    messages=[{'role':'system','content':system}]
+    budget=(5000 if job.get('portal_access') or job.get('internet_access') else 8000)-len(system)-len(job['question']);previous=[]
     rows=c.execute("SELECT question,reply FROM ai_turns WHERE owner=? AND chat=? AND id<? AND status='completed' ORDER BY id DESC LIMIT 4",(job['owner'],job['chat'],job['id'])).fetchall()
     for row in rows:
         size=len(row['question'])+len(row['reply'])
@@ -77,32 +91,66 @@ def _active(db,identifier):
 
 async def generate(db,job,messages,api_key):
     reply='';done=False;last_save=0
+    from .ai_tools import Session
+    session=Session(db,job,messages)
+    definitions=session.definitions()
+    if definitions:
+        messages=[dict(m) for m in messages];messages[0]['content']+=' '+session.instructions()
     async def consume():
         nonlocal reply,done,last_save
+        rounds=3 if definitions else 1
         async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(120,connect=5,write=10,pool=5)) as client:
-            async with client.stream('POST',ORIGIN+'/v1/chat/completions',headers={'Authorization':'Bearer '+api_key},json={'model':'serversstatus-local','messages':messages,'stream':True,'max_tokens':512,'temperature':0.6}) as response:
-                if response.status_code in (401,403):raise ModelError('Модель отклонила ключ доступа. Обратитесь к администратору.')
-                if response.status_code==503:raise ModelError('Модель загружается или приостановлена. Попробуйте позже.')
-                if response.status_code!=200:raise ModelError('Модель не смогла обработать запрос. Попробуйте новый диалог или более короткий вопрос.')
-                async for line in response.aiter_lines():
-                    if not line.startswith('data:'):continue
-                    data=line[5:].strip()
-                    if data=='[DONE]':done=True;break
-                    try:value=json.loads(data)
-                    except ValueError:raise ModelError('Получен некорректный ответ модели.')
-                    if value.get('error'):raise ModelError('Модель сообщила об ошибке обработки запроса.')
-                    for choice in value.get('choices',[]):
-                        part=choice.get('delta',{}).get('content')
-                        if isinstance(part,str):
-                            reply+=part
+            for step in range(rounds):
+                calls={};content='';finished=False
+                payload={'model':'serversstatus-local','messages':messages,'stream':True,'max_tokens':512,'temperature':0.6}
+                if definitions:payload.update(tools=definitions,tool_choice='auto' if step<rounds-1 and session.calls<4 else 'none')
+                async with client.stream('POST',ORIGIN+'/v1/chat/completions',headers={'Authorization':'Bearer '+api_key},json=payload) as response:
+                    if response.status_code in (401,403):raise ModelError('Модель отклонила ключ доступа. Обратитесь к администратору.')
+                    if response.status_code==503:raise ModelError('Модель загружается или приостановлена. Попробуйте позже.')
+                    if response.status_code!=200:raise ModelError('Модель не смогла обработать запрос. Попробуйте новый диалог или более короткий вопрос.')
+                    async for line in response.aiter_lines():
+                        if not line.startswith('data:'):continue
+                        data=line[5:].strip()
+                        if data=='[DONE]':finished=True;break
+                        try:value=json.loads(data)
+                        except ValueError:raise ModelError('Получен некорректный ответ модели.')
+                        if value.get('error'):raise ModelError('Модель сообщила об ошибке обработки запроса.')
+                        for choice in value.get('choices',[]):
+                            delta=choice.get('delta',{});part=delta.get('content')
+                            if isinstance(part,str):reply+=part;content+=part
                             if len(reply)>MAX_REPLY:raise ModelError('Достигнут лимит длины ответа. Уточните вопрос.')
-                        if choice.get('finish_reason') is not None:done=True
-                    if time.monotonic()-last_save>.5:
-                        _save(db,job['id'],reply);last_save=time.monotonic()
+                            for call in delta.get('tool_calls',[]):
+                                index=call.get('index',0)
+                                if type(index) is not int or not 0<=index<3:raise ModelError('Слишком много запросов инструментов')
+                                entry=calls.setdefault(index,{'id':'','type':'function','function':{'name':'','arguments':''}})
+                                if call.get('id'):entry['id']+=call['id']
+                                function=call.get('function',{})
+                                for key in ('name','arguments'):
+                                    part=function.get(key)
+                                    if isinstance(part,str):entry['function'][key]+=part
+                                if len(entry['function']['arguments'])>2048 or len(entry['function']['name'])>64 or len(entry['id'])>128:raise ModelError('Параметры инструмента слишком велики')
+                            if choice.get('finish_reason') is not None:finished=True
+                        if time.monotonic()-last_save>.5:
+                            _save(db,job['id'],reply);last_save=time.monotonic()
+                if calls:
+                    if not definitions or step>=rounds-1 or session.calls>=4:raise ModelError('Лимит инструментов исчерпан. Уточните вопрос.')
+                    ordered=[calls[i] for i in sorted(calls)]
+                    for index,call in enumerate(ordered):
+                        if not call['id']:call['id']='source_'+str(step)+'_'+str(index)
+                    messages.append({'role':'assistant','content':content,'tool_calls':ordered})
+                    for call in ordered:
+                        try:args=json.loads(call['function']['arguments'] or '{}')
+                        except ValueError:result={'error':'Некорректный JSON параметров'}
+                        else:result=await session.execute(call['function']['name'],args)
+                        messages.append({'role':'tool','tool_call_id':call['id'],'content':json.dumps(result,ensure_ascii=False)})
+                    if content:reply+='\n\n'
+                    continue
+                done=finished
+                return
     task=None
     try:
         if not _active(db,job['id']):return
-        task=asyncio.create_task(consume());deadline=time.monotonic()+MAX_RUNTIME
+        task=asyncio.create_task(consume());deadline=time.monotonic()+(max(MAX_RUNTIME,300) if definitions else MAX_RUNTIME)
         while not task.done():
             if not _active(db,job['id']):task.cancel();return
             if time.monotonic()>deadline:raise ModelError('Время ответа истекло. Попробуйте более короткий вопрос.')
@@ -182,9 +230,12 @@ def register(app,db,authenticated,csrf_token):
         owner=user(request);valid_chat(chat)
         with db() as c:
             clean(c,time.time())
-            rows=c.execute('SELECT id,question,reply,status,created,error FROM ai_turns WHERE owner=? AND chat=? ORDER BY id LIMIT 50',(owner,chat)).fetchall()
+            rows=c.execute('SELECT id,question,reply,status,created,error,portal_access,internet_access FROM ai_turns WHERE owner=? AND chat=? ORDER BY id LIMIT 50',(owner,chat)).fetchall()
             if not rows:raise HTTPException(404)
-        kick(db);return response({'turns':[dict(row) for row in rows]})
+            result=[]
+            for row in rows:
+                item=dict(row);item['tools']=[dict(t) for t in c.execute('SELECT id,name,label,url,status,error FROM ai_tool_runs WHERE turn=? ORDER BY id',(row['id'],))];result.append(item)
+        kick(db);return response({'turns':result})
 
     @app.post('/api/ai/ask')
     async def ask(request:Request):
@@ -194,7 +245,7 @@ def register(app,db,authenticated,csrf_token):
             c.execute('BEGIN IMMEDIATE');clean(c,time.time())
             existing=c.execute('SELECT * FROM ai_turns WHERE owner=? AND nonce=?',(owner,value.nonce)).fetchone()
             if existing:
-                if existing['question']!=value.question.strip() or existing['chat']!=value.chat:raise HTTPException(409,'Идентификатор запроса уже использован')
+                if existing['question']!=value.question.strip() or existing['chat']!=value.chat or bool(existing['portal_access'])!=value.portal_access or bool(existing['internet_access'])!=value.internet_access or existing['web_query']!=value.web_query.strip():raise HTTPException(409,'Идентификатор запроса уже использован')
                 return response({'id':existing['id'],'chat':existing['chat']})
             if not key():raise HTTPException(503,'Администратор ещё не настроил подключение модели')
             if c.execute("SELECT 1 FROM ai_turns WHERE owner=? AND status IN ('queued','running')",(owner,)).fetchone():raise HTTPException(409,'Дождитесь ответа на предыдущий вопрос или остановите его')
@@ -203,7 +254,7 @@ def register(app,db,authenticated,csrf_token):
             count=c.execute('SELECT COUNT(DISTINCT chat) FROM ai_turns WHERE owner=?',(owner,)).fetchone()[0]
             if count>=50 and not c.execute('SELECT 1 FROM ai_turns WHERE owner=? AND chat=?',(owner,value.chat)).fetchone():raise HTTPException(409,'Лимит 50 диалогов. Удалите ненужный диалог.')
             now=time.time()
-            identifier=c.execute("INSERT INTO ai_turns(owner,chat,nonce,question,status,created,updated) VALUES (?,?,?,?,'queued',?,?)",(owner,value.chat,value.nonce,value.question.strip(),now,now)).lastrowid
+            identifier=c.execute("INSERT INTO ai_turns(owner,chat,nonce,question,status,created,updated,portal_access,internet_access,web_query) VALUES (?,?,?,?,'queued',?,?,?,?,?)",(owner,value.chat,value.nonce,value.question.strip(),now,now,int(value.portal_access),int(value.internet_access),value.web_query.strip())).lastrowid
         kick(db);return response({'id':identifier,'chat':value.chat})
 
     @app.post('/api/ai/chat/{chat}/{action}')
@@ -214,5 +265,7 @@ def register(app,db,authenticated,csrf_token):
             c.execute('BEGIN IMMEDIATE')
             if not c.execute('SELECT 1 FROM ai_turns WHERE owner=? AND chat=?',(owner,chat)).fetchone():raise HTTPException(404)
             if action=='cancel':c.execute("UPDATE ai_turns SET status='cancelled',updated=? WHERE owner=? AND chat=? AND status IN ('queued','running')",(time.time(),owner,chat))
-            else:c.execute('DELETE FROM ai_turns WHERE owner=? AND chat=?',(owner,chat))
+            else:
+                c.execute('DELETE FROM ai_tool_runs WHERE turn IN (SELECT id FROM ai_turns WHERE owner=? AND chat=?)',(owner,chat))
+                c.execute('DELETE FROM ai_turns WHERE owner=? AND chat=?',(owner,chat))
         return response({'ok':True})

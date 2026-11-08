@@ -46,6 +46,8 @@ def can_users():
 
 
 def revoke(c,name):
+    if c.execute("SELECT 1 FROM sqlite_master WHERE name='ai_turns'").fetchone():
+        c.execute("UPDATE ai_turns SET status='cancelled',updated=? WHERE owner=? AND status IN ('queued','running')",(time.time(),name))
     for table in ('console_grants','console_grant_tokens','console_challenges'):
         c.execute('DELETE FROM '+table+' WHERE session IN (SELECT token FROM session_users WHERE name=?)',(name,))
     c.execute('DELETE FROM sessions WHERE token IN (SELECT token FROM session_users WHERE name=?)',(name,))

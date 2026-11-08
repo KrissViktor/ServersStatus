@@ -1,6 +1,8 @@
 (() => {
   const panel=document.querySelector('.ai-chat');if(!panel)return;
   const form=panel.querySelector('#ai-form'),input=panel.querySelector('#ai-question'),history=panel.querySelector('#ai-messages'),list=panel.querySelector('#ai-chats'),send=panel.querySelector('#ai-send'),cancel=panel.querySelector('#ai-cancel'),fresh=panel.querySelector('#ai-new'),remove=panel.querySelector('#ai-delete'),message=panel.querySelector('#ai-message'),state=document.querySelector('#ai-state');
+  const portal=panel.querySelector('#ai-portal'),internet=panel.querySelector('#ai-internet'),searchBox=panel.querySelector('#ai-search-box'),query=panel.querySelector('#ai-search-query');
+  internet.addEventListener('change',()=>{searchBox.hidden=!internet.checked});
   const labels={queued:'В очереди',running:'Печатает…',completed:'Готово',failed:'Ошибка',cancelled:'Остановлено'};
   let chat=null,busy=false,active=false,configured=false,timer=null,signature='',attempt=null;
   const id=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
@@ -13,7 +15,7 @@
     if(!response.ok)throw Error(typeof result.detail==='string'?result.detail:'Запрос не выполнен');return result;
   }
   function post(url,body){return request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf:panel.dataset.aiCsrf,...body})})}
-  function empty(){history.replaceChildren();const block=node('div');block.className='ai-empty';block.append(node('span','✦'),node('h2','Чем помочь?'),node('p','Задайте вопрос о Windows, Linux, 1С или работе серверов.'),node('small','Интернет-поиск, доступ к 1С и метрикам пока не подключены.'));history.append(block)}
+  function empty(){history.replaceChildren();const block=node('div');block.className='ai-empty';block.append(node('span','✦'),node('h2','Чем помочь?'),node('p','Спросите о состоянии серверов или найдите решение в интернете.'),node('small','Метрики и журнал — только чтение. Интернет включается для отдельного вопроса.'));history.append(block)}
   function render(turns){
     const next=JSON.stringify(turns);active=turns.some(t=>['queued','running'].includes(t.status));controls();if(next===signature)return;signature=next;
     const follow=history.scrollHeight-history.clientHeight-history.scrollTop<70,top=history.scrollTop,fragment=document.createDocumentFragment();
@@ -21,6 +23,13 @@
       const q=node('article');q.className='ai-bubble ai-user';q.append(node('span','Вы'),node('p',turn.question));fragment.append(q);
       const answer=node('article');answer.className='ai-bubble ai-assistant';const header=node('header'),label=node('span','✦ Помощник'),status=node('small',labels[turn.status]||turn.status);header.append(label,status);answer.append(header);
       const text=node('div',turn.reply||(['queued','running'].includes(turn.status)?'Ожидаем ответ…':'Ответ отсутствует'));text.className='ai-answer';answer.append(text);
+      if(turn.tools?.length){
+        const details=node('details'),summary=node('summary','Источники и действия · '+turn.tools.length);details.className='ai-sources';details.append(summary);
+        for(const t of turn.tools){const row=node('div'),label=node('span','[S'+t.id+'] '+t.label);row.append(label,node('small',t.status==='running'?'Чтение…':t.status==='failed'?(t.error||'Ошибка'):'Прочитано'));
+          if(t.url&&t.status==='completed'){try{const url=new URL(t.url,location.origin);if(['http:','https:'].includes(url.protocol)){const link=node('a','Открыть источник ↗');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';row.append(link)}}catch(_){}}
+          details.append(row);
+        }answer.append(details);
+      }
       if(turn.error){const error=node('p',turn.error);error.className='text-danger';answer.append(error)}
       if(turn.reply){const copy=node('button','Копировать');copy.type='button';copy.className='ai-copy';copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(turn.reply);copy.textContent='Скопировано'}catch(_){message.textContent='Не удалось скопировать. Выделите нужный текст.'}});answer.append(copy)}
       fragment.append(answer);
@@ -42,7 +51,8 @@
   form.addEventListener('submit',async event=>{
     event.preventDefault();if(busy||active||!configured||!input.value.trim()||!form.reportValidity())return;
     busy=true;controls();message.textContent='Отправляем…';
-    const text=input.value.trim(),target=chat||attempt?.chat||id();if(!attempt||attempt.question!==text||attempt.chat!==target)attempt={chat:target,nonce:id(),question:text};
+    const text=input.value.trim(),target=chat||attempt?.chat||id(),options={portal_access:portal.checked,internet_access:internet.checked,web_query:internet.checked?query.value.trim():''};
+    if(!attempt||attempt.question!==text||attempt.chat!==target||Object.keys(options).some(k=>attempt[k]!==options[k]))attempt={chat:target,nonce:id(),question:text,...options};
     try{const result=await post('/api/ai/ask',attempt);chat=result.chat;if(input.value.trim()===text)input.value='';attempt=null;message.textContent='';await chats();await load()}
     catch(error){message.textContent=error.message}
     finally{busy=false;controls()}

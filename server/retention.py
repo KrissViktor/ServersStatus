@@ -8,6 +8,8 @@ def cleanup(connection,now):
     if row and row['next_run']>now:
         return 0
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='ai_turns'").fetchone():
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name='ai_tool_runs'").fetchone():
+            connection.execute('DELETE FROM ai_tool_runs WHERE turn IN (SELECT id FROM ai_turns WHERE created<?)',(now-RETENTION_DAYS*86400,))
         connection.execute('DELETE FROM ai_turns WHERE created<?',(now-RETENTION_DAYS*86400,))
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='console_jobs'").fetchone():
         from .console import cleanup_history

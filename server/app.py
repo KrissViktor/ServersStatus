@@ -61,8 +61,8 @@ def db():
         ''')
         from .updates import SCHEMA
         connection.executescript(SCHEMA)
-        from .ai_chat import SCHEMA as AI_SCHEMA
-        connection.executescript(AI_SCHEMA)
+        from .ai_chat import initialize as initialize_ai
+        initialize_ai(connection)
         from .processes import SCHEMA as PROCESS_SCHEMA
         connection.executescript(PROCESS_SCHEMA)
         from .services import SCHEMA as SERVICES_SCHEMA
