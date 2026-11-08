@@ -86,10 +86,11 @@ def detail_page(row, csrf,console_access=False):
     content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/settings/' + esc(identifier) + '">Настройки мониторинга</a><a class="nav-link" href="/servers/' + esc(identifier) + '">Обновить данные</a></header>'
     if not can_history():content=content.replace('<a class="nav-link" href="/settings/'+esc(identifier)+'">Настройки мониторинга</a>','')
     data=json.loads(row['data'] or '{}')
-    name=title or data.get('hostname') or row['id']
+    fallback_name=data.get('hostname') or row['id']
+    name=title or fallback_name
     content+='<div class="panel-name-heading"><span>Панель:</span> '
     if can_history():
-        content+=f'<button type="button" class="panel-name-trigger" title="Двойной щелчок — изменить название; Enter — редактировать" aria-label="Изменить название панели"><span class="panel-name-value">{esc(name)}</span></button><form class="panel-name-form" method="post" action="/servers/{esc(identifier)}/name" hidden><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="sr-only" for="panel-name-input">Название панели</label><input id="panel-name-input" name="display_name" maxlength="120" value="{esc(title)}" placeholder="{esc(data.get('hostname') or row['id'])}"><button type="submit">Сохранить</button><button type="button" data-name-cancel>Отмена</button></form><p class="panel-name-message" role="status"></p>'
+        content+=f'<button type="button" class="panel-name-trigger" title="Двойной щелчок — изменить название; Enter — редактировать" aria-label="Изменить название панели"><span class="panel-name-value">{esc(name)}</span></button><form class="panel-name-form" method="post" action="/servers/{esc(identifier)}/name" hidden><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="sr-only" for="panel-name-input">Название панели</label><input id="panel-name-input" name="display_name" maxlength="120" value="{esc(title)}" placeholder="{esc(fallback_name)}"><button type="submit">Сохранить</button><button type="button" data-name-cancel>Отмена</button></form><p class="panel-name-message" role="status"></p>'
     else:content+='<span class="panel-name-value">'+esc(name)+'</span>'
     content+='</div>'
     content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}))

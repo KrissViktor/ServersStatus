@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Check Python 3.11 syntax
+        run: python -m compileall -q server agent tests
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m unittest discover -s tests -v
       - name: Collect live Linux report
