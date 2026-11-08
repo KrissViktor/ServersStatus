@@ -32,6 +32,13 @@ class ConsoleTest(unittest.TestCase):
     def job(self):return self.client.get('/api/console/pc',headers=self.headers).json()['job']
     def ack(self,job,status,**extras):return self.client.post('/api/console/pc/status',headers=self.headers,json={'id':job['id'],'status':status,**extras})
 
+    def test_multiline_command_preserved_as_one_job(self):
+        command="value=shared\nprintf '%s' \"$value\"\npwd"
+        self.assertEqual(self.queue(command=command).status_code,200)
+        job=self.job();self.assertEqual(job['command'],command)
+        self.assertEqual(self.queue(command='whoami').status_code,409)
+        with a.db() as c:self.assertEqual(c.execute('SELECT count(*) FROM console_jobs').fetchone()[0],1)
+
     def test_permissions_confirmations_and_local_flag(self):
         self.assertEqual(self.queue(csrf='bad').status_code,403)
         self.assertEqual(self.queue(confirmation='other').status_code,400)

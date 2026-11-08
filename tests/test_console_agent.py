@@ -18,6 +18,12 @@ class ConsoleAgentTest(unittest.TestCase):
             result=console.execute(command,5,cwd)
             self.assertEqual(result['status'],'succeeded');self.assertTrue(result['truncated']);self.assertEqual(len(result['output']),16384)
 
+    def test_multiline_block_shares_shell_state(self):
+        command="$value='shared'\nWrite-Output ('first '+$value)\nWrite-Output ('second '+$value)" if os.name=='nt' else "value=shared\nprintf 'first %s\\n' \"$value\"\nprintf 'second %s\\n' \"$value\""
+        with tempfile.TemporaryDirectory() as cwd:result=console.execute(command,5,cwd)
+        self.assertEqual(result['status'],'succeeded')
+        self.assertIn('first shared',result['output']);self.assertIn('second shared',result['output'])
+
     def test_real_timeout(self):
         with tempfile.TemporaryDirectory() as cwd:
             command='Start-Sleep -Seconds 20' if os.name=='nt' else 'sleep 20'
