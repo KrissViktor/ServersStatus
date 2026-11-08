@@ -31,9 +31,10 @@ $headers=@{'User-Agent'='ServersStatus-AI-installer';'Accept'='application/vnd.g
 $releaseUrl=if($EngineTag -eq 'latest'){'https://api.github.com/repos/ggml-org/llama.cpp/releases/latest'}else{'https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/'+[Uri]::EscapeDataString($EngineTag)}
 Write-Host 'Reading official llama.cpp release metadata...'
 $release=Invoke-RestMethod -Uri $releaseUrl -Headers $headers
-$assets=@($release.assets | Where-Object { $_.name -match '^llama-.*-bin-win-cpu-x64\.zip$' })
-if($assets.Count -ne 1){throw 'Could not identify exactly one official Windows CPU x64 ZIP'}
-$asset=$assets[0]
+. (Join-Path $PSScriptRoot 'Release-Helpers.ps1')
+$resolved=Resolve-CpuRelease -Release $release -Headers $headers
+$release=$resolved.release
+$asset=$resolved.asset
 if($asset.browser_download_url -notlike 'https://github.com/ggml-org/llama.cpp/releases/download/*' -or $asset.digest -notmatch '^sha256:([a-fA-F0-9]{64})$'){throw 'Release lacks a SHA256 digest or has an unexpected download URL; refusing unverified executable'}
 $engineHash=$Matches[1].ToLowerInvariant()
 $zip="$root\engine.zip"

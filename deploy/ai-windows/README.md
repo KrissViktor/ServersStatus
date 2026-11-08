@@ -64,6 +64,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\ServersStatusAISetup
 Служба появляется только после загрузки и проверок. Неуспешная загрузка не
 заменяет агент и не создаёт правил брандмауэра. `EngineTag` позволяет выбрать
 конкретный релиз вместо latest; релиз без опубликованного digest отклоняется.
+Если latest содержит только nightly-tag.txt (например v0.9.0), установщик
+следует официальному указателю на бинарную сборку, затем проверяет её digest.
 Если запуск сообщает об отсутствующем VC++ runtime, установите официальный
 Microsoft Visual C++ Redistributable x64: https://aka.ms/vs/17/release/vc_redist.x64.exe
 и повторите запуск службы. Установщик не отключает Defender/проверку TLS.
@@ -136,3 +138,14 @@ Start-Service ServersStatusAI
 
 Лимит памяти модели, ключ и файлы остаются прежними. После перезапуска модель
 ожидает 26 Гб свободно; при работе выгружается, если свободно меньше 4 Гб.
+
+Если старая версия установщика сообщает `Could not identify exactly one official
+Windows CPU x64 ZIP`, можно явно указать проверенный бинарный тег:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\ServersStatusAISetup\ServersStatus-main\deploy\ai-windows\Install-AI.ps1' -EngineTag b12110
+```
+
+Либо обновите исходники установщика из main — автоматическое разрешение
+stable → nightly исправлено. Привязка к Windows CPU x64 и проверка SHA256
+сохраняются; ARM/CUDA/OpenVINO-сборки автоматически не выбираются.

@@ -10,6 +10,9 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - name: Test official release selection
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy/ai-windows/Test-Releases.ps1
       - name: Test native service on Windows PowerShell 5.1
         shell: powershell
         run: |
