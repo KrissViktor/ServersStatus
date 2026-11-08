@@ -12,21 +12,22 @@ def requested(query):return bool(re.search(r'погод|weather|прогноз.{
 
 
 def city(query):
-    if re.search(r'москв|\bmoscow\b',query,re.I):return 'Москва'
-    if re.search(r'петербург|\bспб\b|saint petersburg',query,re.I):return 'Санкт-Петербург'
-    match=re.search(r'(?:\bв|\bво|\bдля|\bin)\s+([\w -]+)',query,re.I)
-    if not match:raise WebError('Для прогноза укажите город, например: «Какая погода завтра в Москве?»')
-    value=re.split(r'\b(?:завтра|сегодня|послезавтра|на|tomorrow|today)\b',match[1],flags=re.I)[0].strip(' -')
-    if not value or len(value)>80:raise WebError('Не удалось определить город. Укажите его название отдельно в вопросе.')
-    return value
+    from .ai_places import city_input,normalize
+    value,case=city_input(query)
+    return normalize(value,case)
 
 
 async def forecast(query):
-    place=city(query)
-    geo=await fetch('https://geocoding-api.open-meteo.com/v1/search?'+urlencode({'name':place,'count':1,'language':'ru','format':'json'}))
-    try:locations=json.loads(geo['text']).get('results',[])
-    except (ValueError,AttributeError):raise WebError('Погодный сервис вернул некорректный список городов')
-    if not locations:raise WebError('Погодный сервис не нашёл город «'+place+'». Укажите название в именительном падеже и страну.')
+    from .ai_places import city_input
+    place=city(query);original,_=city_input(query)
+    candidates=list(dict.fromkeys((place,original)));locations=[]
+    for candidate in candidates:
+        geo=await fetch('https://geocoding-api.open-meteo.com/v1/search?'+urlencode({'name':candidate,'count':1,'language':'ru','format':'json'}))
+        try:locations=json.loads(geo['text']).get('results',[])
+        except (ValueError,AttributeError):raise WebError('Погодный сервис вернул некорректный список городов')
+        if not isinstance(locations,list) or any(not isinstance(point,dict) for point in locations):raise WebError('Погодный сервис вернул некорректный список городов')
+        if locations:break
+    if not locations:raise WebError('Погодный сервис не нашёл город «'+original+'». Уточните название города или регион.')
     point=locations[0]
     try:
         lat=float(point['latitude']);lon=float(point['longitude'])
@@ -53,7 +54,8 @@ async def forecast(query):
 
 def answer(data,source):
     date=datetime.fromisoformat(data['date']).strftime('%d.%m.%Y')
-    return (f"{data['city']} · прогноз на {date} ({data['timezone']})\n"
+    location=', '.join(dict.fromkeys(str(data.get(key) or '') for key in ('city','region','country') if data.get(key)))
+    return (f"{location} · прогноз на {date} ({data['timezone']})\n"
             f"Температура: от {data['temperature_2m_min']:g} до {data['temperature_2m_max']:g} °C.\n"
             f"Вероятность осадков: {data['precipitation_probability_max']:g}%; количество: {data['precipitation_sum']:g} мм.\n"
             f"Максимальный ветер: {data['wind_speed_10m_max']:g} км/ч.\n"
