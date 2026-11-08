@@ -36,7 +36,17 @@ jobs:
       - name: Test Windows management inventory and commands
         run: python -m unittest discover -s tests -p test_windows_management_agent.py -v
       - name: Test remote console engine
-        run: python -m unittest discover -s tests -p test_console_agent.py -v
+        shell: pwsh
+        run: |
+          $output = & python -m unittest discover -s tests -p test_console_agent.py -v 2>&1
+          $testExit = $LASTEXITCODE
+          $output | ForEach-Object { Write-Output $_ }
+          if ($testExit -ne 0) {
+            $details = ($output | Select-Object -Last 80 | ForEach-Object { $_.ToString() }) -join "`n"
+            $details = $details.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error title=Windows console test failure::$details"
+            exit $testExit
+          }
       - name: Stamp agent version
         shell: pwsh
         run: |
