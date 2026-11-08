@@ -97,13 +97,16 @@ def page(content, refresh=False, protection_entry=False):
     if '<header class="topbar"' in content:
         if can_history() and 'href="/admin"' not in content:
             content=content.replace('</header>','<a class="nav-link" href="/admin">Администрирование</a></header>',1)
-        if can_history() and 'href="/ai"' not in content:
-            content=content.replace('</header>','<a class="nav-link" href="/ai">ИИ-помощник</a></header>',1)
         if can_console():
             visibility='data-protection-entry="true"' if protection_entry else 'hidden'
             content=content.replace('</header>',f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
             content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
+    widget=''
+    if can_history() and '<header class="topbar"' in content and 'data-ai-csrf=' not in content:
+        widget=('<button type="button" id="ai-launcher" class="ai-launcher" aria-label="Открыть ИИ-помощника" aria-expanded="false" aria-controls="ai-widget">✦ <span>ИИ-помощник</span></button>'
+                '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside><script>'
+                +Path(__file__).with_name('ai_chat.js').read_text(encoding='utf-8')+'</script><script>'+Path(__file__).with_name('ai_widget.js').read_text(encoding='utf-8')+'</script>')
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 
 def login_page():

@@ -1,6 +1,6 @@
-(() => {
-  const panel=document.querySelector('.ai-chat');if(!panel)return;
-  const form=panel.querySelector('#ai-form'),input=panel.querySelector('#ai-question'),history=panel.querySelector('#ai-messages'),list=panel.querySelector('#ai-chats'),send=panel.querySelector('#ai-send'),cancel=panel.querySelector('#ai-cancel'),fresh=panel.querySelector('#ai-new'),remove=panel.querySelector('#ai-delete'),message=panel.querySelector('#ai-message'),state=document.querySelector('#ai-state');
+window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
+  if(!panel||panel.dataset.initialized)return;panel.dataset.initialized='true';
+  const form=panel.querySelector('#ai-form'),input=panel.querySelector('#ai-question'),history=panel.querySelector('#ai-messages'),list=panel.querySelector('#ai-chats'),send=panel.querySelector('#ai-send'),cancel=panel.querySelector('#ai-cancel'),fresh=panel.querySelector('#ai-new'),remove=panel.querySelector('#ai-delete'),message=panel.querySelector('#ai-message'),state=panel.closest('.ai-widget')?.querySelector('#ai-state')||document.querySelector('#ai-state');
   const portal=panel.querySelector('#ai-portal'),internet=panel.querySelector('#ai-internet'),searchBox=panel.querySelector('#ai-search-box'),query=panel.querySelector('#ai-search-query');
   internet.addEventListener('change',()=>{searchBox.hidden=!internet.checked});
   const labels={queued:'В очереди',running:'Печатает…',completed:'Готово',failed:'Ошибка',cancelled:'Остановлено'};
@@ -64,4 +64,5 @@
   remove.addEventListener('click',async()=>{if(!chat||busy||!confirm('Удалить этот диалог и его историю?'))return;busy=true;controls();try{await post('/api/ai/chat/'+chat+'/delete',{});clearTimeout(timer);chat=null;attempt=null;active=false;signature='';empty();await chats();message.textContent='Диалог удалён'}catch(e){message.textContent=e.message}finally{busy=false;controls()}});
   busy=true;controls();
   chats(true).then(()=>chat?load():controls()).catch(e=>{message.textContent=e.message}).finally(()=>{busy=false;controls()});
-})();
+};
+window.initializeAIChat();
