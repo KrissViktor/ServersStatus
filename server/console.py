@@ -113,7 +113,8 @@ def register(app,db,authenticated,csrf_token,digest):
             if not row or time.time()-row['received']>60 or not info.get('enabled') or not info.get('interactive_input'):raise HTTPException(409,'Агент недоступен или не поддерживает ввод')
             job=c.execute('SELECT status FROM console_jobs WHERE id=? AND agent=?',(job_id,agent)).fetchone()
             if not job or job['status']!='running':raise HTTPException(409,'Команда уже завершена или ещё не запущена')
-            if c.execute('SELECT count(*) FROM console_controls WHERE job=?',(job_id,)).fetchone()[0]>=8:raise HTTPException(429,'Дождитесь передачи предыдущих ответов')
+            if data.action=='cancel':c.execute('DELETE FROM console_controls WHERE job=?',(job_id,))
+            elif c.execute('SELECT count(*) FROM console_controls WHERE job=?',(job_id,)).fetchone()[0]>=8:raise HTTPException(429,'Дождитесь передачи предыдущих ответов')
             c.execute('INSERT INTO console_controls(job,agent,action,text,created) VALUES (?,?,?,?,?)',(job_id,agent,data.action,data.text if data.action=='stdin' else '',time.time()))
             if data.action=='cancel':record(c,agent,'console','Запрошена остановка команды #'+str(job_id))
         return {'ok':True}

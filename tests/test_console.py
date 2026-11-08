@@ -95,3 +95,15 @@ class ConsoleTest(unittest.TestCase):
         self.ack(job,'cancelled')
         self.assertEqual(self.client.post(url,json=body).status_code,409)
         with a.db() as c:self.assertEqual(c.execute('SELECT count(*) FROM console_controls').fetchone()[0],0)
+
+    def test_cancel_bypasses_a_full_input_queue(self):
+        self.report['console']['interactive_input']=True
+        self.client.post('/api/report/pc',headers=self.headers,json=self.report)
+        self.queue();job=self.job();self.ack(job,'running')
+        url='/api/servers/pc/console/'+str(job['id'])+'/control'
+        body={'csrf':self.csrf,'confirmation':'pc','action':'stdin','text':'answer'}
+        for _ in range(8):self.assertEqual(self.client.post(url,json=body).status_code,200)
+        self.assertEqual(self.client.post(url,json=body).status_code,429)
+        self.assertEqual(self.client.post(url,json={**body,'action':'cancel'}).status_code,200)
+        controls=self.client.get('/api/console/pc/'+str(job['id'])+'/controls',headers=self.headers).json()['controls']
+        self.assertEqual([c['action'] for c in controls],['cancel'])
