@@ -85,9 +85,15 @@ def detail_page(row, csrf,console_access=False):
     title = dict(row).get('display_name') or ''
     content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/settings/' + esc(identifier) + '">Настройки мониторинга</a><a class="nav-link" href="/servers/' + esc(identifier) + '">Обновить данные</a></header>'
     if not can_history():content=content.replace('<a class="nav-link" href="/settings/'+esc(identifier)+'">Настройки мониторинга</a>','')
-    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None)
-    from .forecast import forecast_html
-    content += (forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180, monitored_disks(json.loads(row['data'] or '{}'))) if can_history() else '') + '</div>'
+    data=json.loads(row['data'] or '{}')
+    name=title or data.get('hostname') or row['id']
+    content+='<div class="panel-name-heading"><span>Панель:</span> '
+    if can_history():
+        content+=f'<button type="button" class="panel-name-trigger" title="Двойной щелчок — изменить название; Enter — редактировать" aria-label="Изменить название панели"><span class="panel-name-value">{esc(name)}</span></button><form class="panel-name-form" method="post" action="/servers/{esc(identifier)}/name" hidden><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="sr-only" for="panel-name-input">Название панели</label><input id="panel-name-input" name="display_name" maxlength="120" value="{esc(title)}" placeholder="{esc(data.get('hostname') or row['id'])}"><button type="submit">Сохранить</button><button type="button" data-name-cancel>Отмена</button></form><p class="panel-name-message" role="status"></p>'
+    else:content+='<span class="panel-name-value">'+esc(name)+'</span>'
+    content+='</div>'
+    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}))
+    content+='</div>'
     from .task_manager import section as task_section,assets as task_assets
     content += task_section(row['id'])+task_assets()
     data=json.loads(row['data'] or '{}')
@@ -95,7 +101,7 @@ def detail_page(row, csrf,console_access=False):
     if console_access:content+=console_section(row['id'],csrf,data)
     if can_history() and data.get('windows_updates'):
         content += '<section class="server"><h3>Управление Windows</h3><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
-    if can_history():content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
+
     from .folding import fold_sections
     content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>item.open=false);});</script>'
     from .drilldown import widget

@@ -11,6 +11,7 @@ from pathlib import Path
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')
 PROTECTION_SCRIPT=Path(__file__).with_name('protection.js').read_text(encoding='utf-8')
 
+FOLD_SCRIPT=Path(__file__).with_name('folding.js').read_text(encoding='utf-8')
 REFRESH_SCRIPT = Path(__file__).with_name('refresh.js').read_text(encoding='utf-8')
 
 
@@ -100,7 +101,7 @@ def page(content, refresh=False, protection_entry=False):
             visibility='data-protection-entry="true"' if protection_entry else 'hidden'
             content=content.replace('</header>',f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
             content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + ('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
 
 def login_page():
@@ -146,7 +147,7 @@ def backup_alerts(rows, now):
     return '<section class="backup-alarm" role="alert"><p class="eyebrow">ТРЕБУЕТСЯ ВНИМАНИЕ</p><h2>Ошибка резервного копирования</h2><ul>' + ''.join(items) + '</ul></section>'
 
 
-def server_card(row, now, rdp_access=None, historical=False):
+def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
     data = json.loads(row['data']) if row['data'] else {}
     data['disks'] = monitored_disks(data)
     age = max(0, now - row['received']) if row['received'] is not None else None
@@ -176,7 +177,11 @@ def server_card(row, now, rdp_access=None, historical=False):
     for disk in monitored_disks(data):
         percent = min(100, number(disk.get('used_percent')))
         content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'
-    content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section><div class="secondary fold-grid"><section><h3>Службы</h3>'
+    content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section>'
+    if forecasts is not None and can_history():
+        from .forecast import forecast_html
+        content+=forecast_html(forecasts,not online,monitored_disks(data))
+    content+='<div class="secondary fold-grid"><section><h3>Службы</h3>'
     services = data.get('services', [])
     if not services:
         content += '<p class="empty small">Контроль служб не настроен</p>'

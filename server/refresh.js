@@ -18,8 +18,8 @@
         const source = next.getElementById(target.id);
         if (source && source.innerHTML !== target.innerHTML) {
           const key=detail=>detail.dataset.foldKey || detail.querySelector('summary')?.textContent.trim();
-          const expanded = new Map([...target.querySelectorAll('details')].map(detail=>[key(detail),detail.open]));
-          for (const detail of source.querySelectorAll('details'))if(expanded.has(key(detail)))detail.open=expanded.get(key(detail));
+          const expanded = new Map([...target.querySelectorAll('details')].map(detail=>[key(detail),{open:detail.open,wide:detail.classList.contains('is-wide')}]));
+          for (const detail of source.querySelectorAll('details'))if(expanded.has(key(detail))){const state=expanded.get(key(detail));detail.open=state.open;window.setServerFoldSize?.(detail,state.wide)}
           target.innerHTML = source.innerHTML;
         }
       }

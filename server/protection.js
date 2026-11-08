@@ -22,8 +22,8 @@
     const current=document.getElementById('server-live'),fresh=next.getElementById('server-live');
     if(current && fresh){
       const key=n=>n.dataset.foldKey || n.querySelector('summary')?.textContent;
-      const expanded=new Map([...current.querySelectorAll('details')].map(n=>[key(n),n.open]));
-      for(const n of fresh.querySelectorAll('details'))if(expanded.has(key(n)))n.open=expanded.get(key(n));
+      const expanded=new Map([...current.querySelectorAll('details')].map(n=>[key(n),{open:n.open,wide:n.classList.contains('is-wide')}]));
+      for(const n of fresh.querySelectorAll('details'))if(expanded.has(key(n))){const state=expanded.get(key(n));n.open=state.open;window.setServerFoldSize?.(n,state.wide)}
       current.innerHTML=fresh.innerHTML;
     }
     if(open && !document.querySelector('[data-protected-pane]')) {
