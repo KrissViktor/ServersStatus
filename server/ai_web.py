@@ -3,6 +3,8 @@ import asyncio
 import html
 from html.parser import HTMLParser
 import ipaddress
+import os
+import ssl
 import re
 import socket
 from urllib.parse import urlsplit,urlunsplit,urljoin,quote,parse_qs
@@ -49,6 +51,33 @@ async def addresses(host,port):
     return sorted(result,key=lambda v:ipaddress.ip_address(v).version)
 
 
+def web_proxy():
+    value=os.environ.get('STATUS_AI_WEB_PROXY','').strip()
+    if not value:return None
+    try:
+        parsed=urlsplit(value)
+        if parsed.scheme not in ('socks5','socks5h','http','https') or parsed.hostname not in ('127.0.0.1','::1','localhost') or not parsed.port or parsed.username is not None or parsed.password is not None or parsed.path not in ('','/') or parsed.query or parsed.fragment:raise ValueError()
+    except ValueError:raise WebError('Неверная настройка STATUS_AI_WEB_PROXY: нужен локальный HTTP/SOCKS-прокси без пароля')
+    return value
+
+
+def connection_error(exc,host,proxied):
+    route='через локальный прокси' if proxied else 'напрямую'
+    chain=[];cause=exc
+    while cause is not None and len(chain)<8:
+        chain.append(cause);cause=cause.__cause__ or cause.__context__
+    if any(isinstance(item,ssl.SSLCertVerificationError) or 'CERTIFICATE_VERIFY_FAILED' in str(item) for item in chain):
+        reason='не пройдена проверка TLS-сертификата; проверьте время системы и пакет ca-certificates'
+    elif isinstance(exc,httpx.ConnectTimeout):reason='таймаут подключения'
+    elif isinstance(exc,httpx.ReadTimeout):reason='таймаут чтения ответа'
+    elif isinstance(exc,httpx.ProxyError):reason='ошибка локального прокси'
+    elif isinstance(exc,httpx.ConnectError):reason='не удалось установить TCP/TLS-соединение'
+    elif isinstance(exc,httpx.TimeoutException):reason='истекло время сетевого запроса'
+    else:reason='ошибка HTTP-соединения'
+    # Never expose exception text: it may contain URL query strings or credentials.
+    return WebError(f'{host}: {reason} ({route})')
+
+
 async def fetch(value):
     current=normalize_url(value)
     for hop in range(4):
@@ -57,8 +86,11 @@ async def fetch(value):
         # Connect to the validated IP snapshot, never resolve the hostname again.
         # Host and TLS SNI retain the original hostname/certificate verification.
         pinned=httpx.URL(current).copy_with(host=ips[0])
+        proxy=web_proxy()
+        options={'trust_env':False,'follow_redirects':False,'timeout':httpx.Timeout(15,connect=8)}
+        if proxy:options['proxy']=proxy
         try:
-            async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(8,connect=5)) as client:
+            async with httpx.AsyncClient(**options) as client:
                 async with client.stream('GET',pinned,headers={'Host':parsed.netloc,'User-Agent':'ServersStatus-Research/1.0','Accept':'text/html,application/xhtml+xml,application/rss+xml,text/plain,application/xml;q=0.9','Accept-Encoding':'identity'},extensions={'sni_hostname':parsed.hostname}) as response:
                     if response.status_code in (301,302,303,307,308):
                         target=response.headers.get('location')
@@ -79,7 +111,7 @@ async def fetch(value):
                     try:text=bytes(data).decode(encoding,errors='replace')
                     except LookupError:text=bytes(data).decode('utf-8',errors='replace')
                     return {'url':current,'type':kind,'text':text}
-        except httpx.HTTPError:raise WebError('Не удалось прочитать сайт: соединение или сертификат недоступны')
+        except httpx.HTTPError as exc:raise connection_error(exc,parsed.hostname,bool(proxy)) from None
     raise WebError('Слишком много перенаправлений')
 
 
@@ -145,3 +177,17 @@ async def search(query):
     for item in items:item['snippet']=' '.join(item['snippet'].split())[:600]
     if not items:raise WebError('Google не вернул читаемую выдачу (возможно, требуется JavaScript или согласие). Можно указать прямую ссылку; Bing не используется.')
     return items
+
+
+async def diagnose():
+    """Only public probes; no model/portal keys, no proxy URL in output."""
+    import json
+    checks=[('geocoding','https://geocoding-api.open-meteo.com/v1/search?name=Moscow&count=1'),('forecast','https://api.open-meteo.com/v1/forecast?latitude=55.75&longitude=37.62&daily=temperature_2m_max&timezone=Europe%2FMoscow&forecast_days=2'),('google','https://www.google.com/search?hl=ru&num=5&gbv=1&q=weather+Moscow')]
+    for name,url in checks:
+        try:
+            result=await fetch(url)
+            print(json.dumps({'source':name,'status':'HTTP 200','type':result['type'],'characters':len(result['text'])},ensure_ascii=False))
+        except WebError as exc:print(json.dumps({'source':name,'error':str(exc)},ensure_ascii=False))
+
+
+if __name__=='__main__':asyncio.run(diagnose())
