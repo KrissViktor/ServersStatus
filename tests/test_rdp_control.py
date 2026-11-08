@@ -23,6 +23,8 @@ class RdpControlTest(unittest.TestCase):
         self.report={'hostname':'SQL-TEST','cpu_percent':1,'memory_percent':20,'uptime_seconds':10000,'system':{'os':'Windows'},'disks':[],'features':['console_v1','rdp_details_v1'],'console':{'enabled':True,'shell':'powershell','identity':'SYSTEM'},'rdp':{'status':'available','sessions':[{**self.target,'state':'active'}]}}
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('test'),now+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('test'),))
             c.execute('INSERT INTO console_grants VALUES (?,?)',(a.digest('test'),now+1800))
             c.execute('INSERT INTO console_grant_tokens VALUES (?,?)',(a.digest('test'),a.digest('grant')))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))

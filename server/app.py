@@ -77,6 +77,8 @@ def db():
         connection.executescript(VERSION_SCHEMA)
         from .console_access import SCHEMA as ACCESS_SCHEMA
         connection.executescript(ACCESS_SCHEMA)
+        from .access import initialize
+        initialize(connection)
         yield connection
         connection.commit()
     finally:
@@ -92,10 +94,8 @@ def password_hash(password, salt):
 
 
 def authenticated(request):
-    token = request.cookies.get('session', '')
-    with db() as c:
-        return c.execute('SELECT 1 FROM sessions WHERE token=? AND expires>?',
-                         (digest(token), time.time())).fetchone() is not None
+    from .access import principal
+    return principal(request,db) is not None
 
 
 def server_rows():
@@ -103,6 +103,8 @@ def server_rows():
     with db() as c:
         rows=[dict(row) for row in c.execute("SELECT a.id, p.display_name, r.received, r.data,COALESCE(f.important,1) AS important,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id ORDER BY a.id").fetchall()]
         for row in rows:
+            from .access import can_history
+            if not can_history():row['sparkline']=[];continue
             from .memory import RAM_USED_SQL, RAM_TOTAL_SQL
             row['sparkline']=[dict(point) for point in c.execute(f"""SELECT AVG(received) AS timestamp,
                 AVG(json_extract(data,'$.cpu_percent')) AS cpu,
@@ -146,7 +148,9 @@ async def login(request: Request):
     salt = user['salt'] if user else '00' * 16
     async with login_slots:
         calculated = await asyncio.to_thread(password_hash, password, salt)
-    valid = user is not None and hmac.compare_digest(calculated, user['password'])
+    with db() as c:
+        enabled=c.execute('SELECT enabled FROM user_roles WHERE name=?',(name,)).fetchone()
+    valid = user is not None and (not enabled or enabled[0]) and hmac.compare_digest(calculated, user['password'])
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
         wait = blocked_seconds(c, address, now)
@@ -161,7 +165,12 @@ async def login(request: Request):
             c.execute('UPDATE auth_guard SET failures=0 WHERE address=?', (address,))
             token = secrets.token_urlsafe(32)
             c.execute('DELETE FROM sessions WHERE expires<?', (now,))
+            current=c.execute('SELECT password FROM users WHERE name=?',(name,)).fetchone()
+            enabled=c.execute('SELECT enabled FROM user_roles WHERE name=?',(name,)).fetchone()
+            if not current or current['password']!=user['password'] or (enabled and not enabled[0]):raise HTTPException(401,'Неверный логин или пароль')
             c.execute('INSERT INTO sessions VALUES (?,?)', (digest(token), now + 28800))
+            c.execute('INSERT INTO session_users VALUES (?,?)',(digest(token),name))
+            c.execute('DELETE FROM session_users WHERE token NOT IN (SELECT token FROM sessions)')
     if not valid:
         if wait:
             raise HTTPException(429, 'Две ошибки входа: адрес временно заблокирован', headers={'Retry-After': str(wait)})
@@ -174,7 +183,11 @@ async def login(request: Request):
 @app.post('/logout')
 def logout(request: Request):
     with db() as c:
-        c.execute('DELETE FROM sessions WHERE token=?', (digest(request.cookies.get('session', '')),))
+        key=digest(request.cookies.get('session',''))
+        for table in ('console_grants','console_grant_tokens','console_challenges'):
+            c.execute('DELETE FROM '+table+' WHERE session=?',(key,))
+        c.execute('DELETE FROM sessions WHERE token=?', (key,))
+        c.execute('DELETE FROM session_users WHERE token=?',(key,))
     response = RedirectResponse('/', status_code=303)
     response.delete_cookie('session')
     return response
@@ -307,7 +320,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/login', '/logout')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -595,6 +608,9 @@ async def rename_server(agent_id: str, request: Request):
     return RedirectResponse('/agents' if form.get('return_to',[''])[0]=='/agents' else '/servers/' + quote(agent_id, safe=''), status_code=303)
 
 
+from .access import middleware as access_middleware
+app.middleware('http')(access_middleware(db))
+
 @app.middleware('http')
 async def request_protection(request: Request, call_next):
     address = client_address(request)
@@ -636,8 +652,9 @@ def journal(request: Request, agent: str = '', level: str = '', before: int = 0)
     from .events import event_page
     from .console_access import unlocked
     access=unlocked(request,db)
+    from .access import can_users
     with db() as c:
-        rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) AND (? OR category!='console') ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before,access)).fetchall()
+        rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) AND (? OR category!='console') AND (? OR category!='users') ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before,access,can_users())).fetchall()
     return HTMLResponse(event_page(rows,agent,level,before))
 
 @app.get('/bot', response_class=HTMLResponse)
@@ -673,3 +690,6 @@ register_rdp(app,db,authenticated,csrf_token)
 
 from .snapshots import register as register_snapshots
 register_snapshots(app,db,authenticated)
+
+from .users import register as register_users
+register_users(app,db,csrf_token,digest,password_hash)

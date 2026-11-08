@@ -25,6 +25,8 @@ class UpdatesTest(unittest.TestCase):
         self.client.cookies.set('session','session')
         with application.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(application.digest('session'),time.time()+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(application.digest('session'),))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',application.digest('key')))
         self.headers={'Authorization':'Bearer key'}
         self.data={'hostname':'pc','cpu_percent':1,'memory_percent':2,'uptime_seconds':3,'disks':[], 'features':['remote_update_v1'],'agent_version':'v1','agent_platform':'linux-source'}

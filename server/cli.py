@@ -16,6 +16,7 @@ with db() as c:
             raise SystemExit('Пароли не совпадают')
         salt = secrets.token_hex(16)
         c.execute('INSERT INTO users VALUES (?,?,?)', (args.name, salt, password_hash(password, salt)))
+        c.execute("INSERT INTO user_roles VALUES (?,'superadmin',1)",(args.name,))
     else:
         token = secrets.token_urlsafe(32)
         c.execute('INSERT INTO agents VALUES (?,?)', (args.name, digest(token)))

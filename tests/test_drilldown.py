@@ -18,6 +18,8 @@ class DrilldownTest(unittest.TestCase):
         limiter.reset()
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('test'),self.now+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('test'),))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))
             c.execute('INSERT INTO agents VALUES (?,?)',('other',a.digest('other-key')))
             for i in range(1500):

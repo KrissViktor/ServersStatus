@@ -20,6 +20,8 @@ class AgentFlagsTest(unittest.TestCase):
         self.report={'hostname':'SQL-HOST','cpu_percent':10,'memory_percent':25,'uptime_seconds':1000,'disks':[]}
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('test'),self.now+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('test'),))
             for agent in ('pc','other'):
                 c.execute('INSERT INTO agents VALUES (?,?)',(agent,a.digest('key')))
                 c.execute('INSERT INTO latest_reports VALUES (?,?,?)',(agent,self.now,json.dumps(self.report)))

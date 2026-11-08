@@ -17,6 +17,8 @@ class ConsoleTest(unittest.TestCase):
         self.client=TestClient(a.app,base_url='https://testserver');self.client.cookies.set('session','session');self.client.cookies.set('__Host-console-access','granted')
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('session'),time.time()+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('session'),))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))
             c.execute('INSERT INTO console_grants VALUES (?,?)',(a.digest('session'),time.time()+900))
             c.execute('INSERT INTO console_grant_tokens VALUES (?,?)',(a.digest('session'),a.digest('granted')))

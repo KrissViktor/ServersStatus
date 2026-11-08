@@ -20,6 +20,8 @@ class HistoricalSnapshotsTest(unittest.TestCase):
         self.headers={'Authorization':'Bearer key'}
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('test'),self.now+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('test'),))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))
             c.execute('INSERT INTO agents VALUES (?,?)',('other',a.digest('other-key')))
         self.data={'hostname':'PC','cpu_percent':75,'memory_percent':40,'uptime_seconds':1000,'system':{'os':'Windows','memory_total_bytes':20*1024**3,'memory_used_bytes':8*1024**3},'disks':[],'features':['console_v1'],'console':{'enabled':True,'shell':'powershell','identity':'SECRET-IDENTITY'}}

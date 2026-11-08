@@ -17,6 +17,8 @@ class WindowsManagementTest(unittest.TestCase):
         self.client=TestClient(a.app);self.client.cookies.set('session','session')
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('session'),time.time()+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('session'),))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))
         self.headers={'Authorization':'Bearer key'}
         self.data={'hostname':'pc','cpu_percent':0,'memory_percent':1,'uptime_seconds':1000,'disks':[],'features':['windows_management_v1'],'windows_updates':{'status':'available','management_enabled':True,'history_status':'available','hotfix_status':'available','history':[{'title':'KB123 <script>bad</script>','installed_at':1700000000,'result':2}],'reboot_required':True,'reboot_reasons':['Windows Update']}}

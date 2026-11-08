@@ -65,6 +65,8 @@ class GitHubCatalogTest(unittest.TestCase):
         with application.db() as c:
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',application.digest('key')))
             c.execute('INSERT INTO sessions VALUES (?,?)',(application.digest('session'),time.time()+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(application.digest('session'),))
         self.headers={'Authorization':'Bearer key'}
 
     def test_sync_idempotence_failure_preserves_catalog_and_legacy_proxy(self):

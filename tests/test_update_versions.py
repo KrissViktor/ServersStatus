@@ -46,6 +46,8 @@ class UpdatePageTest(unittest.TestCase):
         now=time.time()
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('session'),now+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('session'),))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))
             for index,version in enumerate(['old','current','middle','newest'],1):
                 c.execute('INSERT INTO update_packages VALUES (?,?,?,?,?,?)',(index,'windows-x64',version,str(index)*64,10,'/tmp/fake'))

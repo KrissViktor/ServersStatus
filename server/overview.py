@@ -1,5 +1,6 @@
 """Compact overview and detailed server pages."""
 from .disks import monitored_disks
+from .access import can_history,can_console
 import json
 import time
 from pathlib import Path
@@ -75,6 +76,7 @@ def compact_card(row, now):
     else:
         content += '<p class="text-normal compact-ok">Проблем по полученным данным нет</p>'
     content += '<p class="muted">Отчёт: ' + duration(age) + ' назад · В работе: ' + duration(data.get('uptime_seconds')) + '</p>'
+    if not can_history():return content+f'<p class="history-link"><a class="nav-link" href="{esc(url)}">Открыть сервер →</a></p></article>'
     return content + f'<p class="history-link"><a class="nav-link" href="{esc(url)}">Открыть сервер →</a> <a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">Графики нагрузки</a></p></article>'
 
 
@@ -82,19 +84,20 @@ def detail_page(row, csrf,console_access=False):
     identifier = quote(row['id'], safe='')
     title = dict(row).get('display_name') or ''
     content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/settings/' + esc(identifier) + '">Настройки мониторинга</a><a class="nav-link" href="/servers/' + esc(identifier) + '">Обновить данные</a></header>'
+    if not can_history():content=content.replace('<a class="nav-link" href="/settings/'+esc(identifier)+'">Настройки мониторинга</a>','')
     content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None)
     from .forecast import forecast_html
-    content += forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180, monitored_disks(json.loads(row['data'] or '{}'))) + '</div>'
+    content += (forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180, monitored_disks(json.loads(row['data'] or '{}'))) if can_history() else '') + '</div>'
     from .processes_ui import process_section
     content += process_section(row['id'])
     data=json.loads(row['data'] or '{}')
     from .console_ui import section as console_section
     if console_access:content+=console_section(row['id'],csrf,data)
-    if data.get('windows_updates'):
+    if can_history() and data.get('windows_updates'):
         content += '<section class="server"><h3>Управление Windows</h3><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
-    content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
+    if can_history():content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
     from .folding import fold_sections
     content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>item.open=false);});</script>'
     from .drilldown import widget
     from .rdp_control import widget as rdp_widget
-    return page(fold_sections(content)+widget(row['id'])+rdp_widget(), refresh=True)
+    return page(fold_sections(content)+(widget(row['id']) if can_history() else '')+(rdp_widget() if can_console() else ''), refresh=True)

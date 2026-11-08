@@ -26,6 +26,9 @@ def session_key(request):return hashlib.sha256(request.cookies.get('session','')
 
 
 def unlocked(request,db):
+    from .access import principal
+    user=principal(request,db)
+    if not user or user['role']!='superadmin':return False
     with db() as c:
         now=time.time()
         return c.execute('SELECT 1 FROM console_grants g JOIN sessions s ON s.token=g.session JOIN console_grant_tokens t ON t.session=g.session WHERE g.session=? AND g.expires>? AND s.expires>? AND t.token=?',(session_key(request),now,now,hashlib.sha256(request.cookies.get('__Host-console-access','').encode()).hexdigest())).fetchone() is not None

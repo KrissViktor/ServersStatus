@@ -24,6 +24,8 @@ class ConsoleAccessTest(unittest.TestCase):
         self.data={'hostname':'pc','cpu_percent':0,'memory_percent':1,'uptime_seconds':1000,'disks':[],'features':['console_v1'],'console':{'enabled':True,'streaming':True,'interactive_input':True,'shell':'bash','identity':'agent'}}
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('session'),now+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('session'),))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))
             c.execute('INSERT INTO latest_reports VALUES (?,?,?)',('pc',now,json.dumps(self.data)))
             c.execute('INSERT INTO console_access_config VALUES (1,?,?,?)',(salt,pin_hash('1234',salt),secrets.token_hex(32)))
@@ -90,6 +92,8 @@ class ConsoleAccessTest(unittest.TestCase):
         self.assertFalse(self.client.get('/console-access/status').json()['unlocked'])
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('other'),time.time()+3600))
+            c.execute("INSERT OR IGNORE INTO users VALUES ('admin',?,?)",('00'*16,'0'*128))
+            c.execute("INSERT INTO session_users VALUES (?,'admin')",(a.digest('other'),))
         self.client.cookies.set('session','other');self.csrf=a.digest('agent-management:other')
         self.assertEqual(self.enter(code).status_code,400)
         self.assertFalse(self.client.get('/console-access/status').json()['unlocked'])

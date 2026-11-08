@@ -1,5 +1,6 @@
 """Server-rendered dashboard; all agent-provided text is escaped."""
 from .disks import monitored_disks
+from .access import can_history,can_console
 import html
 import json
 import math
@@ -53,6 +54,7 @@ def meter(label,value,description,points=None,field='cpu',now=None):
     from .task_graph import graph
     percent=min(100,number(value))
     now=time.time() if now is None else now
+    if not can_history():return f'<div class="metric current-metric"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><p class="muted task-description">{esc(description)}</p></div>'
     return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now) + '</div><div class="task-axis"><span>5 минут</span><span>Сейчас</span></div><p class="muted task-description">' + esc(description) + '</p></div>'
 
 
@@ -92,11 +94,12 @@ def memory_description(data):
 
 def page(content, refresh=False, protection_entry=False):
     if '<header class="topbar"' in content:
-        if 'href="/admin"' not in content:
+        if can_history() and 'href="/admin"' not in content:
             content=content.replace('</header>','<a class="nav-link" href="/admin">Администрирование</a></header>',1)
-        visibility='data-protection-entry="true"' if protection_entry else 'hidden'
-        content=content.replace('</header>',f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
-        content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
+        if can_console():
+            visibility='data-protection-entry="true"' if protection_entry else 'hidden'
+            content=content.replace('</header>',f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
+            content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
     return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + ('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
 
@@ -157,7 +160,7 @@ def server_card(row, now, rdp_access=None, historical=False):
     problem_class = ' problem-server' if issues(row, now) else ''
     os_name = (data.get('system') or {}).get('os') or 'ОС неизвестна'
     content = f'<article class="server{problem_class}"><header class="server-head"><div><p class="eyebrow">{esc(os_name)} · АГЕНТ {esc(row["id"])}</p><h2>{esc(title)}</h2><p class="muted">{esc(hostname)}</p></div><span class="badge {badge}">● {state}</span></header>'
-    content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История нагрузки →</a></p>'
+    if can_history():content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История нагрузки →</a></p>'
     if age is None:
         return content + '<div class="empty">Ожидаем первый отчёт агента</div></article>'
     if historical:
@@ -221,6 +224,7 @@ def dashboard(rows, q='', view='all'):
         if any(number(d.get('used_percent')) >= 85 for d in monitored_disks(data)):
             attention += 1
     header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/admin">Администрирование</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
+    if not can_history():header=header.replace('<a class="nav-link" href="/admin">Администрирование</a>','')
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     from .overview import compact_card, matches, search_form
     selected = [row for row in rows if matches(row, now, q, view)]
@@ -232,4 +236,4 @@ def dashboard(rows, q='', view='all'):
     from .overview import LIVE_SCRIPT
     cards = search_form(q, view, len(selected), len(rows)) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
     from .drilldown import widget
-    return page(header + '<div id="overview-alerts">' + backup_alerts([row for row in rows if dict(row).get('important',1)], now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + widget('') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
+    return page(header + '<div id="overview-alerts">' + backup_alerts([row for row in rows if dict(row).get('important',1)], now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + (widget('') if can_history() else '') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
