@@ -1,0 +1,23 @@
+name: Test Windows AI service
+on:
+  push:
+    paths: ['deploy/ai-windows/**', '.github/workflows/ai-windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test native service on Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy/ai-windows/Test-Installation.ps1 2>&1
+          $code = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0) {
+            $message = ($output | Select-Object -Last 60 | Out-String).Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error::$message"
+            exit $code
+          }

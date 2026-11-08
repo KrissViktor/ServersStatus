@@ -8,3 +8,9 @@ agent/config.json
 *.remote.json*
 
 agent/VERSION
+
+# Local AI runtime files and credentials
+*.gguf
+ai/api-key.txt
+ai/settings.xml
+ai/versions.json
