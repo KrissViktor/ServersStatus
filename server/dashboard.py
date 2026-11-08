@@ -176,11 +176,12 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
     content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data),points,'cpu',now) + meter('Оперативная память', data.get('memory_percent'), memory_description(data),points,'ram',now) + '</div><div class="server-information"><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
     for disk in monitored_disks(data):
         percent = min(100, number(disk.get('used_percent')))
-        content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'
+        content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p>'
+        if forecasts is not None and can_history():
+            from .forecast import disk_forecast_html
+            content+=disk_forecast_html(forecasts.get(disk.get('path'),{'status':'insufficient'}),disk,not online)
+        content+='</div>'
     content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section>'
-    if forecasts is not None and can_history():
-        from .forecast import forecast_html
-        content+=forecast_html(forecasts,not online,monitored_disks(data))
     content+='<div class="secondary fold-grid"><section><h3>Службы</h3>'
     services = data.get('services', [])
     if not services:

@@ -1,5 +1,6 @@
 """Hourly free-space regression with explicit data-quality gates."""
 from datetime import datetime, timezone, timedelta
+import hashlib
 from .dashboard import esc, size
 
 def predict(samples):
@@ -50,6 +51,42 @@ def load_forecasts(connection, agent, now):
         'change_bytes':samples[0]['free']-samples[-1]['free']} for path,samples in disks.items()}
 
 
+def forecast_body(forecast,disk,stale=False):
+    content=''
+    if stale:content+='<p class="notice">Нет связи с агентом: данные устарели, сроки заполнения не рассчитываются.</p>'
+    labels = {'insufficient':'Недостаточно истории: нужно ≥24 ч и ≥12 часовых точек',
+              'stable':'Устойчивого уменьшения свободного места нет',
+              'unstable':'Нагрузка меняется: надёжный линейный прогноз недоступен',
+              'full':'Свободного места не осталось'}
+    if not stale and forecast['status']=='estimated':
+        rate=forecast['bytes_per_day']
+        days=max(0,disk.get('free_bytes',rate*forecast['days']))/rate
+        text='Более года до заполнения' if days>365 else f'Примерно {days:.1f} дн. до заполнения'
+        content += '<p>'+esc(text)+'</p><p class="muted">Темп заполнения: '+size(rate)+'/сутки</p>'
+        if disk.get('total_bytes'):
+            for threshold in (95,98):
+                remaining=(disk.get('free_bytes',0)-disk['total_bytes']*(1-threshold/100))/rate
+                if remaining<=0:text='порог уже достигнут'
+                elif remaining>365:text='более года'
+                else:
+                    date=(datetime.now(timezone(timedelta(hours=3)))+timedelta(days=remaining)).strftime('%d.%m.%Y %H:%M МСК')
+                    text=f'примерно через {remaining:.1f} дн. · {date}'
+                content += '<p class="muted">До '+str(threshold)+'%: '+esc(text)+'</p>'
+        content += '<p class="muted">Соответствие линейному тренду: '+esc(f"{forecast['quality']*100:.0f}%")+'</p>'
+    elif not stale:content += '<p>'+esc(labels[forecast['status']])+'</p>'
+    if forecast.get('samples'):
+        change=forecast['change_bytes']
+        content += '<p class="muted">История: '+str(forecast['samples'])+' часовых точек за '+esc(f"{forecast['hours']:.1f}")+' ч. · '+('Места занято: ' if change>=0 else 'Освобождено: ')+size(abs(change))+'</p>'
+    return content
+
+
+def disk_forecast_html(forecast,disk,stale=False):
+    path=str(disk.get('path',''))
+    key='disk-forecast-'+hashlib.sha256(path.encode()).hexdigest()[:16]
+    icon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16M7 15l4-4 4 2 5-7m-5 0h5v5"/></svg>'
+    return '<details class="disk-forecast" data-fold-key="'+key+'"><summary title="Прогноз заполнения '+esc(path)+'">'+icon+'<span><b>Прогноз заполнения</b><small>Темп роста и сроки · подробнее</small></span><span class="disk-forecast-chevron" aria-hidden="true">›</span></summary><div class="disk-forecast-body">'+forecast_body(forecast,disk,stale)+'<p class="muted legend">Оценка по часовым средним за 7 дней. Удаления, рост БД и очистка бэкапов меняют прогноз.</p></div></details>'
+
+
 def forecast_html(forecasts, stale=False, disks=None):
     content = '<section class="extended"><h3>Прогноз заполнения дисков</h3>'
     if stale:
@@ -57,10 +94,6 @@ def forecast_html(forecasts, stale=False, disks=None):
     current = {d.get('path'):d for d in disks} if disks is not None else {path:{} for path in forecasts}
     if not current:
         return content + '<p class="muted">Нет данных о дисках. Недостаточно истории: нужно не менее 24 часов измерений.</p></section>'
-    labels = {'insufficient':'Недостаточно истории: нужно ≥24 ч и ≥12 часовых точек',
-              'stable':'Устойчивого уменьшения свободного места нет',
-              'unstable':'Нагрузка меняется: надёжный линейный прогноз недоступен',
-              'full':'Свободного места не осталось'}
     content += '<div class="forecast-grid">'
     for path, disk in current.items():
         forecast=forecasts.get(path, {'status':'insufficient'})
@@ -71,24 +104,6 @@ def forecast_html(forecasts, stale=False, disks=None):
         content += '</header>'
         if disk.get('total_bytes'):
             content += '<p><b>'+size(disk.get('free_bytes'))+'</b> свободно из '+size(disk['total_bytes'])+'</p>'
-        if not stale and forecast['status']=='estimated':
-            rate=forecast['bytes_per_day']
-            days=max(0,disk.get('free_bytes',rate*forecast['days']))/rate
-            text='Более года до заполнения' if days>365 else f'Примерно {days:.1f} дн. до заполнения'
-            content += '<p>'+esc(text)+'</p><p class="muted">Темп заполнения: '+size(rate)+'/сутки</p>'
-            if disk.get('total_bytes'):
-                for threshold in (95,98):
-                    remaining=(disk.get('free_bytes',0)-disk['total_bytes']*(1-threshold/100))/rate
-                    if remaining<=0:text='порог уже достигнут'
-                    elif remaining>365:text='более года'
-                    else:
-                        date=(datetime.now(timezone(timedelta(hours=3)))+timedelta(days=remaining)).strftime('%d.%m.%Y %H:%M МСК')
-                        text=f'примерно через {remaining:.1f} дн. · {date}'
-                    content += '<p class="muted">До '+str(threshold)+'%: '+esc(text)+'</p>'
-            content += '<p class="muted">Соответствие линейному тренду: '+esc(f"{forecast['quality']*100:.0f}%")+'</p>'
-        elif not stale:content += '<p>'+esc(labels[forecast['status']])+'</p>'
-        if forecast.get('samples'):
-            change=forecast['change_bytes']
-            content += '<p class="muted">История: '+str(forecast['samples'])+' часовых точек за '+esc(f"{forecast['hours']:.1f}")+' ч. · '+('Места занято: ' if change>=0 else 'Освобождено: ')+size(abs(change))+'</p>'
+        content+=forecast_body(forecast,disk,stale)
         content += '</article>'
     return content + '</div><p class="muted legend">Оценка по часовым средним за последние 7 дней, не гарантия. Сроки рассчитаны от последнего свободного места. Удаления, рост БД и очистка бэкапов меняют прогноз.</p></section>'
