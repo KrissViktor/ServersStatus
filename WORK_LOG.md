@@ -1746,3 +1746,8 @@ Windows AI CI #7 (4a6750c) и #8 (96e6b88) успешно прошли release r
 Языки: PowerShell, C# (test CLI), YAML, Markdown. Проверки: diff --check;
 Windows CI запускает новый regression и прежние проверки установки/службы.
 Реальные VPN/Raspi/Windows-настройки и учётные данные не изменялись.
+
+Итог: Windows AI service CI #10 (2f80d81) успешно прошёл новую проверку private
+connection (fake Tailscale CLI), release/cache/diagnostics regression и native
+LocalService smoke-test. Живое соединение ожидает установки/входа пользователя
+на Raspberry Pi и Backup; его доступность пока не подтверждена.
