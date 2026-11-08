@@ -12,6 +12,7 @@ CREATE INDEX IF NOT EXISTS console_jobs_agent ON console_jobs(agent,id);'''
 STATES={'queued':'Ожидает агента','running':'Выполняется','succeeded':'Завершено','failed':'Ошибка','timeout':'Превышен лимит времени','uncertain':'Результат неизвестен — проверьте сервер','expired':'Срок команды истёк','reviewed':'Проверено администратором'}
 
 class ConsoleInfo(BaseModel):
+    streaming:bool=False
     enabled:bool=False
     shell:str=Field(pattern='^(powershell|bash)$')
     identity:str=Field(max_length=255)
@@ -24,6 +25,7 @@ class Command(BaseModel):
     review:bool=False
 
 class Result(BaseModel):
+    progress:bool=False
     id:int=Field(ge=1)
     status:str=Field(pattern='^(running|succeeded|failed|timeout|uncertain)$')
     output:str=Field(default='',max_length=16384)
@@ -99,13 +101,17 @@ def register(app,db,authenticated,csrf_token,digest):
         body=await read_body(request,65536)
         try:data=Result.model_validate_json(body)
         except ValidationError:raise HTTPException(422)
+        if data.progress and data.status!='running':raise HTTPException(422,'Прогресс допустим только для работающей команды')
         with db() as c:
             c.execute('BEGIN IMMEDIATE');authorize(c,agent,request);expire(c,agent)
-            row=c.execute('SELECT status FROM console_jobs WHERE id=? AND agent=?',(data.id,agent)).fetchone()
+            row=c.execute('SELECT status,result FROM console_jobs WHERE id=? AND agent=?',(data.id,agent)).fetchone()
             if not row:raise HTTPException(404)
-            if data.status=='running' and row['status']!='queued':raise HTTPException(409,'Команда принята или просрочена')
-            allowed=(row['status']=='queued' and data.status in ('running','uncertain')) or (row['status'] in ('running','uncertain') and data.status!='running')
+            if data.status=='running' and ((not data.progress and row['status']!='queued') or (data.progress and row['status']!='running')):raise HTTPException(409,'Команда принята, завершена или просрочена')
+            allowed=(row['status']=='running' and data.status=='running' and data.progress) or (row['status']=='queued' and data.status in ('running','uncertain')) or (row['status'] in ('running','uncertain') and data.status!='running')
             if allowed:
+                if data.status=='uncertain' and not data.output:
+                    previous=json.loads(row['result'] or '{}')
+                    data.output=previous.get('output','');data.truncated=previous.get('truncated',False)
                 c.execute('UPDATE console_jobs SET status=?,updated=?,result=? WHERE id=?',(data.status,time.time(),data.model_dump_json(),data.id))
-                record(c,agent,'console','Консоль #'+str(data.id)+': '+STATES[data.status])
+                if not data.progress:record(c,agent,'console','Консоль #'+str(data.id)+': '+STATES[data.status])
         return {'ok':True}

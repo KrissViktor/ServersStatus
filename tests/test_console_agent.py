@@ -47,3 +47,12 @@ class ConsoleAgentTest(unittest.TestCase):
             def read(self,*args):return json.dumps({'job':{'id':1,'command':'whoami','timeout':10,'expires':time.time()+60}}).encode()
         with tempfile.TemporaryDirectory() as directory,patch('agent.console.request',return_value=Response()),patch('agent.console.ack',side_effect=OSError()),patch('agent.console.execute') as execute:
             console.worker({'agent_id':'pc'},Path(directory)/'config.json');execute.assert_not_called()
+
+    def test_output_arrives_before_command_finishes(self):
+        seen=[]
+        with tempfile.TemporaryDirectory() as cwd:
+            command="[Console]::WriteLine('first'); Start-Sleep -Seconds 2; [Console]::WriteLine('second')" if os.name=='nt' else "printf 'first\\n'; sleep 2; printf 'second\\n'"
+            result=console.execute(command,10,cwd,progress=lambda value:seen.append(dict(value)))
+        self.assertEqual(result['status'],'succeeded')
+        self.assertTrue(any('first' in value['output'] and 'second' not in value['output'] for value in seen))
+        self.assertIn('second',result['output'])

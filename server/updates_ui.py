@@ -28,13 +28,13 @@ def render(c,csrf):
             rendered=''.join(f'<option value="{p["id"]}">{esc(p["version"])} ({p["label"]}) · {stamp(p["display_date"])} МСК</option>' for p in options)
             disabled='disabled' if active or not online or not options else ''
             content+=f'<form data-update-form method="post" action="/updates/{esc(quote(agent,safe=""))}"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Перейти на версию<select name="package" required {"disabled" if not options else ""}>{rendered or "<option>Подходящих версий нет</option>"}</select></label><label class="check"><input type="checkbox" required> Разрешаю короткий перезапуск службы агента</label><button {disabled}>Установить выбранную версию</button></form>'
-        content+='<div data-update-history>'
+        content+='<div data-update-history tabindex="0" aria-label="История обновлений: прокручиваемый список" style="max-height:300px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;padding:0 14px;margin-top:18px">'
         jobs=c.execute('SELECT j.*,p.version,x.from_version FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package LEFT JOIN update_job_context x ON x.job=j.id WHERE j.agent=? ORDER BY j.id DESC LIMIT 10',(agent,)).fetchall()
         if jobs:
             content+='<h3>История обновлений</h3>'
             for index,job in enumerate(jobs):
                 label,color=LABELS.get(job['status'],(job['status'],'neutral'))
-                content+=f'<details data-update-job="{job["id"]}" {"open" if index==0 else ""}><summary style="padding:12px 0"><span class="badge {color}">{esc(label)}</span> <b>{esc(job["version"])}</b> · {stamp(job["created"])} МСК · #{job["id"]}</summary>'
+                content+=f'<details data-update-job="{job["id"]}"><summary style="padding:12px 0"><span class="badge {color}">{esc(label)}</span> <b>{esc(job["version"])}</b> · {stamp(job["created"])} МСК · #{job["id"]}</summary>'
                 if job['from_version']:content+=f'<p><code>{esc(job["from_version"])}</code> → <code>{esc(job["version"])}</code></p>'
                 content+='<p>'+esc(job['message'])+'</p><div class="table-scroll"><table class="metric-table"><thead><tr><th>Время (МСК)</th><th>Этап</th><th>Результат</th></tr></thead><tbody>'
                 events=c.execute('SELECT created,status,message FROM update_job_events WHERE job=? ORDER BY id',(job['id'],)).fetchall()

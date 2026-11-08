@@ -26,7 +26,9 @@
         const history=card.querySelector('[data-update-history]'),freshHistory=source.querySelector('[data-update-history]');
         const opened=new Map([...history.querySelectorAll('details')].map(n=>[n.dataset.updateJob,n.open]));
         for (const detail of freshHistory.querySelectorAll('details'))if(opened.has(detail.dataset.updateJob))detail.open=opened.get(detail.dataset.updateJob);
-        if (history.innerHTML!==freshHistory.innerHTML)history.innerHTML=freshHistory.innerHTML;
+        if (history.innerHTML!==freshHistory.innerHTML) {
+          const top=history.scrollTop;history.innerHTML=freshHistory.innerHTML;history.scrollTop=top;
+        }
       }
     } catch (_) {} finally {busy=false;}
   },10000);

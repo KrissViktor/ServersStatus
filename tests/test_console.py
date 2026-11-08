@@ -61,3 +61,17 @@ class ConsoleTest(unittest.TestCase):
         self.assertEqual(self.queue().status_code,409)
         with a.db() as c:c.execute('DELETE FROM agent_update_jobs')
         self.assertEqual(self.queue().status_code,200)
+
+    def test_live_progress_is_not_new_acceptance_or_audit_spam(self):
+        self.queue();job=self.job()
+        self.assertEqual(self.ack(job,'running',progress=True,output='too early').status_code,409)
+        self.ack(job,'running')
+        self.assertEqual(self.ack(job,'running',progress=True,output='first').status_code,200)
+        self.assertEqual(self.ack(job,'running',progress=True,output='first\nsecond').status_code,200)
+        result=self.client.get('/api/servers/pc/console').json()['jobs'][0]
+        self.assertEqual(result['status'],'running');self.assertEqual(result['result']['output'],'first\nsecond')
+        with a.db() as c:self.assertEqual(c.execute("SELECT count(*) FROM events WHERE category='console'").fetchone()[0],2)
+        self.ack(job,'succeeded',output='final',exit_code=0)
+        self.assertEqual(self.ack(job,'running',progress=True,output='late').status_code,409)
+        result=self.client.get('/api/servers/pc/console').json()['jobs'][0]
+        self.assertEqual(result['result']['output'],'final')

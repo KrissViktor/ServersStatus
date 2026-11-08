@@ -19,7 +19,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise ValueError('Redirects are not allowed for agent updates')
 
 
-def request(config,path,data=None):
+def request(config,path,data=None,timeout=45):
     base=config['server_url'].rstrip('/')
     parsed=urllib.parse.urlsplit(base)
     if parsed.scheme!='https' or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('','/'):
@@ -28,7 +28,7 @@ def request(config,path,data=None):
     if data is not None:
         headers['Content-Type']='application/json'
     call=urllib.request.Request(base+path,headers=headers,data=json.dumps(data,ensure_ascii=False).encode('utf-8') if data is not None else None)
-    return urllib.request.build_opener(NoRedirect()).open(call,timeout=45)
+    return urllib.request.build_opener(NoRedirect()).open(call,timeout=timeout)
 
 
 def endpoint(config):

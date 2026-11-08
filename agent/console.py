@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import queue
 import subprocess
 import threading
 import time
@@ -23,10 +24,10 @@ def info(config):
             identity=win32api.GetUserName()
         else:identity=getpass.getuser()
     except Exception:identity='Не определён'
-    return {'enabled':config.get('allow_remote_console') is True,'shell':'powershell' if os.name=='nt' else 'bash','identity':identity[:255]}
+    return {'streaming':True,'enabled':config.get('allow_remote_console') is True,'shell':'powershell' if os.name=='nt' else 'bash','identity':identity[:255]}
 
 
-def execute(command,timeout,cwd):
+def execute(command,timeout,cwd,progress=None):
     output=bytearray();truncated=False;job=None;process=None
     finished=threading.Event()
     def consume(stream):
@@ -38,7 +39,7 @@ def execute(command,timeout,cwd):
                     if finished.is_set():break
                     finished.wait(.05)
                     continue
-            else:chunk=stream.read(4096)
+            else:chunk=stream.read1(4096)
             if not chunk:break
             remaining=OUTPUT_LIMIT-len(output)
             output.extend(chunk[:max(0,remaining)])
@@ -62,9 +63,21 @@ def execute(command,timeout,cwd):
         if os.name!='nt':os.set_blocking(process.stdout.fileno(),False)
         reader=threading.Thread(target=consume,args=(process.stdout,),daemon=True);reader.start()
         if os.name=='nt':process.stdin.write(b'go\n');process.stdin.close()
-        timed_out=False
-        try:exit_code=process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:timed_out=True;exit_code=None
+        timed_out=False;exit_code=None;deadline=time.monotonic()+timeout
+        next_progress=0;last_output=None
+        while True:
+            remaining=deadline-time.monotonic()
+            if remaining<=0:timed_out=True;break
+            now=time.monotonic()
+            if progress is not None and now>=next_progress:
+                current=bytes(output).decode('utf-8',errors='replace')
+                if (current,truncated)!=last_output:
+                    progress({'status':'running','output':current,'exit_code':None,'truncated':truncated})
+                    last_output=(current,truncated)
+                next_progress=now+.5
+            try:
+                exit_code=process.wait(timeout=min(.1,remaining));break
+            except subprocess.TimeoutExpired:pass
         # A command cannot leave background descendants running after its result.
         if os.name=='nt':
             win32api.CloseHandle(job);job=None
@@ -122,8 +135,26 @@ def worker(config,config_path):
         if type(job.get('timeout')) is not int or not 1<=job['timeout']<=60 or not isinstance(job.get('command'),str) or not 1<=len(job['command'])<=4000 or job.get('expires',0)<time.time():return
         state={'id':job['id'],'status':'running','exit_code':None,'output':'','truncated':False,'pending':True}
         save(path,state);ack(config,state)  # An expired/refused acceptance must never execute.
-        try:state.update(execute(job['command'],job['timeout'],str(Path(config_path).parent)))
+        updates=queue.Queue(maxsize=1);upload_done=threading.Event()
+        def uploader():
+            while not upload_done.is_set():
+                try:value=updates.get(timeout=.2)
+                except queue.Empty:continue
+                try:
+                    with request(config,endpoint(config)+'/status',value,timeout=3) as response:response.read(4096)
+                except Exception:pass
+        sender=threading.Thread(target=uploader,daemon=True);sender.start()
+        def progress(value):
+            payload={'id':job['id'],**value,'progress':True}
+            try:updates.put_nowait(payload)
+            except queue.Full:
+                try:updates.get_nowait()
+                except queue.Empty:pass
+                try:updates.put_nowait(payload)
+                except queue.Full:pass
+        try:state.update(execute(job['command'],job['timeout'],str(Path(config_path).parent),progress=progress))
         except Exception:state.update(status='failed',output='Не удалось запустить или завершить процесс команды. Проверьте права службы.',exit_code=None)
+        finally:upload_done.set()
         save(path,state);ack(config,state);state['pending']=False;save(path,state)
     except Exception:pass
     finally:
