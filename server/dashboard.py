@@ -143,7 +143,7 @@ def backup_alerts(rows, now):
     return '<section class="backup-alarm" role="alert"><p class="eyebrow">ТРЕБУЕТСЯ ВНИМАНИЕ</p><h2>Ошибка резервного копирования</h2><ul>' + ''.join(items) + '</ul></section>'
 
 
-def server_card(row, now):
+def server_card(row, now, rdp_access=None):
     data = json.loads(row['data']) if row['data'] else {}
     data['disks'] = monitored_disks(data)
     age = max(0, now - row['received']) if row['received'] is not None else None
@@ -200,7 +200,7 @@ def server_card(row, now):
     if backups:
         content += '<p class="muted legend">Свежесть файла не подтверждает возможность восстановления SQL.</p>'
     from .metrics_ui import extended_sections
-    content += '</section></div>' + extended_sections(data) + '</div><details class="raw-report"><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
+    content += '</section></div>' + extended_sections(data,rdp_access) + '</div><details class="raw-report"><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
     from .folding import fold_sections
     return fold_sections(content)
 

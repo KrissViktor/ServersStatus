@@ -68,6 +68,8 @@ def db():
         connection.executescript(WINDOWS_SCHEMA)
         from .console import SCHEMA as CONSOLE_SCHEMA
         connection.executescript(CONSOLE_SCHEMA)
+        from .rdp_control import SCHEMA as RDP_SCHEMA
+        connection.executescript(RDP_SCHEMA)
         from .console import initialize_sequence
         initialize_sequence(connection)
         from .update_versions import SCHEMA as VERSION_SCHEMA
@@ -389,6 +391,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_processes WHERE agent=?', (name,))
                 c.execute('DELETE FROM windows_commands WHERE agent=?', (name,))
+                c.execute('DELETE FROM rdp_operations WHERE agent=?', (name,))
                 c.execute('DELETE FROM console_jobs WHERE agent=?', (name,))
                 c.execute('DELETE FROM console_controls WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
@@ -646,3 +649,6 @@ register_console_access(app,db,authenticated,csrf_token)
 
 from .drilldown import register as register_drilldown
 register_drilldown(app,db,authenticated)
+
+from .rdp_control import register as register_rdp
+register_rdp(app,db,authenticated,csrf_token)

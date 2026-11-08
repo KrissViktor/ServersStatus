@@ -144,3 +144,8 @@ body:has(#chart-detail[open]){overflow:hidden}
 .history-chart line,.task-graph path,.task-graph line{pointer-events:none}
 
 #detail-chart-plot,#detail-chart-plot *{-webkit-user-select:none;user-select:none}
+.rdp-actions{display:flex;gap:6px;flex-wrap:wrap;max-width:270px}.rdp-actions button{font-size:12px;padding:6px 9px}.rdp-actions button:disabled{opacity:.4;cursor:not-allowed}
+#rdp-action-dialog{color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:14px;width:min(600px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:22px;overflow:auto}
+#rdp-action-dialog::backdrop{background:#000b;backdrop-filter:blur(3px)}.rdp-dialog-heading{display:flex;justify-content:space-between;gap:14px;align-items:center}.rdp-dialog-heading h2{font-size:20px}
+#rdp-action-dialog p,#rdp-action-dialog label{display:block;margin-top:14px;overflow-wrap:anywhere}#rdp-action-dialog label[hidden]{display:none}#rdp-action-dialog .check{display:flex}#rdp-action-dialog .check[hidden]{display:none!important}
+#rdp-action-submit{margin-top:16px}#rdp-action-message{white-space:pre-wrap;font-size:13px}body:has(#rdp-action-dialog[open]){overflow:hidden}

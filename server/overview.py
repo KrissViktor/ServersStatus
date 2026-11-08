@@ -82,7 +82,7 @@ def detail_page(row, csrf,console_access=False):
     identifier = quote(row['id'], safe='')
     title = dict(row).get('display_name') or ''
     content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/settings/' + esc(identifier) + '">Настройки мониторинга</a><a class="nav-link" href="/servers/' + esc(identifier) + '">Обновить данные</a></header>'
-    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time())
+    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None)
     from .forecast import forecast_html
     content += forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180, monitored_disks(json.loads(row['data'] or '{}'))) + '</div>'
     from .processes_ui import process_section
@@ -96,4 +96,5 @@ def detail_page(row, csrf,console_access=False):
     from .folding import fold_sections
     content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>item.open=false);});</script>'
     from .drilldown import widget
-    return page(fold_sections(content)+widget(row['id']), refresh=True)
+    from .rdp_control import widget as rdp_widget
+    return page(fold_sections(content)+widget(row['id'])+rdp_widget(), refresh=True)

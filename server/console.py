@@ -63,6 +63,7 @@ def history_cutoff(now):
 def cleanup_history(c,now):
     cutoff=history_cutoff(now)
     c.execute('DELETE FROM console_controls WHERE job IN (SELECT id FROM console_jobs WHERE created<?)',(cutoff,))
+    c.execute('DELETE FROM rdp_operations WHERE job IN (SELECT id FROM console_jobs WHERE created<?)',(cutoff,))
     c.execute('DELETE FROM console_jobs WHERE created<?',(cutoff,))
 
 
@@ -105,6 +106,10 @@ def register(app,db,authenticated,csrf_token,digest):
             from .console_output import clean_output
             for job in jobs:
                 if isinstance(job['result'].get('output'),str):job['result']['output']=clean_output(job['result']['output'])
+                operation=c.execute('SELECT * FROM rdp_operations WHERE job=?',(job['id'],)).fetchone()
+                if operation:
+                    from .rdp_control import label
+                    job['command']=label(operation)
         return JSONResponse({'info':info,'online':time.time()-row['received']<=60,'jobs':jobs,'cutoff':cutoff,'more':more,'next':jobs[-1]['id'] if more else None},headers={'Cache-Control':'no-store'})
 
     @app.post('/api/servers/{agent}/console')

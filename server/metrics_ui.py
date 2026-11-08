@@ -6,12 +6,12 @@ def rate(value):
     return 'Недоступно' if value is None else size(value) + '/с'
 
 
-def extended_sections(data):
+def extended_sections(data,rdp_access=None):
     from .windows_ui import section as windows_section
     windows_html=windows_section(data)
     system = data.get('system')
     if not system:
-        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data) + windows_html
+        return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data,rdp_access) + windows_html
     facts = [
         ('Операционная система', system.get('distribution') or ' '.join(str(system.get(k) or '') for k in ('os', 'release', 'edition'))),
         ('Версия / сборка', system.get('version') or 'Недоступно'),
@@ -34,10 +34,10 @@ def extended_sections(data):
     if not data.get('disk_io'):
         content += '<p class="muted">Счётчики дисковых операций недоступны в ОС.</p>'
     content += '<p class="muted legend">IOPS — операций в секунду. Скорости измерены за ' + esc(f'{data.get("sample_seconds") or 0:.1f}') + ' с перед отправкой отчёта, а не за весь интервал между отчётами. Устройства указаны по именам ОС; соответствие буквам дисков не определялось.</p></section>'
-    return content + rdp_section(data) + windows_html
+    return content + rdp_section(data,rdp_access) + windows_html
 
 
-def rdp_section(data):
+def rdp_section(data,rdp_access=None):
     if (data.get('system') or {}).get('os') == 'Linux':
         return ''
     rdp = data.get('rdp')
@@ -53,7 +53,7 @@ def rdp_section(data):
         active = [s for s in rdp['sessions'] if s.get('state') == 'active']
         unique = {(s.get('domain', ''), s.get('username', '')) for s in active}
         content += f'<p class="muted">Подключённых пользователей: {len(unique)} · Активных сессий: {len(active)}</p>'
-        content += '<div class="table-scroll"><table class="metric-table"><tr><th>Пользователь</th><th>Сессия</th><th>Состояние</th><th>Вход (МСК)</th><th>Длительность</th><th>Простой</th><th>Компьютер клиента</th><th>IP клиента</th></tr>'
+        content += '<div class="table-scroll"><table class="metric-table"><tr><th>Пользователь</th><th>Сессия</th>'+('<th>Действия</th>' if rdp_access else '')+'<th>Состояние</th><th>Вход (МСК)</th><th>Длительность</th><th>Простой</th><th>Компьютер клиента</th><th>IP клиента</th></tr>'
         for session in rdp['sessions']:
             user = (str(session.get('domain'))+'\\' if session.get('domain') else '') + str(session.get('username', ''))
             state = {'active':'🟢 Подключён','disconnected':'🔴 Отключён (сессия сохранена)'}.get(session.get('state'), 'Другое')
@@ -61,6 +61,10 @@ def rdp_section(data):
                 logon=datetime.fromtimestamp(session['logon_at'],timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S') if session.get('logon_at') is not None else '—'
             except (ValueError,OverflowError,OSError):logon='—'
             extra=[logon, duration(session['duration_seconds']) if session.get('duration_seconds') is not None else '—',duration(session['idle_seconds']) if session.get('idle_seconds') is not None else '—',session.get('client_name') or '—',session.get('client_address') or '—']
-            content += '<tr><td>'+esc(user)+'</td><td>'+esc(session.get('session_id',''))+'</td><td>'+state+'</td>'+''.join('<td>'+esc(v)+'</td>' for v in extra)+'</tr>'
+            content += '<tr><td>'+esc(user)+'</td><td>'+esc(session.get('session_id',''))+'</td>'
+            if rdp_access:
+                from .rdp_control import controls
+                content+=controls(session,rdp_access,data)
+            content+='<td>'+state+'</td>'+''.join('<td>'+esc(v)+'</td>' for v in extra)+'</tr>'
         content += '</table></div>'
     return content + '</section>'

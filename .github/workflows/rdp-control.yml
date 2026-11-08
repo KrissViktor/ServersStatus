@@ -1,0 +1,18 @@
+name: Test RDP controls on Windows
+on:
+  push:
+    paths:
+      - 'server/rdp_command.ps1'
+      - 'tests/test_rdp_command.ps1'
+      - '.github/workflows/rdp-control.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-guards:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Windows PowerShell and isolated WTS guards
+        shell: powershell
+        run: .\tests\test_rdp_command.ps1
