@@ -41,7 +41,8 @@ public sealed class AIService : ServiceBase {
         child.BeginOutputReadLine();child.BeginErrorReadLine();Log("Model started; CPU cap "+s.CpuPercent+"%; committed-memory cap "+s.MemoryMB+" MB; below-normal priority");
     }
     void StopModel(){if(job!=IntPtr.Zero){CloseHandle(job);job=IntPtr.Zero;}if(child!=null){try{if(!child.WaitForExit(10000))child.Kill();}catch{}child.Dispose();child=null;}}
-    bool Paused(){string p=Path.Combine(root,"pause-until.txt");if(!File.Exists(p))return false;long until;return !long.TryParse(File.ReadAllText(p).Trim(),out until)||DateTimeOffset.UtcNow.ToUnixTimeSeconds()<until;}
+    string ReadPause(string p){try{return File.ReadAllText(p);}catch(FileNotFoundException){return "0";}}
+    bool Paused(){string p=Path.Combine(root,"pause-until.txt");if(!File.Exists(p))return false;long until;return !long.TryParse(ReadPause(p).Trim(),out until)||DateTimeOffset.UtcNow.ToUnixTimeSeconds()<until;}
     void Run(){
         try{
             Settings s;using(var f=File.OpenRead(Path.Combine(root,"settings.xml")))s=(Settings)new XmlSerializer(typeof(Settings)).Deserialize(f);

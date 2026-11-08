@@ -13,6 +13,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 $root='C:\ProgramData\ServersStatusAI'
+if(Get-NetTCPConnection -LocalPort 8091 -State Listen -ErrorAction SilentlyContinue){throw 'TCP port 8091 is already in use'}
 if (!$AllowOtherComputer -and $env:COMPUTERNAME -ne 'WIN-4JJ50EC22U2') { throw 'Prepared for WIN-4JJ50EC22U2 (windows-04). Use -AllowOtherComputer only intentionally.' }
 if (Get-Service ServersStatusAI -ErrorAction SilentlyContinue) { throw 'Service already installed. Stop it and review existing settings; installation will not overwrite them.' }
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
@@ -56,16 +57,45 @@ if($ModelPath){
 }else{
     Write-Host 'Reading official Qwen3-14B GGUF metadata...'
     $meta=Invoke-RestMethod -Uri 'https://huggingface.co/api/models/Qwen/Qwen3-14B-GGUF?blobs=true'
+    if($meta.sha -notmatch '^[a-f0-9]{40}$'){throw 'Invalid model revision'}
     $files=@($meta.siblings | Where-Object { $_.rfilename -match '(^|/)qwen3-14b-q4_k_m\.gguf$' })
-    if($files.Count -ne 1 -or $files[0].lfs.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or $meta.sha -notmatch '^[a-f0-9]{40}$'){throw 'No single-file Q4_K_M with verified SHA256 found. Download a GGUF manually and use -ModelPath -ModelSha256.'}
-    $file=$files[0];$modelHash=$file.lfs.sha256.ToLowerInvariant();$modelRevision=$meta.sha
-    $modelUrl='https://huggingface.co/Qwen/Qwen3-14B-GGUF/resolve/'+$meta.sha+'/'+(($file.rfilename.Split('/') | ForEach-Object {[Uri]::EscapeDataString($_)}) -join '/')+'?download=true'
-    Write-Host ('Downloading model (~'+[Math]::Round($file.lfs.size/1GB,1)+' GB). This can take a long time...')
-    Invoke-WebRequest -UseBasicParsing -Uri $modelUrl -OutFile "$root\models\model.gguf.part"
-    if((Get-FileHash "$root\models\model.gguf.part" -Algorithm SHA256).Hash.ToLowerInvariant() -ne $modelHash){throw 'Model SHA256 mismatch'}
-    Move-Item "$root\models\model.gguf.part" "$root\models\model.gguf" -Force
+    $split=$false
+    if(!$files.Count){$files=@($meta.siblings | Where-Object { $_.rfilename -match '(^|/)qwen3-14b-q4_k_m-\d{5}-of-\d{5}\.gguf$' } | Sort-Object rfilename);$split=$true}
+    if(!$files.Count -or (!$split -and $files.Count -ne 1)){throw 'No unambiguous Q4_K_M GGUF found. Use -ModelPath -ModelSha256.'}
+    if($split){
+        $expected=0;$index=1
+        foreach($file in $files){
+            if($file.rfilename -notmatch '-(\d{5})-of-(\d{5})\.gguf$'){throw 'Invalid shard name'}
+            if([int]$Matches[1] -ne $index -or ($expected -and $expected -ne [int]$Matches[2])){throw 'Incomplete model shards'}
+            $expected=[int]$Matches[2];$index++
+        }
+        if($files.Count -ne $expected){throw 'Incomplete model shards'}
+    }
+    New-Item -ItemType Directory -Force -Path "$root\models\parts" | Out-Null
+    $parts=@();$modelRevision=$meta.sha
+    foreach($file in $files){
+        if($file.lfs.sha256 -notmatch '^[a-fA-F0-9]{64}$'){throw 'Model file lacks trusted LFS SHA256'}
+        $modelUrl='https://huggingface.co/Qwen/Qwen3-14B-GGUF/resolve/'+$meta.sha+'/'+(($file.rfilename.Split('/') | ForEach-Object {[Uri]::EscapeDataString($_)}) -join '/')+'?download=true'
+        $target=Join-Path "$root\models\parts" ([IO.Path]::GetFileName($file.rfilename))
+        Write-Host ('Downloading '+$file.rfilename+' (~'+[Math]::Round($file.lfs.size/1GB,1)+' GB)...')
+        Invoke-WebRequest -UseBasicParsing -Uri $modelUrl -OutFile ($target+'.part')
+        if((Get-FileHash ($target+'.part') -Algorithm SHA256).Hash -ne $file.lfs.sha256){throw 'Model SHA256 mismatch'}
+        Move-Item ($target+'.part') $target -Force;$parts+=$target
+    }
+    if($split){
+        $mergers=@(Get-ChildItem "$root\engine" -Filter llama-gguf-split.exe -Recurse)
+        if($mergers.Count -ne 1){throw 'Verified shards downloaded, but engine has no GGUF merge tool. Use a single-file -ModelPath.'}
+        & $mergers[0].FullName --merge $parts[0] "$root\models\model.gguf"
+        if($LASTEXITCODE){throw 'GGUF merge failed'}
+    }else{Move-Item $parts[0] "$root\models\model.gguf" -Force}
+    $modelHash=(Get-FileHash "$root\models\model.gguf" -Algorithm SHA256).Hash.ToLowerInvariant()
+    # Input shards were verified before merging; record each trusted input hash.
+    @($files | Select-Object rfilename,@{Name='sha256';Expression={$_.lfs.sha256}}) | ConvertTo-Json | Set-Content "$root\model-inputs.json" -Encoding UTF8
+
 }
-$help=(& $engine --help 2>&1 | Out-String)
+$previousPreference=$ErrorActionPreference
+try{$ErrorActionPreference='Continue';$help=(& $engine --help 2>&1 | Out-String);$helpExit=$LASTEXITCODE}finally{$ErrorActionPreference=$previousPreference}
+if($helpExit){throw 'Engine could not run --help. Check CPU compatibility and Microsoft VC++ x64 runtime.'}
 $load=if($help -match '--load-mode'){'--load-mode none'}elseif($help -match '--no-mmap'){'--no-mmap'}else{throw 'Engine has no supported non-mmap mode; cannot apply the intended memory accounting'}
 if($help -notmatch '--api-key-file'){throw 'Engine lacks API-key-file support'}
 $reasoning=if($help -match '--reasoning '){'--reasoning off'}elseif($help -match '--chat-template-kwargs'){'--chat-template-kwargs "{\"enable_thinking\":false}"'}else{throw 'Engine lacks supported thinking configuration'}
