@@ -1,6 +1,9 @@
 """Bounded history aggregation and dependency-free SVG charts."""
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote, urlencode
+from pathlib import Path
+
+IO_SCRIPT=Path(__file__).with_name("io_history.js").read_text(encoding="utf-8")
 
 from .dashboard import esc, page
 from .memory import RAM_USED_SQL, RAM_TOTAL_SQL, memory_tooltip
@@ -89,4 +92,4 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         content += chart(points, 'cpu', 'Процессор · CPU', start, end, '#4adeab')
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
     content += extra_html
-    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><footer>История хранится 186 дней (не менее 6 месяцев). Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
+    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script><footer>История хранится 186 дней (не менее 6 месяцев). Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)

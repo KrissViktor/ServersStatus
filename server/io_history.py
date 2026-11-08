@@ -53,16 +53,20 @@ def samples(connection,agent,group,name,field,start,end,bucket):
     return metric_series(connection,agent,group,name,start,end,bucket)[field]
 
 
-def chart(rows,title,start,end,iops=False):
+def chart(rows,title,start,end,iops=False,key=None):
+    heading='<header class="io-chart-heading"><h3>'+esc(title)+'</h3>'
+    if key:heading+='<button type="button" class="chart-expand" aria-expanded="false">Расширить</button>'
+    heading+='</header>'
+    opening='<section class="server io-chart" data-chart-key="'+esc(key or title)+'">'+heading
     if not rows:
-        return '<section class="server"><h3>'+esc(title)+'</h3><p class="muted">Измерений пока нет.</p></section>'
+        return opening+'<p class="muted">Измерений пока нет.</p></section>'
     maximum=max(1,max(row['peak'] for row in rows)*1.1)
     fmt=lambda value: f'{value:.1f} оп/с' if iops else size(value)+'/с'
-    x=lambda t: 90+(t-start)/(end-start)*890
+    x=lambda t: 130+(t-start)/(end-start)*850
     y=lambda value: 200-value/maximum*180
     drawing=''
     for ratio in (0,.25,.5,.75,1):
-        drawing+=f'<line class="chart-grid" x1="90" x2="980" y1="{y(maximum*ratio)}" y2="{y(maximum*ratio)}"/><text class="chart-label" x="82" y="{y(maximum*ratio)+4}" text-anchor="end">{esc(fmt(maximum*ratio))}</text>'
+        drawing+=f'<line class="chart-grid" x1="130" x2="980" y1="{y(maximum*ratio)}" y2="{y(maximum*ratio)}"/><text class="chart-label" x="122" y="{y(maximum*ratio)+4}" text-anchor="end">{esc(fmt(maximum*ratio))}</text>'
     for fraction in (0,.5,1):
         timestamp=start+(end-start)*fraction
         drawing+=f'<text class="chart-label" x="{x(timestamp)}" y="230" text-anchor="{"start" if fraction==0 else "end" if fraction==1 else "middle"}">{stamp(timestamp)}</text>'
@@ -73,24 +77,22 @@ def chart(rows,title,start,end,iops=False):
         tooltip=stamp(row['timestamp'])+' · среднее '+fmt(row['value'])+' · пик '+fmt(row['peak'])
         drawing+=f'<circle class="chart-point" fill="#83c4ff" r="3" cx="{x(row["timestamp"])}" cy="{y(row["value"])}"><title>{esc(tooltip)}</title></circle>'
         previous=row
-    return '<section class="server"><h2>'+esc(title)+'</h2><div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245">'+drawing+'</svg></div></section>'
+    return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245">'+drawing+'</svg></div></section>'
 
 
 def sections(connection, agent, period, start,end,bucket,nic=None,disk=None):
     options={group:names(connection,agent,group,start,end) for group in FIELDS}
     nic=nic if nic in options['network'] else next(iter(options['network']), '')
     disk=disk if disk in options['disk_io'] else next(iter(options['disk_io']), '')
-    content='<form class="searchbar" method="get" action="/history/'+esc(quote(agent,safe=''))+'"><input type="hidden" name="period" value="'+esc(period)+'">'
-    for group,key,selected,label in [('network','nic',nic,'Сетевой интерфейс'),('disk_io','disk',disk,'Дисковое устройство')]:
-        content+='<label>'+label+'<select name="'+key+'">'+''.join('<option '+('selected ' if name==selected else '')+'value="'+esc(name)+'">'+esc(name)+'</option>' for name in options[group])+'</select></label>'
-    content+='<button>Показать графики</button></form><p class="muted history-note">Скорости — секундные снимки перед отчётом. Выбран отдельный интерфейс/устройство, без суммирования виртуальных адаптеров. Пропуски не считаются нулями.</p>'
+    content='<p class="muted history-note">Скорости — секундные снимки перед отчётом. Каждый интерфейс и устройство показаны отдельно. Пропуски не считаются нулями.</p>'
     series={group:metric_series(connection,agent,group,name,start,end,bucket) for group,name in [('network',nic),('disk_io',disk)] if name}
-    for group,name,field,title,iops in [
-        ('network',nic,'receive_bytes_per_second','Сеть · приём',False),('network',nic,'send_bytes_per_second','Сеть · передача',False),
-        ('disk_io',disk,'read_bytes_per_second','Диски · чтение',False),('disk_io',disk,'write_bytes_per_second','Диски · запись',False),
-        ('disk_io',disk,'read_iops','Диски · чтение IOPS',True),('disk_io',disk,'write_iops','Диски · запись IOPS',True)]:
-        if name:
-            content+=chart(series[group][field],title+' · '+name,start,end,iops)
-    if not nic and not disk:
-        content+='<p class="empty">История сети и дисковых операций появится после отчётов расширенного агента.</p>'
+    for group,key,selected,label,title in [('network','nic',nic,'Сетевой интерфейс','Сеть'),('disk_io','disk',disk,'Дисковое устройство','Дисковые операции')]:
+        other_key,other_value=('disk',disk) if key=='nic' else ('nic',nic)
+        content+='<section class="server io-section" data-io-section="'+group+'"><h2>'+title+'</h2><form class="searchbar io-selector" method="get" action="/history/'+esc(quote(agent,safe=''))+'"><input type="hidden" name="period" value="'+esc(period)+'"><input type="hidden" name="'+other_key+'" value="'+esc(other_value)+'"><label>'+label+'<select name="'+key+'">'+''.join('<option '+('selected ' if name==selected else '')+'value="'+esc(name)+'">'+esc(name)+'</option>' for name in options[group])+'</select></label><noscript><button>Показать графики</button></noscript></form><p class="muted io-status" role="status" aria-live="polite"></p><div class="io-plots">'
+        fields=[('receive_bytes_per_second','Приём',False),('send_bytes_per_second','Передача',False)] if group=='network' else [('read_bytes_per_second','Чтение',False),('write_bytes_per_second','Запись',False),('read_iops','Чтение IOPS',True),('write_iops','Запись IOPS',True)]
+        if selected:
+            for field,caption,iops in fields:
+                content+=chart(series[group][field],title+' · '+caption[:1].lower()+caption[1:]+' · '+selected,start,end,iops,key=group+'-'+field)
+        else:content+='<p class="empty">История появится после получения отчётов с этими метриками.</p>'
+        content+='</div></section>'
     return content, {'nic': nic, 'disk': disk}

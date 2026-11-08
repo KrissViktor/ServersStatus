@@ -4,12 +4,14 @@
   if (!targets.length) return;
   let busy = false;
   setInterval(async () => {
-    if (busy || document.hidden || (targets.some(target => target.contains(document.activeElement)) && document.activeElement.matches('input,select,textarea'))) return;
+    if (busy || document.hidden || targets.some(target=>target.dataset.fetchBusy==='true') || (targets.some(target => target.contains(document.activeElement)) && document.activeElement.matches('input,select,textarea'))) return;
     busy = true;
     try {
-      const response = await fetch(location.href, {credentials: 'same-origin', cache: 'no-store'});
+      const requested=location.href;
+      const response = await fetch(requested, {credentials: 'same-origin', cache: 'no-store'});
       if (!response.ok) return;
       const next = new DOMParser().parseFromString(await response.text(), 'text/html');
+      if(requested!==location.href || targets.some(target=>target.dataset.fetchBusy==='true'))return;
       const x = scrollX, y = scrollY;
       document.body.style.minHeight = Math.max(innerHeight, y + innerHeight) + 'px';
       for (const target of targets) {
