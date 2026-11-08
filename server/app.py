@@ -376,6 +376,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM latest_processes WHERE agent=?', (name,))
                 c.execute('DELETE FROM windows_commands WHERE agent=?', (name,))
                 c.execute('DELETE FROM console_jobs WHERE agent=?', (name,))
+                c.execute('DELETE FROM console_controls WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
                 record(c,name,'configuration','Агент удалён')

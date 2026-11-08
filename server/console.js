@@ -3,7 +3,8 @@
   if (!panel?.dataset.url) return;
   const form=document.getElementById('console-form'), history=document.getElementById('console-history'), message=document.getElementById('console-message');
   if (!history) return;
-  const review=document.getElementById('console-review');
+  const review=document.getElementById('console-review'), inputForm=document.getElementById('console-input-form');
+  let runningId=null, sendingInput=false;
   let busy=false, fetching=false, snapshot='', submitted=null, refreshDelay=5000, timer=null;
   const node=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n};
   async function refresh() {
@@ -14,6 +15,8 @@
       if (!response.ok) throw new Error();
       const result=await response.json();
       refreshDelay=result.jobs.some(job=>['queued','running'].includes(job.status)) ? 1000 : 5000;
+      runningId=result.jobs.find(job=>job.status==='running')?.id || null;
+      if (inputForm)inputForm.hidden=!runningId || !result.info.interactive_input;
       if (form) {
         const active=result.jobs.some(job=>['queued','running','uncertain'].includes(job.status));
         form.querySelector('button[type=submit]').disabled=active || !result.online || !result.info.enabled;
@@ -66,6 +69,21 @@
     } catch(error) {message.textContent=error.message;}
     finally {busy=false;poll();}
   }
+  async function sendControl(action) {
+    if (!runningId || sendingInput)return;
+    sendingInput=true;
+    try {
+      const response=await fetch(panel.dataset.url+'/'+runningId+'/control',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf:form.elements.csrf.value,confirmation:panel.dataset.agent,action,text:action==='stdin' ? inputForm.elements.stdin.value : ''})});
+      const result=await response.json();
+      if (!response.ok)throw new Error(typeof result.detail==='string' ? result.detail : 'Не удалось передать ответ');
+      if (action==='stdin')inputForm.elements.stdin.value='';
+      message.textContent=action==='cancel' ? 'Запрошена остановка команды.' : action==='eof' ? 'Отправлен конец ввода.' : 'Ответ отправлен агенту.';
+    } catch(error) {message.textContent=error.message;}
+    finally {sendingInput=false;poll();}
+  }
+  inputForm?.addEventListener('submit',event=>{event.preventDefault();sendControl('stdin')});
+  inputForm?.querySelector('[data-console-eof]').addEventListener('click',()=>sendControl('eof'));
+  inputForm?.querySelector('[data-console-cancel]').addEventListener('click',()=>sendControl('cancel'));
   form?.addEventListener('submit',event=>{event.preventDefault();submit()});
   review?.addEventListener('click',()=>submit(true));
   async function poll(){clearTimeout(timer);await refresh();clearTimeout(timer);timer=setTimeout(poll,refreshDelay)}

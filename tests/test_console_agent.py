@@ -56,3 +56,25 @@ class ConsoleAgentTest(unittest.TestCase):
         self.assertEqual(result['status'],'succeeded')
         self.assertTrue(any('first' in value['output'] and 'second' not in value['output'] for value in seen))
         self.assertIn('second',result['output'])
+
+    def test_unicode_answer_to_running_prompt(self):
+        controls=console.ControlChannel();sent=False
+        command="$name=Read-Host 'Name';[Console]::WriteLine('Hello '+$name)" if os.name=='nt' else "printf 'Name: '; IFS= read -r name; printf 'Hello %s' \"$name\""
+        def progress(value):
+            nonlocal sent
+            if not sent and 'Name:' in value['output']:
+                controls.put_nowait({'action':'stdin','text':'Виктор'});sent=True
+        with tempfile.TemporaryDirectory() as cwd:result=console.execute(command,10,cwd,progress=progress,controls=controls)
+        self.assertTrue(sent);self.assertEqual(result['status'],'succeeded');self.assertIn('Hello Виктор',result['output'])
+
+    def test_eof_and_cancel(self):
+        controls=console.ControlChannel()
+        controls.put_nowait({'action':'stdin','text':'answer'});controls.put_nowait({'action':'eof'})
+        command='[Console]::Write([Console]::In.ReadToEnd())' if os.name=='nt' else 'cat'
+        with tempfile.TemporaryDirectory() as cwd:result=console.execute(command,10,cwd,controls=controls)
+        self.assertEqual(result['status'],'succeeded');self.assertIn('answer',result['output'])
+        controls=console.ControlChannel();controls.put_nowait({'action':'cancel'})
+        command='Start-Sleep -Seconds 20' if os.name=='nt' else 'sleep 20'
+        with tempfile.TemporaryDirectory() as cwd:
+            before=time.monotonic();result=console.execute(command,10,cwd,controls=controls)
+        self.assertEqual(result['status'],'cancelled');self.assertLess(time.monotonic()-before,5)

@@ -8,11 +8,14 @@ from pydantic import BaseModel,Field,ValidationError
 from .events import record
 
 SCHEMA='''CREATE TABLE IF NOT EXISTS console_jobs (id INTEGER PRIMARY KEY,agent TEXT,command TEXT,timeout INTEGER,status TEXT,created REAL,expires REAL,updated REAL,result TEXT);
-CREATE INDEX IF NOT EXISTS console_jobs_agent ON console_jobs(agent,id);'''
-STATES={'queued':'Ожидает агента','running':'Выполняется','succeeded':'Завершено','failed':'Ошибка','timeout':'Превышен лимит времени','uncertain':'Результат неизвестен — проверьте сервер','expired':'Срок команды истёк','reviewed':'Проверено администратором'}
+CREATE INDEX IF NOT EXISTS console_jobs_agent ON console_jobs(agent,id);
+CREATE TABLE IF NOT EXISTS console_controls (id INTEGER PRIMARY KEY AUTOINCREMENT,job INTEGER,agent TEXT,action TEXT,text TEXT,created REAL);
+CREATE INDEX IF NOT EXISTS console_controls_job ON console_controls(job,id);'''
+STATES={'queued':'Ожидает агента','running':'Выполняется','succeeded':'Завершено','failed':'Ошибка','cancelled':'Остановлено пользователем','timeout':'Превышен лимит времени','uncertain':'Результат неизвестен — проверьте сервер','expired':'Срок команды истёк','reviewed':'Проверено администратором'}
 
 class ConsoleInfo(BaseModel):
     streaming:bool=False
+    interactive_input:bool=False
     enabled:bool=False
     shell:str=Field(pattern='^(powershell|bash)$')
     identity:str=Field(max_length=255)
@@ -27,16 +30,24 @@ class Command(BaseModel):
 class Result(BaseModel):
     progress:bool=False
     id:int=Field(ge=1)
-    status:str=Field(pattern='^(running|succeeded|failed|timeout|uncertain)$')
+    status:str=Field(pattern='^(running|succeeded|failed|timeout|cancelled|uncertain)$')
     output:str=Field(default='',max_length=16384)
     exit_code:int|None=None
     truncated:bool=False
+
+
+class Control(BaseModel):
+    csrf:str=Field(max_length=200)
+    confirmation:str=Field(max_length=64)
+    action:str=Field(pattern='^(stdin|eof|cancel)$')
+    text:str=Field(default='',max_length=1024)
 
 
 def expire(c,agent):
     now=time.time()
     c.execute("UPDATE console_jobs SET status='expired',updated=? WHERE agent=? AND status='queued' AND expires<?",(now,agent,now))
     c.execute("UPDATE console_jobs SET status='uncertain',updated=? WHERE agent=? AND status='running' AND updated<?",(now,agent,now-180))
+    c.execute("DELETE FROM console_controls WHERE agent=? AND job IN (SELECT id FROM console_jobs WHERE status!='running')",(agent,))
 
 
 async def read_body(request,limit):
@@ -88,6 +99,39 @@ def register(app,db,authenticated,csrf_token,digest):
             c.execute("DELETE FROM console_jobs WHERE agent=? AND id NOT IN (SELECT id FROM console_jobs WHERE agent=? ORDER BY id DESC LIMIT 100) AND status NOT IN ('queued','running','uncertain')",(agent,agent))
         return {'ok':True,'id':identifier}
 
+    @app.post('/api/servers/{agent}/console/{job_id}/control')
+    async def control(agent:str,job_id:int,request:Request):
+        if not authenticated(request):raise HTTPException(401)
+        try:data=Control.model_validate_json(await read_body(request,8192))
+        except ValidationError:raise HTTPException(422)
+        if not hmac.compare_digest(data.csrf.encode(),csrf_token(request).encode()):raise HTTPException(403)
+        if data.confirmation!=agent:raise HTTPException(400)
+        with db() as c:
+            c.execute('BEGIN IMMEDIATE');expire(c,agent)
+            row=c.execute('SELECT data,received FROM current_reports WHERE agent=?',(agent,)).fetchone()
+            info=(json.loads(row['data']).get('console') or {}) if row else {}
+            if not row or time.time()-row['received']>60 or not info.get('enabled') or not info.get('interactive_input'):raise HTTPException(409,'Агент недоступен или не поддерживает ввод')
+            job=c.execute('SELECT status FROM console_jobs WHERE id=? AND agent=?',(job_id,agent)).fetchone()
+            if not job or job['status']!='running':raise HTTPException(409,'Команда уже завершена или ещё не запущена')
+            if c.execute('SELECT count(*) FROM console_controls WHERE job=?',(job_id,)).fetchone()[0]>=8:raise HTTPException(429,'Дождитесь передачи предыдущих ответов')
+            c.execute('INSERT INTO console_controls(job,agent,action,text,created) VALUES (?,?,?,?,?)',(job_id,agent,data.action,data.text if data.action=='stdin' else '',time.time()))
+            if data.action=='cancel':record(c,agent,'console','Запрошена остановка команды #'+str(job_id))
+        return {'ok':True}
+
+    @app.get('/api/console/{agent}/{job_id}/controls')
+    def controls(agent:str,job_id:int,request:Request,after:int=0):
+        if after<0:raise HTTPException(400)
+        with db() as c:
+            c.execute('BEGIN IMMEDIATE');authorize(c,agent,request)
+            job=c.execute('SELECT status FROM console_jobs WHERE id=? AND agent=?',(job_id,agent)).fetchone()
+            if not job or job['status']!='running':raise HTTPException(409)
+            # Delete only IDs this same agent previously fetched and acknowledged via its cursor.
+            maximum=c.execute('SELECT max(id) FROM console_controls WHERE job=? AND agent=?',(job_id,agent)).fetchone()[0]
+            if after and maximum and after>maximum:raise HTTPException(400)
+            c.execute('DELETE FROM console_controls WHERE job=? AND agent=? AND id<=?',(job_id,agent,after))
+            rows=c.execute('SELECT id,action,text FROM console_controls WHERE job=? AND agent=? AND id>? ORDER BY id LIMIT 8',(job_id,agent,after)).fetchall()
+        return JSONResponse({'controls':[dict(row) for row in rows]},headers={'Cache-Control':'no-store'})
+
     @app.get('/api/console/{agent}')
     def pending(agent:str,request:Request):
         with db() as c:
@@ -113,5 +157,6 @@ def register(app,db,authenticated,csrf_token,digest):
                     previous=json.loads(row['result'] or '{}')
                     data.output=previous.get('output','');data.truncated=previous.get('truncated',False)
                 c.execute('UPDATE console_jobs SET status=?,updated=?,result=? WHERE id=?',(data.status,time.time(),data.model_dump_json(),data.id))
+                if data.status!='running':c.execute('DELETE FROM console_controls WHERE job=?',(data.id,))
                 if not data.progress:record(c,agent,'console','Консоль #'+str(data.id)+': '+STATES[data.status])
         return {'ok':True}

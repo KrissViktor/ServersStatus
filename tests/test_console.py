@@ -75,3 +75,23 @@ class ConsoleTest(unittest.TestCase):
         self.assertEqual(self.ack(job,'running',progress=True,output='late').status_code,409)
         result=self.client.get('/api/servers/pc/console').json()['jobs'][0]
         self.assertEqual(result['result']['output'],'final')
+
+    def test_input_queue_scoped_delivery_and_no_id_reuse(self):
+        self.report['console']['interactive_input']=True
+        self.client.post('/api/report/pc',headers=self.headers,json=self.report)
+        self.queue();job=self.job();self.ack(job,'running')
+        url='/api/servers/pc/console/'+str(job['id'])+'/control'
+        body={'csrf':self.csrf,'confirmation':'pc','action':'stdin','text':'Виктор'}
+        self.assertEqual(self.client.post(url,json={**body,'csrf':'bad'}).status_code,403)
+        self.assertEqual(self.client.post(url,json=body).status_code,200)
+        agent_url='/api/console/pc/'+str(job['id'])+'/controls'
+        self.assertEqual(self.client.get(agent_url).status_code,401)
+        first=self.client.get(agent_url,headers=self.headers).json()['controls'][0]
+        self.assertEqual(first['text'],'Виктор')
+        self.assertEqual(self.client.get(agent_url+'?after='+str(first['id']),headers=self.headers).json()['controls'],[])
+        self.client.post(url,json={**body,'text':'next'})
+        second=self.client.get(agent_url+'?after='+str(first['id']),headers=self.headers).json()['controls'][0]
+        self.assertGreater(second['id'],first['id'])
+        self.ack(job,'cancelled')
+        self.assertEqual(self.client.post(url,json=body).status_code,409)
+        with a.db() as c:self.assertEqual(c.execute('SELECT count(*) FROM console_controls').fetchone()[0],0)
