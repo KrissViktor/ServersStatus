@@ -15,7 +15,7 @@
     if(!response.ok)throw Error(typeof result.detail==='string'?result.detail:'Запрос не выполнен');return result;
   }
   function post(url,body){return request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf:panel.dataset.aiCsrf,...body})})}
-  function empty(){history.replaceChildren();const block=node('div');block.className='ai-empty';block.append(node('span','✦'),node('h2','Чем помочь?'),node('p','Спросите о состоянии серверов или найдите решение в интернете.'),node('small','Метрики и журнал — только чтение. Интернет включается для отдельного вопроса.'));history.append(block)}
+  function empty(){history.replaceChildren();const block=node('div');block.className='ai-empty';block.append(node('span','✦'),node('h2','Чем помочь?'),node('p','Спросите о состоянии серверов или найдите решение в интернете.'),node('small','Метрики и журнал — только чтение. Интернет включён по умолчанию.'));history.append(block)}
   function render(turns){
     const next=JSON.stringify(turns);active=turns.some(t=>['queued','running'].includes(t.status));controls();if(next===signature)return;signature=next;
     const follow=history.scrollHeight-history.clientHeight-history.scrollTop<70,top=history.scrollTop,fragment=document.createDocumentFragment();

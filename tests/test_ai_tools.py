@@ -51,6 +51,40 @@ class ToolsTest(unittest.TestCase):
         self.assertIn('sql',asyncio.run(s.execute('processes',{'agent':'win'}))['data'])
         value=asyncio.run(s.execute('services',{'agent':'win'}));self.assertIn('running',value['data']);self.assertNotIn('PRIVATE',value['data'])
 
+    def test_automatic_search_before_model_without_separate_query(self):
+        import httpx
+        s=self.session(internet_access=True,question='Какая погода завтра в Москве?')
+        with a.db() as c:messages=ai_chat.context(c,s.job)
+        def handler(request):
+            payload=json.loads(request.content)
+            self.assertEqual(payload['messages'][-1]['role'],'tool')
+            self.assertIn('Weather forecast',payload['messages'][-1]['content'])
+            return httpx.Response(200,content=b'data: {"choices":[{"delta":{"content":"Forecast [S1]"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
+        with patch('server.ai_tools.search',new_callable=AsyncMock,return_value=[{'url':'https://example.com/weather','title':'Weather forecast'}]) as search:
+            result=self.generate(handler,s.job,messages)
+            search.assert_awaited_once_with('Какая погода завтра в Москве?')
+        self.assertEqual(result['status'],'completed')
+        self.assertEqual(self.client.get('/api/ai/chat/'+self.chat).json()['turns'][0]['tools'][0]['status'],'completed')
+
+    def test_direct_source_uses_current_question_only(self):
+        s=self.session(internet_access=True,question='Какая погода?')
+        messages=[{'role':'user','content':'https://example.com/old'},{'role':'user','content':s.job['question']}]
+        self.assertIsNone(ai_tools.Session(a.db,s.job,messages).direct_source)
+        job={**s.job,'question':'Прочти https://example.com/new'}
+        session=ai_tools.Session(a.db,job,messages+[{'role':'user','content':job['question']}])
+        self.assertEqual(session.urls[session.direct_source],'https://example.com/new')
+
+    def test_automatic_source_failure_is_visible_not_invented(self):
+        import httpx
+        s=self.session(internet_access=True)
+        with a.db() as c:messages=ai_chat.context(c,s.job)
+        def handler(request):
+            payload=json.loads(request.content);self.assertIn('Search unavailable',payload['messages'][-1]['content'])
+            return httpx.Response(200,content=b'data: {"choices":[{"delta":{"content":"Search unavailable"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
+        with patch('server.ai_tools.search',new_callable=AsyncMock,side_effect=ai_web.WebError('Search unavailable')):
+            self.assertEqual(self.generate(handler,s.job,messages)['status'],'completed')
+        self.assertEqual(self.client.get('/api/ai/chat/'+self.chat).json()['turns'][0]['tools'][0]['status'],'failed')
+
     def test_stream_tool_round_trip(self):
         import httpx
         s=self.session(portal_access=True);seen=[]

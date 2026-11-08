@@ -99,6 +99,14 @@ async def generate(db,job,messages,api_key):
     async def consume():
         nonlocal reply,done,last_save
         rounds=3 if definitions else 1
+        # Fetch current public context before generation: small local models may
+        # answer from training data instead of choosing a tool themselves.
+        if session.internet:
+            name='web_page' if session.direct_source and not job.get('web_query') else 'web_search'
+            args={'source_id':session.direct_source} if name=='web_page' else {}
+            result=await session.execute(name,args)
+            messages.append({'role':'assistant','content':None,'tool_calls':[{'id':'automatic_web','type':'function','function':{'name':name,'arguments':json.dumps(args)}}]})
+            messages.append({'role':'tool','tool_call_id':'automatic_web','content':json.dumps(result,ensure_ascii=False)})
         async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(120,connect=5,write=10,pool=5)) as client:
             for step in range(rounds):
                 calls={};content='';finished=False
