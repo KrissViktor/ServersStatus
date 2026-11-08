@@ -61,6 +61,8 @@ def db():
         ''')
         from .updates import SCHEMA
         connection.executescript(SCHEMA)
+        from .ai_chat import SCHEMA as AI_SCHEMA
+        connection.executescript(AI_SCHEMA)
         from .processes import SCHEMA as PROCESS_SCHEMA
         connection.executescript(PROCESS_SCHEMA)
         from .services import SCHEMA as SERVICES_SCHEMA
@@ -700,3 +702,6 @@ register_users(app,db,csrf_token,digest,password_hash)
 
 from .services import register as register_services
 register_services(app,db,authenticated,digest)
+
+from .ai_chat import register as register_ai_chat
+register_ai_chat(app,db,authenticated,csrf_token)

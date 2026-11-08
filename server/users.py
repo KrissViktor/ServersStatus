@@ -86,6 +86,6 @@ def register(app,db,csrf_token,digest,password_hash):
                 else:
                     if name=='admin' or name==actor['name']:raise HTTPException(400,'Нельзя удалить собственную или основную учётную запись')
                     if value('confirmation')!=name:raise HTTPException(400,'Введите точный логин')
-                    revoke(c,name);c.execute('DELETE FROM user_roles WHERE name=?',(name,));c.execute('DELETE FROM users WHERE name=?',(name,))
+                    c.execute('DELETE FROM ai_turns WHERE owner=?',(name,));revoke(c,name);c.execute('DELETE FROM user_roles WHERE name=?',(name,));c.execute('DELETE FROM users WHERE name=?',(name,))
                     record(c,'','users','Удалён пользователь '+name)
         return RedirectResponse('/' if action=='password' and name==actor['name'] else '/users',303)

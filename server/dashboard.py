@@ -97,6 +97,8 @@ def page(content, refresh=False, protection_entry=False):
     if '<header class="topbar"' in content:
         if can_history() and 'href="/admin"' not in content:
             content=content.replace('</header>','<a class="nav-link" href="/admin">Администрирование</a></header>',1)
+        if can_history() and 'href="/ai"' not in content:
+            content=content.replace('</header>','<a class="nav-link" href="/ai">ИИ-помощник</a></header>',1)
         if can_console():
             visibility='data-protection-entry="true"' if protection_entry else 'hidden'
             content=content.replace('</header>',f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
