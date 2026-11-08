@@ -1244,3 +1244,9 @@ Chromium: скрытие кнопок до допуска, загрузка Shad
 тесте имитировались; реальные RDP-пользователи не затронуты. Compileall,
 node --check и diff --check прошли. Windows CI запускается после push; локального
 Windows/PowerShell нет (загрузка официального Linux PowerShell вернула 504).
+
+Финальная Windows-проверка: GitHub Actions «Test RDP controls on Windows»
+для 2008f40 завершилась Success (22 секунды, native-guards — 19 секунд).
+Проверены PowerShell 5.1, компиляция native declarations/WTSINFO ABI и все
+8 mock-сценариев защитных условий. Реальные сеансы не отключались.
+Запуск: https://github.com/KrissViktor/ServersStatus/actions/runs/42467798260
