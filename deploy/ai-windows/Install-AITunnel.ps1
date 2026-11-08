@@ -7,10 +7,12 @@ param(
  [Parameter(Mandatory=$true)][ValidatePattern('^ssh-ed25519 [A-Za-z0-9+/]+={0,2}$')][string]$HostKey
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SSHKey-Helpers.ps1')
 if($env:COMPUTERNAME -ne 'WIN-CU629F0N7II'){throw 'Run on Backup / WIN-CU629F0N7II'}
 $root='C:\ProgramData\ServersStatusAI\tunnel'
 if(!(Test-Path "$root\id_ed25519")){throw 'Run New-AITunnelKey.ps1 and authorize its public key on Raspberry Pi first'}
 if(!(Test-Path "$env:WINDIR\System32\OpenSSH\ssh.exe")){throw 'OpenSSH Client not installed'}
+Protect-AITunnelKey -Path "$root\id_ed25519"
 # Host key must be copied from the trusted Raspi console, not accepted blindly from the network.
 [IO.File]::WriteAllText("$root\known_hosts",('['+$ServerHost+']:'+$ServerPort+' '+$HostKey+"`n"),(New-Object Text.UTF8Encoding($false)))
 & "$env:WINDIR\System32\OpenSSH\ssh-keygen.exe" -lf "$root\known_hosts"

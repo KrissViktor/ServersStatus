@@ -2,6 +2,7 @@
 #Requires -RunAsAdministrator
 param([switch]$AllowOtherComputer)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'SSHKey-Helpers.ps1')
 if(!$AllowOtherComputer -and $env:COMPUTERNAME -ne 'WIN-CU629F0N7II'){throw 'Run on Backup / WIN-CU629F0N7II'}
 $root='C:\ProgramData\ServersStatusAI\tunnel'
 $keygen="$env:WINDIR\System32\OpenSSH\ssh-keygen.exe"
@@ -18,5 +19,6 @@ if(!(Test-Path $key)){
     if($code){throw 'SSH key generation failed'}
 }
 if(!(Test-Path ($key+'.pub'))){throw 'Private key exists but public file is missing; do not overwrite the private key'}
+Protect-AITunnelKey -Path $key
 Write-Host 'Copy ONLY this PUBLIC key to Raspberry Pi; keep id_ed25519 private:'
 Get-Content ($key+'.pub')
