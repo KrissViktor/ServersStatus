@@ -49,6 +49,7 @@ def db():
         CREATE INDEX IF NOT EXISTS reports_resource_metrics ON reports(agent,received,json_extract(data,'$.cpu_percent'),json_extract(data,'$.memory_percent'));
         CREATE TABLE IF NOT EXISTS report_maintenance (name TEXT PRIMARY KEY,next_run REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS agent_flags (agent TEXT PRIMARY KEY, important INTEGER NOT NULL DEFAULT 1 CHECK(important IN (0,1)), active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)));
         CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT,received REAL,agent TEXT,category TEXT,level TEXT,message TEXT);
         CREATE INDEX IF NOT EXISTS events_time ON events(received);
@@ -100,7 +101,7 @@ def authenticated(request):
 def server_rows():
     now=time.time()
     with db() as c:
-        rows=[dict(row) for row in c.execute('SELECT a.id, p.display_name, r.received, r.data FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id ORDER BY a.id').fetchall()]
+        rows=[dict(row) for row in c.execute("SELECT a.id, p.display_name, r.received, r.data,COALESCE(f.important,1) AS important,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id ORDER BY a.id").fetchall()]
         for row in rows:
             from .memory import RAM_USED_SQL, RAM_TOTAL_SQL
             row['sparkline']=[dict(point) for point in c.execute(f"""SELECT AVG(received) AS timestamp,
@@ -318,7 +319,7 @@ def csrf_token(request):
 
 def agent_rows():
     with db() as c:
-        return c.execute('SELECT a.id,r.received FROM agents a LEFT JOIN current_reports r ON a.id=r.agent ORDER BY a.id').fetchall()
+        return c.execute("SELECT a.id,r.received,p.display_name,json_extract(r.data,'$.hostname') AS hostname,COALESCE(f.important,1) AS important,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN current_reports r ON a.id=r.agent LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id ORDER BY a.id").fetchall()
 
 
 @app.get('/admin', response_class=HTMLResponse)
@@ -341,7 +342,7 @@ async def change_agent(action: str, request: Request):
     from urllib.parse import parse_qs
     if not authenticated(request):
         raise HTTPException(401, 'Войдите в панель')
-    if action not in ('create', 'rotate', 'delete'):
+    if action not in ('create', 'rotate', 'delete', 'flags'):
         raise HTTPException(404)
     body = bytearray()
     async for chunk in request.stream():
@@ -377,6 +378,19 @@ async def change_agent(action: str, request: Request):
             exists = c.execute('SELECT 1 FROM agents WHERE id=?', (name,)).fetchone()
             if not exists:
                 error, status = 'Агент не найден.', 404
+            elif action == 'flags':
+                field=value('flag')
+                if field not in ('important','active') or value('enabled') not in ('','1'):
+                    raise HTTPException(400,'Некорректный флаг')
+                enabled=int(value('enabled')=='1')
+                c.execute('INSERT OR IGNORE INTO agent_flags(agent) VALUES (?)',(name,))
+                c.execute('UPDATE agent_flags SET '+field+'=? WHERE agent=?',(enabled,name))
+                if field=='important' and not enabled and c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='telegram_state'").fetchone():
+                    c.execute('DELETE FROM telegram_state WHERE agent=?',(name,))
+                record(c,name,'configuration',('Важный' if field=='important' else 'Активный')+': '+('включено' if enabled else 'выключено'))
+                if 'application/json' in request.headers.get('accept',''):
+                    return JSONResponse({'ok':True,'flag':field,'enabled':bool(enabled)},headers={'Cache-Control':'no-store'})
+                return RedirectResponse('/agents',303)
             elif action == 'rotate':
                 if value('confirm') != 'yes':
                     error, status = 'Подтвердите отключение старого ключа.', 400
@@ -399,6 +413,7 @@ async def change_agent(action: str, request: Request):
                 record(c,name,'configuration','Агент удалён')
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
+                c.execute('DELETE FROM agent_flags WHERE agent=?', (name,))
     if action == 'delete' and not error:
         return RedirectResponse('/agents', status_code=303)
     return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name), status_code=status)
@@ -574,7 +589,7 @@ async def rename_server(agent_id: str, request: Request):
             raise HTTPException(404)
         c.execute('INSERT INTO agent_profiles VALUES (?,?) ON CONFLICT(agent) DO UPDATE SET display_name=excluded.display_name', (agent_id, name))
         record(c,agent_id,'configuration','Название в панели изменено')
-    return RedirectResponse('/servers/' + quote(agent_id, safe=''), status_code=303)
+    return RedirectResponse('/agents' if form.get('return_to',[''])[0]=='/agents' else '/servers/' + quote(agent_id, safe=''), status_code=303)
 
 
 @app.middleware('http')

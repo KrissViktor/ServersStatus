@@ -7,31 +7,31 @@
   const results = document.getElementById('server-results');
   let timer, pending, version = 0;
 
-  function updateResults(next) {
-    const oldGrid = results.querySelector('.server-grid');
-    const newGrid = next.querySelector('.server-grid');
-    if (!oldGrid || !newGrid) {
-      if (results.innerHTML !== next.innerHTML) results.replaceChildren(...next.childNodes);
-      return;
-    }
-    // Keep unchanged cards and focused links in place during background updates.
-    const existing = new Map([...oldGrid.children].map(card => [card.dataset.serverId, card]));
-    const wanted = new Set();
-    let cursor = oldGrid.firstElementChild;
-    for (const card of [...newGrid.children]) {
-      const id = card.dataset.serverId;
-      wanted.add(id);
-      let current = existing.get(id);
-      if (!current) current = card;
-      else if (current.outerHTML !== card.outerHTML && !current.contains(document.activeElement)) {
-        current.replaceWith(card);
-        if (cursor === current) cursor = card;
-        current = card;
+  function updateResults(next,background) {
+    const existing=new Map([...results.querySelectorAll('[data-server-id]')].map(card=>[card.dataset.serverId,card]));
+    const wanted=new Set();
+    for(const group of ['active','inactive']){
+      const oldGrid=results.querySelector('[data-server-group="'+group+'"]'),newGrid=next.querySelector('[data-server-group="'+group+'"]');
+      if(!oldGrid || !newGrid){results.replaceChildren(...next.childNodes);return}
+      let cursor=oldGrid.firstElementChild;
+      for(const card of [...newGrid.children]){
+        const id=card.dataset.serverId;wanted.add(id);
+        let current=existing.get(id);
+        if(!current)current=card;
+        else if(current.outerHTML!==card.outerHTML && !current.contains(document.activeElement)){
+          current.replaceWith(card);if(cursor===current)cursor=card;current=card;
+        }
+        if(current!==cursor)oldGrid.insertBefore(current,cursor);
+        cursor=current.nextElementSibling;
       }
-      if (current !== cursor) oldGrid.insertBefore(current, cursor);
-      cursor = current.nextElementSibling;
     }
-    for (const [id, card] of existing) if (!wanted.has(id)) card.remove();
+    for(const [id,card] of existing)if(!wanted.has(id))card.remove();
+    const inactive=results.querySelector('#inactive-servers'),fresh=next.querySelector('#inactive-servers');
+    if(inactive && fresh){
+      inactive.hidden=fresh.hidden;inactive.querySelector('summary').innerHTML=fresh.querySelector('summary').innerHTML;
+      if(!background)inactive.open=fresh.open;
+    }
+    const empty=results.querySelector('.empty-results');if(empty)empty.hidden=next.querySelector('.empty-results').hidden;
   }
 
   async function search(background = false) {
@@ -61,7 +61,7 @@
       const x = window.scrollX, y = window.scrollY;
       // Removing filtered cards must not clamp the viewport to the page bottom.
       document.body.style.minHeight = Math.max(window.innerHeight, y + window.innerHeight) + 'px';
-      updateResults(next);
+      updateResults(next,background);
       for (const id of ['overview-alerts', 'overview-stats']) {
         const target = document.getElementById(id), source = nextPage.getElementById(id);
         if (target && source && target.innerHTML !== source.innerHTML) target.innerHTML = source.innerHTML;

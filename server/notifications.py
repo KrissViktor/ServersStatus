@@ -78,7 +78,7 @@ def tick(db, sender, now=None):
         c.execute('''CREATE TABLE IF NOT EXISTS telegram_state (
             key TEXT PRIMARY KEY, agent TEXT, body TEXT, active INTEGER,
             sent INTEGER, next_attempt REAL DEFAULT 0)''')
-        rows = c.execute('SELECT a.id, r.received, r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id').fetchall()
+        rows = c.execute('SELECT a.id, r.received, r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id WHERE COALESCE(f.important,1)=1').fetchall()
         existing = c.execute('SELECT * FROM telegram_state').fetchall()
         incidents, valid, checked = evaluate(rows, existing, now, disk_threshold=98)
         c.execute('CREATE TABLE IF NOT EXISTS telegram_policy (name TEXT PRIMARY KEY, value TEXT)')
@@ -104,6 +104,11 @@ def tick(db, sender, now=None):
     for state in pending:
         if real_clock and not delivery_window(time.time()):
             break
+        with db() as c:
+            enabled=c.execute('SELECT COALESCE(f.important,1) FROM agents a LEFT JOIN agent_flags f ON f.agent=a.id WHERE a.id=?',(state['agent'],)).fetchone()
+            if not enabled or not enabled[0]:
+                c.execute('DELETE FROM telegram_state WHERE agent=?',(state['agent'],))
+                continue
         text = ('🔴 ServersStatus · ПРОБЛЕМА\n' if state['active'] else '🟢 ServersStatus · ВОССТАНОВЛЕНО\nПроблема больше не обнаружена:\n') + state['body']
         try:
             sender(text)

@@ -218,10 +218,12 @@ def dashboard(rows, q='', view='all'):
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     from .overview import compact_card, matches, search_form
     selected = [row for row in rows if matches(row, now, q, view)]
-    cards = '<div class="server-grid">' + ''.join(compact_card(row, now) for row in selected) + '</div>'
-    if not selected:
-        cards = '<div class="empty">Нет серверов по выбранным условиям.</div>'
+    active=[row for row in selected if dict(row).get('active',1)]
+    inactive=[row for row in selected if not dict(row).get('active',1)]
+    cards='<div class="server-grid" data-server-group="active">'+''.join(compact_card(row,now) for row in active)+'</div>'
+    cards+='<details id="inactive-servers" class="inactive-servers" '+('hidden' if not inactive else '')+' '+('open' if inactive and (q or view!='all') else '')+'><summary>Не активные <span class="count">'+str(len(inactive))+'</span></summary><div class="server-grid" data-server-group="inactive">'+''.join(compact_card(row,now) for row in inactive)+'</div></details>'
+    cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'
     from .overview import LIVE_SCRIPT
     cards = search_form(q, view, len(selected), len(rows)) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
     from .drilldown import widget
-    return page(header + '<div id="overview-alerts">' + backup_alerts(rows, now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + widget('') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
+    return page(header + '<div id="overview-alerts">' + backup_alerts([row for row in rows if dict(row).get('important',1)], now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + widget('') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
