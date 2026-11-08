@@ -7,7 +7,7 @@ param(
     [ValidatePattern('^[a-fA-F0-9]{64}$')][string]$ModelSha256,
     [ValidateRange(1,80)][int]$CpuPercent = 80,
     [ValidateRange(10,25)][int]$MemoryGB = 22,
-    [ValidateRange(4,16)][int]$ReserveGB = 6,
+    [ValidateRange(4,16)][int]$ReserveGB = 4,
     [ValidateRange(1,20)][int]$Threads = 12,
     [switch]$AllowOtherComputer
 )

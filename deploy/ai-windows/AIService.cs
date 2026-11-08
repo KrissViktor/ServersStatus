@@ -8,7 +8,7 @@ using System.Xml.Serialization;
 
 public class Settings {
     public string Executable, Arguments, WorkingDirectory;
-    public int CpuPercent=80, MemoryMB=22528, ReserveMB=6144;
+    public int CpuPercent=80, MemoryMB=22528, ReserveMB=4096;
 }
 public sealed class AIService : ServiceBase {
     readonly string root=AppDomain.CurrentDomain.BaseDirectory;
