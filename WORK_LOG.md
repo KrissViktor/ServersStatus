@@ -1695,3 +1695,7 @@ diff --check. Изменены только значения по умолчан
 отдельный regression step перед существующим smoke-test службы.
 API GitHub в среде разработки вернул 403; сведения проверены через официальный
 web release и его expanded_assets. Реальная установка пользователя не изменялась.
+
+Windows AI CI #7 (4a6750c) и #8 (96e6b88) успешно прошли release regression
+и native service smoke-test на PS5.1/windows-2022. Учтён также byte[]-ответ
+при скачивании nightly-tag.txt: декодируется UTF-8 до проверки тега.
