@@ -2060,3 +2060,47 @@ DNS/public IP pinning, Host/SNI, TLS, redirects и лимиты. Ошибки XM
 при двойной ошибке, отсутствие повтора запретов/прямого сбоя, direct без proxy
 при заданном env с сохранённым trust_env=False и TLS verify. Compileall и
  git diff --check прошли.
+
+## 2026-11-09 — Поисковый API для ИИ вместо HTML Google
+
+По просьбе пользователя реализован отдельный поисковый backend Tavily search /
+extract. HTML Google больше не используется по умолчанию (старый режим только
+STATUS_AI_SEARCH_PROVIDER=google). Контракт проверен по официальному клиенту
+https://github.com/tavily-ai/tavily-python/blob/master/tavily/async_tavily.py:
+Bearer key, официальные keyless headers, include_raw_content=text и extract.
+Живой api.tavily.com из этой среды не проверялся: текущая сеть ограничивает
+произвольные сайты; доступность/лимиты keyless нужно подтвердить на Raspi.
+
+Без файла ключа включён предусмотренный провайдером анонимный режим, без обхода
+лимитов/смены IP. API-ошибки 401/402/403/429/432/433 дают явное сообщение о ключе /
+доступе/квоте. Личный ключ необязателен для попытки keyless, хранится отдельно
+от модели: /var/lib/serversstatus/ai-search-key (600, owner serversstatus).
+Enable-AISearch.sh: скрытый ввод, отмена пустым Enter, проверка формата, atomic
+save и restart веб-службы; не обещает проверить реальную авторизацию. Ключ не
+в Git/DOM/argv/ответах/сыром exception text. Квоты/тарифы определяет провайдер.
+
+Поиск передаёт только вопрос/отдельный запрос, не историю/метрики/журнал.
+Фиксированный HTTPS endpoint API, DNS/public IP pinning и TLS SNI, redirects
+запрещены, trust_env=False, сохраняется STATUS_AI_WEB_PROXY, ответ до 2 МБ.
+Список источников нормализован/дедуплицирован, private URLs запрещены. Извлечённый
+Tavily текст хранится только в памяти текущего вопроса и передаётся модели
+через web_page без повторного скачивания сайта. Если чтение прямой ссылки
+не удалось, API extract — с повторной проверкой публичности адреса. Сайты/
+результаты остаются недоверенными данными, не инструкциями.
+
+В форме/виджете отображается провайдер и режим без ключа/с личным ключом.
+Добавлен безопасный CLI `python -m server.ai_search` (один запрос, расходует
+квоту, не печатает ключ). Обновлена deploy/AI-CHAT.md. Модель/Windows/SSH/VPN и
+существующие ключи пользователя не менялись, новых зависимостей нет.
+
+Языки: Python 3.11, JavaScript, HTML, CSS, Bash, Markdown.
+Проверки: 227 тестов в полном прогоне успешно (2 платформенных пропуска),
+затем все 7 test_ai_search.py после добавления extract-fallback проверки.
+Проверены keyless/auth headers, key isolation/redaction, API DNS/IP/Host/SNI/
+TLS/trust_env/redirect, лимиты/ошибки/плохой JSON, duplicate/private URL,
+extract private DNS reject, интеграция search -> cached actual page -> model
+без Google/скачивания сайта, история портала не отправляется поисковому API.
+Chromium: виджет desktop/mobile, режим Tavily, отправка/история/сворачивание/
+черновик/отмена/удаление, XSS/без ключей в DOM/без JS-ошибок; скриншот просмотрен.
+Compileall, node --check, bash -n, git diff --check прошли. Внешние ответы в
+тестах искусственные, реальный Tavily/Qwen необходимо проверить на Raspi.

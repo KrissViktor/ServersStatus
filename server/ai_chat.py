@@ -258,7 +258,8 @@ def register(app,db,authenticated,csrf_token):
                 result.append({'chat':row['chat'],'title':title[:64],'updated':row['updated']})
             active=c.execute("SELECT chat FROM ai_turns WHERE owner=? AND status IN ('queued','running') LIMIT 1",(owner,)).fetchone()
         kick(db)
-        return response({'chats':result,'configured':key() is not None,'active':active['chat'] if active else None})
+        from .ai_search import info as search_info
+        return response({'chats':result,'configured':key() is not None,'active':active['chat'] if active else None,'search':search_info()})
 
     @app.get('/api/ai/chat/{chat}')
     def turns(chat:str,request:Request):

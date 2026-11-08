@@ -41,7 +41,7 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
     try{const result=await request('/api/ai/chat/'+wanted);if(chat!==wanted)return;render(result.turns);if(active)timer=setTimeout(load,1000)}catch(error){message.textContent=error.message;if(chat===wanted&&configured)timer=setTimeout(load,5000)}
   }
   async function chats(initial=false){
-    const result=await request('/api/ai/chats');configured=result.configured;
+    const result=await request('/api/ai/chats');configured=result.configured;const searchState=panel.querySelector('#ai-search-state');if(searchState)searchState.textContent=result.search?.label||'Поиск ИИ';
     if(initial)chat=result.active||result.chats[0]?.chat||null;
     list.replaceChildren();const option=node('option','Новый диалог');option.value='';list.append(option);
     for(const c of result.chats){const n=node('option',c.title);n.value=c.chat;list.append(n)}

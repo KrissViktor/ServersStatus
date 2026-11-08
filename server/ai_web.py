@@ -189,7 +189,7 @@ class GoogleResults(HTMLParser):
         if tag=='a':self.anchor=None
 
 
-async def search(query):
+async def google_search(query):
     if not query.strip():raise WebError('Введите вопрос или поисковый запрос')
     result=await fetch('https://www.google.com/search?hl=ru&num=5&gbv=1&q='+quote(query[:300],safe=''))
     host=urlsplit(result['url']).hostname
@@ -201,6 +201,14 @@ async def search(query):
     for item in items:item['snippet']=' '.join(item['snippet'].split())[:600]
     if not items:raise WebError('Google не вернул читаемую выдачу (возможно, требуется JavaScript или согласие). Можно указать прямую ссылку; Bing не используется.')
     return items
+
+
+async def search(query):
+    provider=os.environ.get('STATUS_AI_SEARCH_PROVIDER','tavily').strip().lower()
+    if provider=='google':return await google_search(query)
+    if provider!='tavily':raise WebError('Неизвестный STATUS_AI_SEARCH_PROVIDER; используйте tavily или google')
+    from .ai_search import search as api_search
+    return await api_search(query)
 
 
 async def diagnose():

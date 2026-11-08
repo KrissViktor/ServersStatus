@@ -135,11 +135,11 @@ class WebTest(unittest.TestCase):
     def test_html_and_search(self):
         self.assertEqual(ai_web.page_text('<h1>Title</h1><script>secret</script><p>Body</p>','text/html'),'Title\nBody')
         with patch('server.ai_web.fetch',new_callable=AsyncMock,return_value={'url':'https://www.google.com/search','text':'<html><a href="/url?q=https%3A%2F%2Fexample.com%2F&amp;sa=U"><h3>Guide</h3></a><div>Useful snippet</div></html>'}) as fetch:
-            result=asyncio.run(ai_web.search('safe query'));self.assertEqual(result[0]['title'],'Guide');self.assertIn('safe%20query',fetch.call_args.args[0]);self.assertTrue(fetch.call_args.args[0].startswith('https://www.google.com/search?'));self.assertIn('Useful snippet',result[0]['snippet'])
+            result=asyncio.run(ai_web.google_search('safe query'));self.assertEqual(result[0]['title'],'Guide');self.assertIn('safe%20query',fetch.call_args.args[0]);self.assertTrue(fetch.call_args.args[0].startswith('https://www.google.com/search?'));self.assertIn('Useful snippet',result[0]['snippet'])
     def test_google_block_pages_are_errors_and_no_bing_fallback(self):
         for url,text in [('https://www.google.com/sorry/','unusual traffic'),('https://consent.google.com/','consent'),('https://www.google.com/search','Please enable JavaScript')]:
             with self.subTest(url=url),patch('server.ai_web.fetch',new_callable=AsyncMock,return_value={'url':url,'text':text}) as fetch:
-                with self.assertRaises(ai_web.WebError):asyncio.run(ai_web.search('weather'))
+                with self.assertRaises(ai_web.WebError):asyncio.run(ai_web.google_search('weather'))
                 self.assertEqual(fetch.await_count,1);self.assertIn('www.google.com',fetch.call_args.args[0])
     def test_google_parser_filters_private_links_and_deduplicates(self):
         parser=ai_web.GoogleResults()
