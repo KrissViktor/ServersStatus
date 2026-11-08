@@ -1783,3 +1783,27 @@ Ed25519 с пустой passphrase через ProcessStartInfo, ACL Admin/SYSTEM
 без замены ключа, синтаксис новых scripts и прежние regression/service проверки.
 После добавления явного AuthorizedKeysFile повторно проверен временный локальный
 reverse SSH с эффективными ограничениями. Рабочие VPN/SSH-машины не подключались.
+
+## 08.11.2026 — Права приватного ключа при запуске SSH от SYSTEM
+
+- По журналу пользователя SSH доходил до Raspi, но игнорировал приватный ключ:
+  UNPROTECTED PRIVATE KEY FILE / bad permissions. Прежняя проверка ограничивалась
+  каталогом; не проверяла владельца/ACE файла и чтение из контекста SYSTEM.
+- Правила сверены с официальным Windows OpenSSH check_secure_file_permission:
+  SYSTEM принимает owner SYSTEM/Builtin Administrators/current user и соответствующие
+  ACE. Добавлен свежий защищённый FileSecurity только SYSTEM/Admins FullControl,
+  owner Builtin Administrators; удаляются также явные creator/LocalService ACE.
+- Repair-AITunnelKey.ps1 останавливает/перезапускает задачу, исправляя только
+  владельца/ACL ключа. Ключ не генерируется заново; Raspi не нужно перенастраивать.
+  Защита автоматически применяется и при генерации/установке туннеля.
+- Windows regression намеренно портит owner/ACE, исправляет без изменения bytes,
+  затем запускает реальную scheduled task от SYSTEM и ssh-keygen -y, сверяя
+  полученный публичный ключ. Приватное содержимое в вывод/логи не попадает.
+
+Языки: PowerShell 5.1, Markdown. Проверки: diff --check; Windows CI проверяет
+новый сценарий, синтаксис всех скриптов и прежние проверки. Реальный ключ
+пользователя не читался и не изменялся в среде разработки.
+
+Итог: Windows AI CI #12 (96b67b0) прошёл. Реальная задача SYSTEM смогла прочитать
+исправленный приватный ключ через Windows OpenSSH и вывести совпадающий public
+key. Все остальные Windows regression/service проверки также прошли.
