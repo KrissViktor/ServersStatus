@@ -122,3 +122,5 @@ progress{margin:9px 0;height:6px}.legend{margin-top:8px}.list-row{padding:7px 0;
 .admin-card h2{font-size:17px;display:flex;justify-content:space-between;gap:12px}.admin-card h2 span{color:var(--muted)}
 .admin-card p{color:var(--muted);font-size:13px;margin-top:7px}
 @media(max-width:600px){.admin-grid{grid-template-columns:1fr}.admin-card{padding:15px}}
+.forecast-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:10px;margin-top:10px}
+.forecast-disk{border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}.forecast-disk h4{margin:0;overflow-wrap:anywhere}.forecast-disk p{font-size:12px;margin-top:7px;overflow-wrap:anywhere}

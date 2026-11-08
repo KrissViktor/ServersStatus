@@ -100,9 +100,11 @@ def server_rows():
     with db() as c:
         rows=[dict(row) for row in c.execute('SELECT a.id, p.display_name, r.received, r.data FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id ORDER BY a.id').fetchall()]
         for row in rows:
-            row['sparkline']=[dict(point) for point in c.execute("""SELECT AVG(received) AS timestamp,
+            from .memory import RAM_USED_SQL, RAM_TOTAL_SQL
+            row['sparkline']=[dict(point) for point in c.execute(f"""SELECT AVG(received) AS timestamp,
                 AVG(json_extract(data,'$.cpu_percent')) AS cpu,
-                AVG(json_extract(data,'$.memory_percent')) AS ram
+                AVG(json_extract(data,'$.memory_percent')) AS ram,
+                AVG({RAM_USED_SQL}) AS ram_used_bytes, AVG({RAM_TOTAL_SQL}) AS ram_total_bytes
                 FROM reports INDEXED BY reports_resource_metrics
                 WHERE agent=? AND received>=? AND received<=?
                 GROUP BY CAST(received/10 AS INTEGER) ORDER BY timestamp""",(row['id'],now-300,now))]

@@ -62,7 +62,12 @@ def resource_points(row,data):
         return cached
     if row['received'] is None:
         return []
-    return [{'timestamp':row['received'],'cpu':data.get('cpu_percent'),'ram':data.get('memory_percent')}]
+    system=data.get('system') or {}
+    total=system.get('memory_total_bytes')
+    used=system.get('memory_used_bytes')
+    if used is None and total:
+        used=max(0,total-system['memory_available_bytes']) if system.get('memory_available_bytes') is not None else total*number(data.get('memory_percent'))/100
+    return [{'timestamp':row['received'],'cpu':data.get('cpu_percent'),'ram':data.get('memory_percent'),'ram_used_bytes':used,'ram_total_bytes':total}]
 
 
 

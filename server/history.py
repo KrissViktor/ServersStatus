@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import quote, urlencode
 
 from .dashboard import esc, page
+from .memory import RAM_USED_SQL, RAM_TOTAL_SQL, memory_tooltip
 
 PERIODS = {'1h': ('Час', 3600, 60), '6h': ('6 часов', 21600, 60),
            '24h': ('Сутки', 86400, 300), '7d': ('Неделя', 604800, 1800),
@@ -12,11 +13,12 @@ PERIODS = {'1h': ('Час', 3600, 60), '6h': ('6 часов', 21600, 60),
 def load_history(connection, agent_id, start, end, bucket):
     # Filter by indexed agent/time before extracting metrics. Grouping returns
     # at most one point per time bucket, independent of reporting frequency.
-    return connection.execute('''
+    return connection.execute(f'''
         WITH samples AS (
             SELECT received,
                    json_extract(data, '$.cpu_percent') AS cpu,
                    json_extract(data, '$.memory_percent') AS ram,
+                   {RAM_USED_SQL} AS ram_used_bytes, {RAM_TOTAL_SQL} AS ram_total_bytes,
                    received - LAG(received) OVER (ORDER BY received) AS gap
             FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<=?
         )
@@ -25,6 +27,8 @@ def load_history(connection, agent_id, start, end, bucket):
                MAX(received) AS last, COUNT(*) AS samples,
                AVG(cpu) AS cpu, MAX(cpu) AS cpu_peak,
                AVG(ram) AS ram, MAX(ram) AS ram_peak,
+               AVG(ram_used_bytes) AS ram_used_bytes, MAX(ram_used_bytes) AS ram_used_peak_bytes,
+               AVG(ram_total_bytes) AS ram_total_bytes, COUNT(ram_used_bytes) AS ram_size_samples,
                MAX(CASE WHEN gap>180 THEN 1 ELSE 0 END) AS has_gap
         FROM samples GROUP BY bucket ORDER BY bucket
     ''', (agent_id, start, end, bucket)).fetchall()
@@ -55,6 +59,12 @@ def chart(points, metric, title, start, end, color):
         if previous is not None and not point['has_gap'] and not previous['has_gap'] and point['first'] - previous['last'] <= 180:
             drawing += f'<line x1="{x(previous["timestamp"]):.2f}" y1="{y(previous[metric]):.2f}" x2="{px:.2f}" y2="{py:.2f}" stroke="{color}" stroke-width="2"/>'
         tooltip = f'{stamp(point["first"])} — {stamp(point["last"])} · среднее {point[metric]:.1f}% · пик {point[metric + "_peak"]:.1f}% · отчётов: {point["samples"]}'
+        if metric=='ram':
+            tooltip+=' · средний объём: '+memory_tooltip(point)
+            if dict(point).get('ram_used_peak_bytes') is not None:
+                from .dashboard import size
+                tooltip+=' · пик объёма: '+size(point['ram_used_peak_bytes'])
+                tooltip+=' · отчётов с объёмом: '+str(point['ram_size_samples'])
         drawing += f'<circle class="chart-point" cx="{px:.2f}" cy="{py:.2f}" r="3" fill="{color}"><title>{esc(tooltip)}</title></circle>'
         previous = point
     return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'

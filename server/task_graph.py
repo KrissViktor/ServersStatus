@@ -9,6 +9,7 @@ WINDOW=300
 def graph(points,field,now):
     start=now-WINDOW
     samples=[]
+    ram_sizes={p.get('timestamp'):p for p in points}
     for point in points:
         timestamp=point.get('timestamp')
         value=point.get(field)
@@ -40,7 +41,11 @@ def graph(points,field,now):
         content+=f'<path class="task-line" d="{line}"/>'
     for timestamp,value in samples:
         stamp=datetime.fromtimestamp(timestamp,timezone(timedelta(hours=3))).strftime('%H:%M:%S МСК')
-        content+=f'<circle class="task-point" cx="{x(timestamp):.2f}" cy="{y(value):.2f}" r="2"><title>{html.escape(stamp)} · {value:.1f}%</title></circle>'
+        tooltip=f'{stamp} · {value:.1f}%'
+        if field=='ram':
+            from .memory import memory_tooltip
+            tooltip+=' · '+memory_tooltip(ram_sizes[timestamp])
+        content+=f'<circle class="task-point" cx="{x(timestamp):.2f}" cy="{y(value):.2f}" r="2"><title>{html.escape(tooltip)}</title></circle>'
     content+='</svg>'
     if not samples:
         content+='<span class="task-empty">Нет измерений за последние 5 минут</span>'
