@@ -5,7 +5,7 @@ from pathlib import Path
 
 IO_SCRIPT=Path(__file__).with_name("io_history.js").read_text(encoding="utf-8")
 
-from .dashboard import esc, page
+from .dashboard import esc, page, size
 from .memory import RAM_USED_SQL, RAM_TOTAL_SQL, memory_tooltip
 
 PERIODS = {'1h': ('Час', 3600, 60), '6h': ('6 часов', 21600, 60),
@@ -68,7 +68,8 @@ def chart(points, metric, title, start, end, color):
                 from .dashboard import size
                 tooltip+=' · пик объёма: '+size(point['ram_used_peak_bytes'])
                 tooltip+=' · отчётов с объёмом: '+str(point['ram_size_samples'])
-        drawing += f'<circle class="chart-point" cx="{px:.2f}" cy="{py:.2f}" r="3" fill="{color}"><title>{esc(tooltip)}</title></circle>'
+        attributes=f'data-detail-metric="{esc(metric)}" data-detail-first="{point["first"]}" data-detail-last="{point["last"]}" data-detail-count="{point["samples"]}" data-detail-title="{esc(title)}" tabindex="0" role="button" aria-label="Открыть исходные отчёты: {esc(tooltip)}"'
+        drawing += f'<circle {attributes} class="chart-point" cx="{px:.2f}" cy="{py:.2f}" r="3" fill="{color}"><title>{esc(tooltip)}</title></circle>'
         previous = point
     return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
 
@@ -83,13 +84,19 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         content += '<div class="empty">За выбранный период отчётов нет. История появится после получения данных агента.</div>'
     else:
         total = sum(p['samples'] for p in points)
+        size_points=[dict(p) for p in points if dict(p).get('ram_used_bytes') is not None]
+        size_count=sum(p.get('ram_size_samples',0) for p in size_points)
+        average_size=size(sum(p['ram_used_bytes']*p.get('ram_size_samples',0) for p in size_points)/size_count) if size_count else 'Объём недоступен'
+        peak_sizes=[dict(p)['ram_used_peak_bytes'] for p in points if dict(p).get('ram_used_peak_bytes') is not None]
+        peak_size=size(max(peak_sizes)) if peak_sizes else 'Объём недоступен'
         content += '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong>{value}</strong></div>' for label, value in [
             ('Среднее CPU', f'{sum(p["cpu"] * p["samples"] for p in points)/total:.1f}%'),
             ('Пик CPU', f'{max(p["cpu_peak"] for p in points):.1f}%'),
-            ('Среднее RAM', f'{sum(p["ram"] * p["samples"] for p in points)/total:.1f}%'),
-            ('Пик RAM', f'{max(p["ram_peak"] for p in points):.1f}%')]) + '</div>'
-        content += f'<p class="muted history-note">Отчётов: {total} · Точки — средние за {bucket // 60} мин. Наведите на точку, чтобы увидеть пик и время. Разрывы означают отсутствие отчётов более 3 минут; интервалы с пропусками показаны отдельными точками. Время — московское (МСК).</p>'
+            ('Среднее RAM', f'{sum(p["ram"] * p["samples"] for p in points)/total:.1f}%<small class="stat-detail" title="Объём по {size_count} отчётам с данными памяти">{average_size}</small>'),
+            ('Пик RAM', f'{max(p["ram_peak"] for p in points):.1f}%<small class="stat-detail">{peak_size}</small>')]) + '</div>'
+        content += f'<p class="muted history-note">Отчётов: {total} · Точки — средние за {bucket // 60} мин. Наведите на точку, чтобы увидеть пик и время. Нажмите на точку для просмотра исходных отчётов и масштаба до 900 отчётов. Разрывы означают отсутствие отчётов более 3 минут; интервалы с пропусками показаны отдельными точками. Время — московское (МСК).</p>'
         content += chart(points, 'cpu', 'Процессор · CPU', start, end, '#4adeab')
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
     content += extra_html
-    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script><footer>История хранится 186 дней (не менее 6 месяцев). Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
+    from .drilldown import widget
+    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится 186 дней (не менее 6 месяцев). Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)

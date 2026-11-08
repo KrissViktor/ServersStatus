@@ -102,6 +102,9 @@ def register(app,db,authenticated,csrf_token,digest):
             rows=c.execute('SELECT * FROM console_jobs WHERE agent=? AND created>=? AND (?=0 OR id<?) ORDER BY id DESC LIMIT 101',(agent,cutoff,before,before)).fetchall()
             more=len(rows)>100
             jobs=[{**dict(job),'result':json.loads(job['result'] or '{}'),'label':STATES[job['status']]} for job in rows[:100]]
+            from .console_output import clean_output
+            for job in jobs:
+                if isinstance(job['result'].get('output'),str):job['result']['output']=clean_output(job['result']['output'])
         return JSONResponse({'info':info,'online':time.time()-row['received']<=60,'jobs':jobs,'cutoff':cutoff,'more':more,'next':jobs[-1]['id'] if more else None},headers={'Cache-Control':'no-store'})
 
     @app.post('/api/servers/{agent}/console')

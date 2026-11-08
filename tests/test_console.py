@@ -53,6 +53,19 @@ class ConsoleTest(unittest.TestCase):
         with a.db() as c:c.execute('UPDATE console_jobs SET expires=? WHERE id=?',(time.time()-1,job['id']))
         self.assertEqual(self.ack(job,'running').status_code,409);self.assertIsNone(self.job())
 
+    def test_clixml_hidden_for_live_and_archived_output_without_changing_storage(self):
+        self.queue();job=self.job();self.ack(job,'running')
+        raw='Result\n#< CLIXML\n<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04"><Obj S="progress" RefId="0"><TN RefId="0"/></Obj><S S="Error">Access denied</S></Objs>'
+        self.ack(job,'running',progress=True,output=raw)
+        live=self.client.get('/api/servers/pc/console').json()['jobs'][0]['result']['output']
+        self.assertEqual(live,'Result\nAccess denied')
+        self.ack(job,'failed',output=raw,exit_code=1)
+        archived=self.client.get('/api/servers/pc/console?archive=true').json()['jobs'][0]['result']['output']
+        self.assertEqual(archived,live)
+        with a.db() as c:
+            stored=json.loads(c.execute('SELECT result FROM console_jobs WHERE id=?',(job['id'],)).fetchone()[0])
+        self.assertEqual(stored['output'],raw)
+
     def test_unknown_requires_review_and_agent_update_mutex(self):
         self.queue();job=self.job();self.ack(job,'running');self.ack(job,'uncertain')
         self.assertEqual(self.queue().status_code,409)

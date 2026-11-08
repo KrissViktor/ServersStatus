@@ -95,4 +95,5 @@ def detail_page(row, csrf,console_access=False):
     content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
     from .folding import fold_sections
     content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>item.open=false);});</script>'
-    return page(fold_sections(content), refresh=True)
+    from .drilldown import widget
+    return page(fold_sections(content)+widget(row['id']), refresh=True)

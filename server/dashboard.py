@@ -223,4 +223,5 @@ def dashboard(rows, q='', view='all'):
         cards = '<div class="empty">Нет серверов по выбранным условиям.</div>'
     from .overview import LIVE_SCRIPT
     cards = search_form(q, view, len(selected), len(rows)) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
-    return page(header + '<div id="overview-alerts">' + backup_alerts(rows, now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
+    from .drilldown import widget
+    return page(header + '<div id="overview-alerts">' + backup_alerts(rows, now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + widget('') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')

@@ -45,7 +45,7 @@ def graph(points,field,now):
         if field=='ram':
             from .memory import memory_tooltip
             tooltip+=' · '+memory_tooltip(ram_sizes[timestamp])
-        content+=f'<circle class="task-point" cx="{x(timestamp):.2f}" cy="{y(value):.2f}" r="2"><title>{html.escape(tooltip)}</title></circle>'
+        content+=f'<circle data-detail-metric="{field}" data-detail-first="{timestamp}" data-detail-last="{timestamp}" data-detail-count="30" data-detail-title="{"Процессор" if field=="cpu" else "Оперативная память"}" tabindex="0" role="button" aria-label="Открыть исходные отчёты" class="task-point" cx="{x(timestamp):.2f}" cy="{y(value):.2f}" r="2"><title>{html.escape(tooltip)}</title></circle>'
     content+='</svg>'
     if not samples:
         content+='<span class="task-empty">Нет измерений за последние 5 минут</span>'

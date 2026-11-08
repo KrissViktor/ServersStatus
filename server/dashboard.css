@@ -130,3 +130,15 @@ progress{margin:9px 0;height:6px}.legend{margin-top:8px}.list-row{padding:7px 0;
 .io-chart-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}.io-chart-heading h3{font-size:13px;margin:0;overflow-wrap:anywhere}.chart-expand{flex-shrink:0;font-size:12px;padding:5px 9px;min-height:30px}
 .io-plots .history-chart{min-width:0;margin-top:8px}.io-plots .chart-label{font-size:16px}.io-chart.is-expanded .chart-label{font-size:12px}
 @media(max-width:760px){.io-plots{grid-template-columns:1fr}.io-plots .chart-label{font-size:18px}.io-chart.is-expanded .chart-label{font-size:18px}.chart-expand{display:none}}
+.stat strong{text-align:right}.stat-detail{display:block;font-size:13px;color:var(--muted);font-weight:500;line-height:1.5}
+[data-detail-metric]{cursor:zoom-in;outline:none}[data-detail-metric]:focus{stroke:var(--text);stroke-width:3}
+#chart-detail{position:fixed;inset:0;margin:0;width:100vw;height:100dvh;max-width:none;max-height:none;border:0;border-radius:0;padding:20px;background:var(--bg);color:var(--text);overflow:auto}
+#chart-detail[open]{display:flex;flex-direction:column;gap:12px}#chart-detail::backdrop{background:#000d}
+.detail-chart-toolbar,.detail-chart-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.detail-chart-toolbar{justify-content:space-between}.detail-chart-toolbar h2{font-size:20px}.detail-chart-controls button{font-size:13px}
+#detail-chart-status{min-height:20px;font-size:12px}#detail-chart-plot{flex:1;min-height:250px;border:1px solid var(--line);border-radius:9px;overflow:hidden;touch-action:none;cursor:grab;background:var(--panel)}
+#detail-chart-plot:active{cursor:grabbing}#detail-chart-plot svg{width:100%;height:100%;display:block}.detail-report-point:focus{stroke:white;stroke-width:2;outline:none}
+#detail-point-info{min-height:22px;font-variant-numeric:tabular-nums}.detail-chart-help{font-size:12px}
+body:has(#chart-detail[open]){overflow:hidden}
+@media(max-width:760px){#chart-detail{padding:12px;gap:8px}.detail-chart-toolbar h2{font-size:16px}.detail-chart-controls{gap:6px}.detail-chart-controls button{padding:7px 9px;font-size:12px}#detail-chart-count{flex-basis:100%;font-size:12px}.detail-chart-help{font-size:11px}}
+.chart-point[data-detail-metric]:hover{r:3;fill:#fff;stroke:none}
+.history-chart line,.task-graph path,.task-graph line{pointer-events:none}

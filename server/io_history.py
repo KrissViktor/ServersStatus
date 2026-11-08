@@ -44,7 +44,7 @@ def metric_series(connection,agent,group,name,start,end,bucket):
             slot['last']=timestamp
             slot['peak']=max(slot['peak'],value)
     return {field:[{'timestamp':slot['timestamp_sum']/slot['count'],'value':slot['sum']/slot['count'],
-                   'first':slot['first'],'last':slot['last'],'peak':slot['peak'],'has_gap':slot['has_gap']}
+                   'first':slot['first'],'last':slot['last'],'peak':slot['peak'],'has_gap':slot['has_gap'],'samples':slot['count']}
                   for _,slot in sorted(slots.items())] for field,slots in aggregates.items()}
 
 
@@ -53,7 +53,7 @@ def samples(connection,agent,group,name,field,start,end,bucket):
     return metric_series(connection,agent,group,name,start,end,bucket)[field]
 
 
-def chart(rows,title,start,end,iops=False,key=None):
+def chart(rows,title,start,end,iops=False,key=None,metric=None,name=''):
     heading='<header class="io-chart-heading"><h3>'+esc(title)+'</h3>'
     if key:heading+='<button type="button" class="chart-expand" aria-expanded="false">Расширить</button>'
     heading+='</header>'
@@ -75,7 +75,9 @@ def chart(rows,title,start,end,iops=False,key=None):
         if previous and not row['has_gap'] and not previous['has_gap'] and row['first']-previous['last']<=180:
             drawing+=f'<line stroke="#83c4ff" stroke-width="2" x1="{x(previous["timestamp"])}" y1="{y(previous["value"])}" x2="{x(row["timestamp"])}" y2="{y(row["value"])}"/>'
         tooltip=stamp(row['timestamp'])+' · среднее '+fmt(row['value'])+' · пик '+fmt(row['peak'])
-        drawing+=f'<circle class="chart-point" fill="#83c4ff" r="3" cx="{x(row["timestamp"])}" cy="{y(row["value"])}"><title>{esc(tooltip)}</title></circle>'
+        attributes=''
+        if metric:attributes=f'data-detail-metric="{esc(metric)}" data-detail-name="{esc(name)}" data-detail-first="{row["first"]}" data-detail-last="{row["last"]}" data-detail-count="{row.get("samples",30)}" data-detail-title="{esc(title)}" tabindex="0" role="button" aria-label="Открыть исходные отчёты: {esc(tooltip)}"'
+        drawing+=f'<circle {attributes} class="chart-point" fill="#83c4ff" r="3" cx="{x(row["timestamp"])}" cy="{y(row["value"])}"><title>{esc(tooltip)}</title></circle>'
         previous=row
     return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245">'+drawing+'</svg></div></section>'
 
@@ -92,7 +94,7 @@ def sections(connection, agent, period, start,end,bucket,nic=None,disk=None):
         fields=[('receive_bytes_per_second','Приём',False),('send_bytes_per_second','Передача',False)] if group=='network' else [('read_bytes_per_second','Чтение',False),('write_bytes_per_second','Запись',False),('read_iops','Чтение IOPS',True),('write_iops','Запись IOPS',True)]
         if selected:
             for field,caption,iops in fields:
-                content+=chart(series[group][field],title+' · '+caption[:1].lower()+caption[1:]+' · '+selected,start,end,iops,key=group+'-'+field)
+                content+=chart(series[group][field],title+' · '+caption[:1].lower()+caption[1:]+' · '+selected,start,end,iops,key=group+'-'+field,metric=group+'.'+field,name=selected)
         else:content+='<p class="empty">История появится после получения отчётов с этими метриками.</p>'
         content+='</div></section>'
     return content, {'nic': nic, 'disk': disk}

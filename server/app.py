@@ -643,3 +643,6 @@ register_console(app,db,authenticated,csrf_token,digest)
 
 from .console_access import register as register_console_access
 register_console_access(app,db,authenticated,csrf_token)
+
+from .drilldown import register as register_drilldown
+register_drilldown(app,db,authenticated)
