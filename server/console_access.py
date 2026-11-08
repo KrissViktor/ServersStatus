@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS console_challenges(session TEXT PRIMARY KEY,step INTE
 CREATE TABLE IF NOT EXISTS console_grants(session TEXT PRIMARY KEY,expires REAL);
 CREATE TABLE IF NOT EXISTS console_grant_tokens(session TEXT PRIMARY KEY,token TEXT);
 CREATE TABLE IF NOT EXISTS console_delivery_rate(created REAL);'''
+ACCESS_SECONDS=1800
 _slots=asyncio.Semaphore(2)
 
 
@@ -48,32 +49,35 @@ def send_code(code,step):
     send_message(token,chat,'🔐 Снятие защиты портала · шаг '+str(step)+'/3\nКод: '+code+'\nДействует 5 минут. Если вы не запрашивали код, не вводите и никому не сообщайте его.')
 
 
-def access_page(request,db,csrf,message=''):
+def access_page(request,db,csrf,message='',fragment=False):
     from .dashboard import page,esc
     with db() as c:
         config=c.execute('SELECT 1 FROM console_access_config').fetchone()
         challenge=c.execute('SELECT step,expires FROM console_challenges WHERE session=?',(session_key(request),)).fetchone()
-    body='<header class="topbar"><a href="/">← На главную</a></header><h1>Снятие защиты</h1>'
+    def render(body):
+        if fragment:return body
+        return page('<header class="topbar"><a href="/">← На главную</a></header>'+body)
+    body='<h1 id="protection-title">Снятие защиты</h1>'
     if message:body+='<p class="notice">'+esc(message)+'</p>'
-    if not config:return page(body+'<p>Защита ещё не настроена администратором. Выполните настройку на Raspberry Pi по deploy/CONSOLE-ACCESS.md.</p>')
+    if not config:return render(body+'<p>Защита ещё не настроена администратором. Выполните настройку на Raspberry Pi по deploy/CONSOLE-ACCESS.md.</p>')
     if unlocked(request,db):
-        return page(body+f'<p>Защита снята для этого сеанса на 15 минут.</p><form method="post" action="/console-access/lock"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Включить защиту</button></form><a href="/">Вернуться к серверам</a>')
+        return render(body+f'<p>Защита снята для этого сеанса на 30 минут.</p><form method="post" action="/console-access/lock"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Включить защиту</button></form><a href="/">Вернуться к серверам</a>')
     step=challenge['step'] if challenge and challenge['expires']>time.time() else 1
-    if step==0:return page(body+'<p>Код отправляется. Обновите страницу через несколько секунд.</p>')
+    if step==0:return render(body+'<p>Код отправляется. Обновите страницу через несколько секунд.</p>')
     if step==1:
         label='Постоянный PIN: 4 цифры';pattern='[0-9]{4}';maxlength=4;autocomplete='off'
     elif step==2:
         label='Код из Telegram: 6 цифр';pattern='[0-9]{6}';maxlength=6;autocomplete='one-time-code'
     else:
         label='Второй код из Telegram: 6 цифр и знаков';pattern='.{6}';maxlength=6;autocomplete='off'
-    return page(body+f'<section class="server"><h2>Шаг {step} из 3</h2><form method="post" action="/console-access"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>{label}<input type="password" name="code" required pattern="{pattern}" maxlength="{maxlength}" autocomplete="{autocomplete}" autofocus></label><button>Продолжить</button></form><p class="muted">Каждый код действует 5 минут. Доступ откроется только после всех трёх шагов.</p></section>')
+    return render(body+f'<section class="server"><h2>Шаг {step} из 3</h2><form method="post" action="/console-access"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>{label}<input type="password" name="code" required pattern="{pattern}" maxlength="{maxlength}" autocomplete="{autocomplete}" autofocus></label><button>Продолжить</button></form><p class="muted">Каждый код действует 5 минут. Доступ откроется только после всех трёх шагов.</p></section>')
 
 
 def register(app,db,authenticated,csrf_token):
     @app.get('/console-access',response_class=HTMLResponse)
     def form(request:Request):
         if not authenticated(request):return RedirectResponse('/',303)
-        return HTMLResponse(access_page(request,db,csrf_token(request)),headers={'Cache-Control':'no-store'})
+        return HTMLResponse(access_page(request,db,csrf_token(request),fragment=request.query_params.get('modal')=='1'),headers={'Cache-Control':'no-store'})
 
     @app.get('/console-access/status')
     def state(request:Request):
@@ -115,10 +119,10 @@ def register(app,db,authenticated,csrf_token):
                         lease_token=secrets.token_urlsafe(32)
                         c.execute('INSERT INTO console_grant_tokens VALUES (?,?) ON CONFLICT(session) DO UPDATE SET token=excluded.token',(session,hashlib.sha256(lease_token.encode()).hexdigest()))
                         c.execute('DELETE FROM console_challenges WHERE session=?',(session,))
-                        c.execute('INSERT INTO console_grants VALUES (?,?) ON CONFLICT(session) DO UPDATE SET expires=excluded.expires',(session,time.time()+900))
+                        c.execute('INSERT INTO console_grants VALUES (?,?) ON CONFLICT(session) DO UPDATE SET expires=excluded.expires',(session,time.time()+ACCESS_SECONDS))
                         c.execute('UPDATE auth_guard SET failures=0 WHERE address=?',(address,))
                         from .events import record
-                        record(c,'','security','Защита снята для сеанса портала на 15 минут')
+                        record(c,'','security','Защита снята для сеанса портала на 30 минут')
                     else:
                         c.execute('DELETE FROM console_delivery_rate WHERE created<?',(time.time()-60,))
                         if c.execute('SELECT count(*) FROM console_delivery_rate').fetchone()[0]>=6:
@@ -140,9 +144,10 @@ def register(app,db,authenticated,csrf_token):
                 error='Не удалось отправить код в Telegram. Доступ остаётся закрытым.'
             else:
                 with db() as c:c.execute('UPDATE console_challenges SET step=? WHERE session=? AND nonce=?',(next_step,session,nonce))
-        if error:return HTMLResponse(access_page(request,db,csrf_token(request),error),status_code=400,headers={'Cache-Control':'no-store'})
-        response=RedirectResponse('/console-access',303)
-        if lease_token:response.set_cookie('__Host-console-access',lease_token,max_age=900,httponly=True,secure=True,samesite='strict',path='/')
+        if error:return HTMLResponse(access_page(request,db,csrf_token(request),error,fragment=request.query_params.get('modal')=='1'),status_code=400,headers={'Cache-Control':'no-store'})
+        response=HTMLResponse(access_page(request,db,csrf_token(request),fragment=True),headers={'Cache-Control':'no-store'}) if request.query_params.get('modal')=='1' else RedirectResponse('/console-access',303)
+        if lease_token and request.query_params.get('modal')=='1':response=HTMLResponse('<h1 id="protection-title">Защита снята</h1><p>Доступ открыт на 30 минут.</p>',headers={'Cache-Control':'no-store'})
+        if lease_token:response.set_cookie('__Host-console-access',lease_token,max_age=ACCESS_SECONDS,httponly=True,secure=True,samesite='strict',path='/')
         return response
 
     @app.post('/console-access/lock')
@@ -157,7 +162,8 @@ def register(app,db,authenticated,csrf_token):
             c.execute('DELETE FROM console_grants WHERE session=?',(session_key(request),));c.execute('DELETE FROM console_challenges WHERE session=?',(session_key(request),))
             from .events import record
             record(c,'','security','Защита включена для сеанса портала')
-        response=RedirectResponse('/',303);response.delete_cookie('__Host-console-access',path='/',secure=True,httponly=True,samesite='strict');return response
+        response=HTMLResponse(access_page(request,db,csrf_token(request),fragment=True),headers={'Cache-Control':'no-store'}) if request.query_params.get('modal')=='1' else RedirectResponse('/',303)
+        response.delete_cookie('__Host-console-access',path='/',secure=True,httponly=True,samesite='strict');return response
 
 
 def main():

@@ -8,6 +8,8 @@ from urllib.parse import quote
 from pathlib import Path
 
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')
+PROTECTION_SCRIPT=Path(__file__).with_name('protection.js').read_text(encoding='utf-8')
+
 REFRESH_SCRIPT = Path(__file__).with_name('refresh.js').read_text(encoding='utf-8')
 
 
@@ -85,7 +87,8 @@ def memory_description(data):
 
 def page(content, refresh=False):
     if '<header class="topbar"' in content:
-        content=content.replace('</header>','<a class="nav-link protection-link" href="/console-access">Снять защиту</a></header>',1)
+        content=content.replace('</header>','<button type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
+        content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
     return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + ('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
 

@@ -152,7 +152,7 @@ class WorkflowTest(unittest.TestCase):
             self.assertEqual(result.status_code, 200)
             self.assertIn('6.8%', result.text)
             self.assertIn('50.4%', result.text)
-            self.assertEqual(result.text.count('<svg '), 2)
+            self.assertEqual(result.text.count('<svg class="history-chart"'), 2)
             self.assertIn('МСК', result.text)
 
     def test_prominent_backup_alarm(self):
@@ -331,7 +331,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertNotIn('user<script>',details)
         self.assertIn('Подключён',details)
         history=self.client.get('/history/pc?period=1h').text
-        self.assertEqual(history.count('<svg '),8)
+        self.assertEqual(history.count('<svg class="history-chart"'),8)
         self.assertIn('1.0 Мб/с',history)
         self.assertIn('PhysicalDrive0',history)
 

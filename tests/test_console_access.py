@@ -150,3 +150,18 @@ class ConsoleAccessTest(unittest.TestCase):
     def test_public_api_schema_does_not_reveal_protected_routes(self):
         self.assertEqual(self.client.get('/openapi.json').status_code,404)
         self.assertEqual(self.client.get('/docs').status_code,404)
+
+    def test_modal_fragments_and_thirty_minute_cookie(self):
+        started=time.time()
+        fragment=self.client.get('/console-access?modal=1')
+        self.assertNotIn('<html',fragment.text);self.assertIn('Шаг 1 из 3',fragment.text)
+        def submit(code):return self.client.post('/console-access?modal=1',data={'csrf':self.csrf,'code':code},follow_redirects=False)
+        response=submit('1234');self.assertEqual(response.status_code,200);self.assertIn('Шаг 2 из 3',response.text)
+        response=submit(self.codes[-1][0]);self.assertEqual(response.status_code,200);self.assertIn('Шаг 3 из 3',response.text)
+        response=submit(self.codes[-1][0]);self.assertEqual(response.status_code,200);self.assertIn('30 минут',response.text)
+        self.assertIn('Max-Age=1800',response.headers['set-cookie'])
+        with a.db() as c:self.assertGreaterEqual(c.execute('SELECT expires FROM console_grants').fetchone()[0],started+1800)
+        self.assertTrue(self.client.get('/console-access/status').json()['unlocked'])
+        response=self.client.post('/console-access/lock?modal=1',data={'csrf':self.csrf},follow_redirects=False)
+        self.assertEqual(response.status_code,200);self.assertNotIn('<html',response.text)
+        self.assertFalse(self.client.get('/console-access/status').json()['unlocked'])
