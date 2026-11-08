@@ -143,13 +143,14 @@ def backup_alerts(rows, now):
     return '<section class="backup-alarm" role="alert"><p class="eyebrow">ТРЕБУЕТСЯ ВНИМАНИЕ</p><h2>Ошибка резервного копирования</h2><ul>' + ''.join(items) + '</ul></section>'
 
 
-def server_card(row, now, rdp_access=None):
+def server_card(row, now, rdp_access=None, historical=False):
     data = json.loads(row['data']) if row['data'] else {}
     data['disks'] = monitored_disks(data)
     age = max(0, now - row['received']) if row['received'] is not None else None
     online = age is not None and age < 180
     state = 'Нет данных' if age is None else 'Онлайн' if online else 'Нет связи'
     badge = 'normal' if online else 'danger' if age is not None else 'neutral'
+    if historical:state,badge='Снимок','neutral'
     hostname = data.get('hostname') or row['id']
     title = dict(row).get('display_name') or hostname
     from .overview import issues
@@ -159,7 +160,12 @@ def server_card(row, now, rdp_access=None):
     content += f'<p class="history-link"><a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">История нагрузки →</a></p>'
     if age is None:
         return content + '<div class="empty">Ожидаем первый отчёт агента</div></article>'
-    content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
+    if historical:
+        from datetime import datetime,timezone,timedelta
+        when=datetime.fromtimestamp(row['received'],timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S МСК')
+        content+=f'<div class="timing"><span>Отчёт: <b>{when}</b></span><span>Время работы на момент отчёта: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
+    else:
+        content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
     if not online:
         content += '<p class="notice">Данные устарели: агент не присылал отчёт более 3 минут.</p>'
     points=resource_points(row,data)

@@ -15,6 +15,8 @@ def cleanup(connection,now):
         connection.execute('DELETE FROM console_grant_tokens WHERE session NOT IN (SELECT session FROM console_grants)')
         connection.execute('DELETE FROM console_challenges WHERE expires<?',(now,))
         connection.execute('DELETE FROM console_delivery_rate WHERE created<?',(now-60,))
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='process_history'").fetchone():
+        connection.execute('DELETE FROM process_history WHERE report IN (SELECT rowid FROM reports WHERE received<? ORDER BY received LIMIT ?)',(now-RETENTION_DAYS*86400,CLEANUP_BATCH))
     cursor=connection.execute('''DELETE FROM reports WHERE rowid IN (
         SELECT rowid FROM reports WHERE received<? ORDER BY received LIMIT ?
     )''',(now-RETENTION_DAYS*86400,CLEANUP_BATCH))

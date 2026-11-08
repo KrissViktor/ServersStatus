@@ -75,3 +75,26 @@ class AgentSettingsTest(unittest.TestCase):
             with patch('agent.client.collect',return_value={'hostname':'pc'}),patch('agent.client.urllib.request.urlopen',return_value=Response()),patch('agent.client.time.monotonic',side_effect=[100,102,110,112]):
                 run(path,stop)
             self.assertEqual(stop.waits,[8,8])
+
+    def test_process_upload_carries_exact_report_reference(self):
+        from unittest.mock import patch
+        from agent.client import run
+        requests=[]
+        class Stop:
+            def __init__(self):self.done=False
+            def is_set(self):return self.done
+            def wait(self,delay):self.done=True
+        class Response:
+            status=200
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,maximum):return json.dumps({'ok':True,'report_id':123,'report_received':1700000000.5}).encode()
+        def upload(request,*args,**kwargs):
+            requests.append(request);return Response()
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'config.json';path.write_text(json.dumps({'server_url':'https://example.com','agent_id':'pc','token':'key'}))
+            with patch('agent.client.collect',return_value={'hostname':'pc'}),patch('agent.processes.begin',return_value={}),patch('agent.processes.finish',return_value={'status':'available','items':[]}),patch('agent.client.urllib.request.urlopen',side_effect=upload):
+                run(path,Stop())
+        process=next(request for request in requests if '/api/processes/' in request.full_url)
+        self.assertEqual(json.loads(process.data)['report_id'],123)
+        self.assertEqual(json.loads(process.data)['report_received'],1700000000.5)

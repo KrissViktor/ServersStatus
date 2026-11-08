@@ -285,7 +285,7 @@ async def report(agent_id: str, request: Request):
         received = time.time()
         encoded = data.model_dump_json()
         c.execute('INSERT INTO latest_reports VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data', (agent_id,received,encoded))
-        c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded))
+        report_id=c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded)).lastrowid
         cleanup(c,received)
         from .updates import confirm
         confirm(c,agent_id,data)
@@ -294,7 +294,7 @@ async def report(agent_id: str, request: Request):
         monitoring = {'revision': remote['revision'], 'settings': json.loads(remote['data'])} if remote else {'revision': 0, 'settings': None}
     if monitoring['settings'] is not None and 'auto_services_v1' not in data.features:
         monitoring['settings'].pop('auto_monitor_services', None)
-    return {'ok': True, 'monitoring': monitoring, 'report_interval_seconds': 10}
+    return {'ok': True, 'monitoring': monitoring, 'report_interval_seconds': 10,'report_id':report_id,'report_received':received}
 
 
 @app.get('/health')
@@ -404,6 +404,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_processes WHERE agent=?', (name,))
+                c.execute('DELETE FROM process_history WHERE agent=?', (name,))
                 c.execute('DELETE FROM windows_commands WHERE agent=?', (name,))
                 c.execute('DELETE FROM rdp_operations WHERE agent=?', (name,))
                 c.execute('DELETE FROM console_jobs WHERE agent=?', (name,))
@@ -434,7 +435,9 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
         points = load_history(c, agent_id, start, end, bucket)
         from .io_history import sections
         io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk)
-    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io))
+        from .snapshots import extrema
+        extremes=extrema(c,agent_id,start,end)
+    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes))
 
 
 def settings_state(agent_id):
@@ -667,3 +670,6 @@ register_drilldown(app,db,authenticated)
 
 from .rdp_control import register as register_rdp
 register_rdp(app,db,authenticated,csrf_token)
+
+from .snapshots import register as register_snapshots
+register_snapshots(app,db,authenticated)

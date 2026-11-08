@@ -74,7 +74,7 @@ def chart(points, metric, title, start, end, color):
     return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
 
 
-def history_page(agent_id, points, period, start, end, extra_html="", selectors=None):
+def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None):
     _, _, bucket = PERIODS[period]
     url = '/history/' + quote(agent_id, safe='')
     links = ''.join(f'<a class="period {"selected" if key == period else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{label}</a>' for key, (label, _, _) in PERIODS.items())
@@ -89,11 +89,24 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         average_size=size(sum(p['ram_used_bytes']*p.get('ram_size_samples',0) for p in size_points)/size_count) if size_count else 'Объём недоступен'
         peak_sizes=[dict(p)['ram_used_peak_bytes'] for p in points if dict(p).get('ram_used_peak_bytes') is not None]
         peak_size=size(max(peak_sizes)) if peak_sizes else 'Объём недоступен'
-        content += '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong>{value}</strong></div>' for label, value in [
-            ('Среднее CPU', f'{sum(p["cpu"] * p["samples"] for p in points)/total:.1f}%'),
-            ('Пик CPU', f'{max(p["cpu_peak"] for p in points):.1f}%'),
-            ('Среднее RAM', f'{sum(p["ram"] * p["samples"] for p in points)/total:.1f}%<small class="stat-detail" title="Объём по {size_count} отчётам с данными памяти">{average_size}</small>'),
-            ('Пик RAM', f'{max(p["ram_peak"] for p in points):.1f}%<small class="stat-detail">{peak_size}</small>')]) + '</div>'
+        extremes=extremes or {}
+        def stat(label,value,record=None,metric='cpu'):
+            if record:
+                attrs=f'data-detail-metric="{metric}" data-detail-first="{record["timestamp"]}" data-detail-last="{record["timestamp"]}" data-detail-count="30" data-detail-report="{record["report_id"]}" data-detail-title="{esc(label)}"'
+                return f'<button type="button" class="stat extreme-stat" {attrs}><span>{label}</span><strong>{value}</strong></button>'
+            return f'<div class="stat"><span>{label}</span><strong>{value}</strong></div>'
+        content+='<div class="stats '+('history-stats' if extremes else '')+'">'
+        content+=stat('Среднее CPU',f'{sum(p["cpu"]*p["samples"] for p in points)/total:.1f}%')
+        record=extremes.get('cpu_max');content+=stat('Пик CPU',f'{max(p["cpu_peak"] for p in points):.1f}%',record)
+        record=extremes.get('cpu_min')
+        if record:content+=stat('Минимум CPU',f'{record["value"]:.1f}%',record)
+        content+=stat('Среднее RAM',f'{sum(p["ram"]*p["samples"] for p in points)/total:.1f}%<small class="stat-detail" title="Объём по {size_count} отчётам с данными памяти">{average_size}</small>')
+        record=extremes.get('ram_max')
+        peak_size=size(record['ram_used_bytes']) if record and record.get('ram_used_bytes') is not None else peak_size
+        content+=stat('Пик RAM',f'{max(p["ram_peak"] for p in points):.1f}%<small class="stat-detail">{peak_size}</small>',record,'ram')
+        record=extremes.get('ram_min')
+        if record:content+=stat('Минимум RAM',f'{record["value"]:.1f}%<small class="stat-detail">{size(record.get("ram_used_bytes"))}</small>',record,'ram')
+        content+='</div>'
         content += f'<p class="muted history-note">Отчётов: {total} · Точки — средние за {bucket // 60} мин. Наведите на точку, чтобы увидеть пик и время. Нажмите на точку для просмотра исходных отчётов и масштаба до 900 отчётов. Разрывы означают отсутствие отчётов более 3 минут; интервалы с пропусками показаны отдельными точками. Время — московское (МСК).</p>'
         content += chart(points, 'cpu', 'Процессор · CPU', start, end, '#4adeab')
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')

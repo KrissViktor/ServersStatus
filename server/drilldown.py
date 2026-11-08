@@ -10,7 +10,7 @@ SCRIPT=Path(__file__).with_name('drilldown.js').read_text(encoding='utf-8')
 
 
 def widget(agent):
-    return '<dialog id="chart-detail" aria-labelledby="chart-detail-title" data-url="/api/history/'+esc(quote(agent,safe=''))+'/detail"><header class="detail-chart-toolbar"><h2 id="chart-detail-title">Подробный график</h2><button type="button" data-detail-close aria-label="Закрыть график">Закрыть ×</button></header><div class="detail-chart-controls"><button type="button" data-pan="-1" aria-label="Предыдущие отчёты">← Раньше</button><button type="button" data-zoom="in">Приблизить</button><button type="button" data-zoom="out">Отдалить ×3</button><button type="button" data-pan="1" aria-label="Следующие отчёты">Позже →</button><span class="muted" id="detail-chart-count"></span></div><p class="muted" id="detail-chart-status" role="status" aria-live="polite"></p><div id="detail-chart-plot"></div><p id="detail-point-info" class="muted">Наведите на точку для просмотра отчёта.</p><p class="muted detail-chart-help">Колесо мыши — масштаб · Потяните график — перемещение · Стрелки — раньше/позже · До 900 исходных отчётов без усреднения. Разрывы — отсутствие данных.</p></dialog><script>'+SCRIPT+'</script>'
+    return '<dialog id="chart-detail" aria-labelledby="chart-detail-title" data-url="/api/history/'+esc(quote(agent,safe=''))+'/detail"><header class="detail-chart-toolbar"><h2 id="chart-detail-title">Подробный график</h2><button type="button" data-detail-close aria-label="Закрыть график">Закрыть ×</button></header><div class="detail-chart-controls"><button type="button" data-pan="-1" aria-label="Предыдущие отчёты">← Раньше</button><button type="button" data-zoom="in">Приблизить</button><button type="button" data-zoom="out">Отдалить ×3</button><button type="button" data-pan="1" aria-label="Следующие отчёты">Позже →</button><span class="muted" id="detail-chart-count"></span></div><p class="muted" id="detail-chart-status" role="status" aria-live="polite"></p><div id="detail-chart-plot"></div><div id="detail-chart-tooltip" role="tooltip" hidden></div><p id="detail-point-info" class="muted">Наведите на точку для просмотра отчёта.</p><div class="detail-snapshot-actions"><button type="button" id="detail-snapshot" disabled>Снимок</button><span id="detail-selected-label" class="muted"></span><button type="button" data-view-extreme="min">Минимум</button><button type="button" data-view-extreme="max">Максимум</button></div><section id="detail-snapshot-content" hidden></section><p class="muted detail-chart-help">Колесо мыши — масштаб · Потяните график — перемещение · Стрелки — раньше/позже · До 900 исходных отчётов без усреднения. Разрывы — отсутствие данных.</p></dialog><script>'+SCRIPT+'</script>'
 
 
 def load_reports(connection, agent, center, count, metric, name='', first=None, last=None):
@@ -32,7 +32,7 @@ def load_reports(connection, agent, center, count, metric, name='', first=None, 
         else:
             group,field=metric.split('.',1)
             value=next((device.get(field) for device in json.loads(report['value'] or '[]') if device.get('name')==name),None)
-        point={'timestamp':row['received'],'value':finite(value)}
+        point={'report_id':row['rowid'],'timestamp':row['received'],'value':finite(value)}
         if metric=='ram':
             total=finite(report['total']);used=finite(report['used'])
             if used is None and total:

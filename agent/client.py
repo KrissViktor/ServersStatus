@@ -98,6 +98,9 @@ def run(config_path, stop=None):
                     if updated != cached:
                         cached = save_cache(cache_path, updated)
                         previous.clear()
+            if type(reply.get('report_id')) is int and isinstance(reply.get('report_received'),(int,float)):
+                process_snapshot['report_id']=reply['report_id']
+                process_snapshot['report_received']=reply['report_received']
             from agent.console import handle as handle_console
             handle_console(config,config_path)
             if os.name == 'nt':
