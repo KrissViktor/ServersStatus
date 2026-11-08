@@ -22,6 +22,21 @@ def extrema(c,agent,start,end):
     return result
 
 
+def missing_process_reason(c,agent,received):
+    latest=c.execute('SELECT received,data FROM latest_processes WHERE agent=?',(agent,)).fetchone()
+    first=c.execute('SELECT MIN(received) FROM process_history WHERE agent=?',(agent,)).fetchone()[0]
+    if first is not None and received<first:
+        when=datetime.fromtimestamp(first,timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S МСК')
+        return 'Этот отчёт старше начала истории процессов. Первые сохранённые процессы: '+when+'. Для более раннего момента список восстановить нельзя.'
+    if latest is None:return 'Списки процессов от этого агента ещё не получены. Проверьте обновление агента, его журнал и разрешение /api/processes/ в reverse proxy.'
+    data=json.loads(latest['data'])
+    if not data.get('report_id') or data.get('report_received') is None:
+        return 'Агент присылает только текущий список без привязки к отчёту. Обновите Windows/Linux-агент; для Raspberry Pi перезапустите serversstatus-host-monitor после git pull.'
+    if abs(latest['received']-received)<30:
+        return 'Процессы приходят отдельным запросом после метрик. Повторите открытие снимка через 10 секунд. Если список не появился, проверьте журнал агента.'
+    return 'Для этого отчёта список процессов не был сохранён. Проверьте журнал агента и доступность /api/processes/. Текущие процессы в прошлый момент не подставляются.'
+
+
 def snapshot(c,agent,identifier):
     row=c.execute('SELECT rowid,received,data FROM reports WHERE rowid=? AND agent=?',(identifier,agent)).fetchone()
     if not row:raise HTTPException(404,'Отчёт не найден: он мог быть удалён по сроку хранения')
@@ -35,7 +50,7 @@ def snapshot(c,agent,identifier):
     compact=json.loads(zlib.decompress(process['data']).decode('utf-8')) if process else None
     content+='<section class="server snapshot-processes"><h3>Процессы в этом измерении</h3>'
     if compact is None:
-        content+='<p class="muted">История процессов для этого отчёта не сохранена. Обновите агент для будущих снимков. Текущий список процессов в старый снимок не подставляется.</p>'
+        content+='<p class="muted">'+esc(missing_process_reason(c,agent,row['received']))+'</p>'
     elif compact.get('status','available')!='available':
         content+='<p class="muted">В этом измерении агент не смог прочитать список процессов. Проверьте права службы на сервере.</p>'
     else:

@@ -48,7 +48,7 @@ class AgentSettingsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'config.json'
             path.write_text(json.dumps({'server_url': 'https://example.com', 'agent_id': 'pc', 'token': 'keep', 'services': ['old']}))
-            with patch('agent.client.collect', return_value={'hostname': 'pc'}) as collect, patch('agent.client.urllib.request.urlopen', return_value=Response()):
+            with patch('agent.service_inventory.handle'),patch('agent.client.collect', return_value={'hostname': 'pc'}) as collect, patch('agent.client.urllib.request.urlopen', return_value=Response()):
                 run(path, Stop())
             self.assertEqual(collect.call_args_list[0].args[0]['services'], ['old'])
             self.assertEqual(collect.call_args_list[1].args[0]['services'], ['SQL'])
@@ -72,7 +72,7 @@ class AgentSettingsTest(unittest.TestCase):
             path=Path(directory)/'config.json'
             path.write_text(json.dumps({'server_url':'https://example.com','agent_id':'pc','token':'keep','interval_seconds':60}))
             stop=Stop()
-            with patch('agent.client.collect',return_value={'hostname':'pc'}),patch('agent.client.urllib.request.urlopen',return_value=Response()),patch('agent.client.time.monotonic',side_effect=[100,102,110,112]):
+            with patch('agent.service_inventory.handle'),patch('agent.client.collect',return_value={'hostname':'pc'}),patch('agent.client.urllib.request.urlopen',return_value=Response()),patch('agent.client.time.monotonic',side_effect=[100,102,110,112]):
                 run(path,stop)
             self.assertEqual(stop.waits,[8,8])
 
@@ -93,7 +93,7 @@ class AgentSettingsTest(unittest.TestCase):
             requests.append(request);return Response()
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'config.json';path.write_text(json.dumps({'server_url':'https://example.com','agent_id':'pc','token':'key'}))
-            with patch('agent.client.collect',return_value={'hostname':'pc'}),patch('agent.processes.begin',return_value={}),patch('agent.processes.finish',return_value={'status':'available','items':[]}),patch('agent.client.urllib.request.urlopen',side_effect=upload):
+            with patch('agent.service_inventory.handle'),patch('agent.client.collect',return_value={'hostname':'pc'}),patch('agent.processes.begin',return_value={}),patch('agent.processes.finish',return_value={'status':'available','items':[]}),patch('agent.client.urllib.request.urlopen',side_effect=upload):
                 run(path,Stop())
         process=next(request for request in requests if '/api/processes/' in request.full_url)
         self.assertEqual(json.loads(process.data)['report_id'],123)

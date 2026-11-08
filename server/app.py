@@ -63,6 +63,8 @@ def db():
         connection.executescript(SCHEMA)
         from .processes import SCHEMA as PROCESS_SCHEMA
         connection.executescript(PROCESS_SCHEMA)
+        from .services import SCHEMA as SERVICES_SCHEMA
+        connection.executescript(SERVICES_SCHEMA)
         from .github_updates import SCHEMA as GITHUB_SCHEMA
         connection.executescript(GITHUB_SCHEMA)
         from .windows import SCHEMA as WINDOWS_SCHEMA
@@ -417,6 +419,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_processes WHERE agent=?', (name,))
+                c.execute('DELETE FROM latest_services WHERE agent=?', (name,))
                 c.execute('DELETE FROM process_history WHERE agent=?', (name,))
                 c.execute('DELETE FROM windows_commands WHERE agent=?', (name,))
                 c.execute('DELETE FROM rdp_operations WHERE agent=?', (name,))
@@ -693,3 +696,6 @@ register_snapshots(app,db,authenticated)
 
 from .users import register as register_users
 register_users(app,db,csrf_token,digest,password_hash)
+
+from .services import register as register_services
+register_services(app,db,authenticated,digest)

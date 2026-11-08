@@ -90,6 +90,8 @@ def detail_page(row, csrf,console_access=False):
     content += (forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180, monitored_disks(json.loads(row['data'] or '{}'))) if can_history() else '') + '</div>'
     from .processes_ui import process_section
     content += process_section(row['id'])
+    from .services import section as services_section
+    content += services_section(row['id'])
     data=json.loads(row['data'] or '{}')
     from .console_ui import section as console_section
     if console_access:content+=console_section(row['id'],csrf,data)

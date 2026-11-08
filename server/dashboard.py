@@ -182,7 +182,7 @@ def server_card(row, now, rdp_access=None, historical=False):
         content += '<p class="empty small">Контроль служб не настроен</p>'
     for service in services:
         state = service.get('status', 'unavailable')
-        labels = {'running': 'Работает', 'stopped': 'Остановлена', 'paused': 'Приостановлена', 'unavailable': 'Недоступна'}
+        labels = {'running': '🟢 Работает', 'stopped': '🔴 Остановлена', 'paused': '🟡 На паузе', 'failed':'🔴 Ошибка','start_pending':'🟠 Запускается','stop_pending':'🟠 Останавливается','continue_pending':'🟠 Возобновляется','pause_pending':'🟠 Переход на паузу','unavailable': '⚪ Недоступна'}
         content += f'<div class="list-row"><b>{esc(service.get("display_name") or service.get("name", "—"))}</b><span class="badge {"normal" if state == "running" else "warning"}">{esc(labels.get(state, state))}</span></div>'
     content += '</section><section><h3>Резервные копии</h3>'
     backups = data.get('backups', [])

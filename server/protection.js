@@ -28,7 +28,7 @@
     }
     if(open && !document.querySelector('[data-protected-pane]')) {
       const panel=next.querySelector('[data-protected-pane]'),script=next.querySelector('[data-protected-script]');
-      const reference=document.querySelector('.process-panel')?.closest('details.server-fold') || current;
+      const reference=document.querySelector('.all-services-panel')?.closest('details.server-fold') || document.querySelector('.process-panel')?.closest('details.server-fold') || current;
       if(panel && reference){
         const wrapper=panel.closest('details.server-fold') || panel;
         reference.after(wrapper);
