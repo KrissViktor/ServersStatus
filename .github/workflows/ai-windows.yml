@@ -24,6 +24,9 @@ jobs:
             Write-Output "::error::$message"
             exit $code
           }
+      - name: Test resource settings update and rollback
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File deploy/ai-windows/Test-Resources.ps1
       - name: Test private AI connection configuration
         shell: powershell
         run: |
