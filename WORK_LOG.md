@@ -1724,3 +1724,25 @@ Windows AI CI #7 (4a6750c) и #8 (96e6b88) успешно прошли release r
 Итог: Windows AI service CI #9 (9af1d35) успешно прошёл release regression,
 новый Test-Setup (проверенный кэш/повреждения/независимый exit code/логи DLL/CPU)
 и native LocalService smoke-test на Windows Server 2022 / PS5.1.
+
+## 08.11.2026 — Подготовлено соединение Raspi ↔ Backup через разные сети
+
+- Пользователь подтвердил локальный запуск модели: health ok, ответ за 4,9 с,
+  22 токена, 6,27 токена/с. Raspi и Backup находятся в разных локальных сетях.
+- Добавлена deploy/AI-CONNECTION.md: официальный Tailscale на Linux/Windows,
+  вход в одну tailnet, approval/HTTPS/MagicDNS, проверка /health из Raspi.
+  Новая локальная сеть или проброс порта роутера не нужны.
+- Connect-AI.ps1 проверяет целевой Backup, вход/DNS Tailscale, местную модель,
+  существующую Serve-конфигурацию. Включает unattended mode и private HTTPS Serve
+  8443 → localhost:8091. Не включает Funnel/exit node/subnet routing/firewall.
+  Отказывает при чужом 8443 или включённом Funnel; совпадающий proxy повторяемый.
+- Ключ модели не читается/не передаётся скриптом; следующий шаг — защищённый
+  файл на Raspi после проверки связи, затем отдельный чат. Интернет/1С/чат пока
+  не реализованы. Tailscale аккаунт и подтверждение машин выполняет пользователь.
+- Синтаксис serve/set сверён с официальными исходниками Tailscale. Добавлен
+  Windows PS5.1 тест с fake CLI: private proxy, unattended, повтор, конфликт
+  порта/Funnel/login, отсутствие изменений при отказе.
+
+Языки: PowerShell, C# (test CLI), YAML, Markdown. Проверки: diff --check;
+Windows CI запускает новый regression и прежние проверки установки/службы.
+Реальные VPN/Raspi/Windows-настройки и учётные данные не изменялись.
