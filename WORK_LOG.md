@@ -1751,3 +1751,29 @@ Windows CI запускает новый regression и прежние прове
 connection (fake Tailscale CLI), release/cache/diagnostics regression и native
 LocalService smoke-test. Живое соединение ожидает установки/входа пользователя
 на Raspberry Pi и Backup; его доступность пока не подтверждена.
+
+## 08.11.2026 — Обратный SSH вместо недоступного Tailscale
+
+- Tailscale недоступен в регионе Backup. Пользователь подтвердил возможность
+  проброса внешнего TCP 2222 → Raspi:22. Подготовлен вариант без VPN-сервиса:
+  исходящий Windows SSH с reverse forwarding Raspi 127.0.0.1:18091 →
+  Backup 127.0.0.1:8091. Модель и её API-ключ не публикуются наружу.
+- Setup-Raspi.sh создаёт отдельный key-only tunnel-account без shell/PTY,
+  разрешает только remote listen 127.0.0.1:18091. Drop-in проверяется sshd -t
+  и эффективными параметрами sshd -T; при отказе откатывается. Другие аккаунты
+  не переписываются. Ключи и authorized_keys защищены от записи tunnel-user.
+- Windows: генерация Ed25519 без перезаписи ключа, ACL только Admin/SYSTEM,
+  pin публичного host key Raspi, системная задача автозапуска с keepalive и
+  переподключением. Публичный/приватный ключи чётко разделены в инструкции.
+  Нет отключения проверки хоста, password login или новых портов Windows.
+- Документированы проброс/DNS, публикация существующего SSH Raspi и отличие
+  ограничения нового tunnel-account от защиты старых аккаунтов, health,
+  диагностика/отзыв. Tailscale-инструкция помечена как альтернативная.
+
+Языки: Bash, PowerShell 5.1, OpenSSH config, YAML, Markdown.
+
+Проверки: bash -n, diff --check; настоящий временный локальный sshd + ssh
+подтвердили reverse HTTP health, pin ключа, Include/Match, запрет shell и другого
+remote port. Реальные сетевые адреса/sshd_config/пользователи не изменялись.
+В Windows CI добавлена реальная генерация ключа OpenSSH, проверка ACL и повторного
+запуска без замены. Живой туннель ждёт публичных ключей/настройки роутера пользователем.
