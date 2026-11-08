@@ -317,6 +317,14 @@ def agent_rows():
         return c.execute('SELECT a.id,r.received FROM agents a LEFT JOIN current_reports r ON a.id=r.agent ORDER BY a.id').fetchall()
 
 
+@app.get('/admin', response_class=HTMLResponse)
+def administration(request: Request):
+    if not authenticated(request):
+        return RedirectResponse('/', status_code=303)
+    from .admin_ui import administration_page
+    return HTMLResponse(administration_page())
+
+
 @app.get('/agents', response_class=HTMLResponse)
 def manage_agents(request: Request):
     if not authenticated(request):

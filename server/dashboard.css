@@ -114,3 +114,11 @@ progress{margin:9px 0;height:6px}.legend{margin-top:8px}.list-row{padding:7px 0;
 }
 @media(max-width:420px){.server-information{grid-template-columns:1fr}.metric-top strong{font-size:22px}.detail-toolbar{gap:6px}.detail-toolbar p{max-width:150px}}
 @media(max-width:760px){.metric-top{align-content:start;gap:3px}.metric-top>span{flex-basis:100%}.task-description{overflow-wrap:anywhere}.detail-toolbar p{max-width:none}.detail-toolbar{flex-wrap:wrap}}
+
+.protection-toggle[hidden]{display:none}
+.admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.admin-card{display:block;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--panel);text-decoration:none;color:var(--text);transition:border-color .15s,background-color .15s}
+.admin-card:hover{border-color:var(--muted);background:#1c1c1c}.admin-card:focus-visible{outline:2px solid var(--muted);outline-offset:3px}
+.admin-card h2{font-size:17px;display:flex;justify-content:space-between;gap:12px}.admin-card h2 span{color:var(--muted)}
+.admin-card p{color:var(--muted);font-size:13px;margin-top:7px}
+@media(max-width:600px){.admin-grid{grid-template-columns:1fr}.admin-card{padding:15px}}

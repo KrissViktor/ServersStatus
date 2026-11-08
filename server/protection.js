@@ -3,6 +3,7 @@
   if (!button || !dialog)return;
   let state=null,busy=false,refreshing=null;
   function icon(open) {
+    button.hidden=!open && button.dataset.protectionEntry!=='true';
     button.classList.toggle('is-unlocked',open);
     button.setAttribute('aria-label',open ? 'Защита снята' : 'Снять защиту');
     button.title=open ? 'Защита снята — управление доступом' : 'Снять защиту';

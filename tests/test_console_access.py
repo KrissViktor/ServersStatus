@@ -37,6 +37,22 @@ class ConsoleAccessTest(unittest.TestCase):
         self.assertEqual(self.enter(self.codes[-1][0]).status_code,303)
         self.assertEqual(self.enter(self.codes[-1][0]).status_code,303)
 
+    def test_administration_navigation_and_protection_entry(self):
+        anonymous=TestClient(a.app,base_url='https://testserver')
+        self.assertEqual(anonymous.get('/admin',follow_redirects=False).status_code,303)
+        home=self.client.get('/').text
+        header=re.search(r'<header class="topbar">(.*?)</header>',home,re.S).group(1)
+        self.assertIn('href="/admin"',header)
+        for url in ('/host','/updates','/bot','/events','/agents'):
+            self.assertNotIn('href="'+url+'"',header)
+        admin=self.client.get('/admin')
+        self.assertEqual(admin.status_code,200)
+        for url in ('/host','/updates','/bot','/events','/agents'):
+            self.assertIn('href="'+url+'"',admin.text)
+        self.assertRegex(home,r'<button hidden[^>]*id="protection-toggle"')
+        agents=self.client.get('/agents').text
+        self.assertRegex(agents,r'<button data-protection-entry="true"[^>]*id="protection-toggle"')
+
     def test_hidden_html_and_api_until_all_three_steps(self):
         html=self.client.get('/servers/pc').text
         self.assertNotIn('Мини-консоль',html);self.assertNotIn('remote-console',html);self.assertNotIn('console_v1',html)

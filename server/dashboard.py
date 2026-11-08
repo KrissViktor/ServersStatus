@@ -85,9 +85,12 @@ def memory_description(data):
         used = max(0, total-number(system.get('memory_available_bytes')))
     return size(used) + ' / ' + size(total) + ' · занято / всего'
 
-def page(content, refresh=False):
+def page(content, refresh=False, protection_entry=False):
     if '<header class="topbar"' in content:
-        content=content.replace('</header>','<button type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
+        if 'href="/admin"' not in content:
+            content=content.replace('</header>','<a class="nav-link" href="/admin">Администрирование</a></header>',1)
+        visibility='data-protection-entry="true"' if protection_entry else 'hidden'
+        content=content.replace('</header>',f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
         content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
     return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + ('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
@@ -206,7 +209,7 @@ def dashboard(rows, q='', view='all'):
         data = json.loads(row['data']) if row['data'] else {}
         if any(number(d.get('used_percent')) >= 85 for d in monitored_disks(data)):
             attention += 1
-    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/host">Raspberry Pi</a><a class="nav-link" href="/updates">Обновления</a><a class="nav-link" href="/bot">Бот</a><a class="nav-link" href="/events">Журнал событий</a><a class="nav-link" href="/agents">Управление агентами</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
+    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/admin">Администрирование</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     from .overview import compact_card, matches, search_form
     selected = [row for row in rows if matches(row, now, q, view)]
