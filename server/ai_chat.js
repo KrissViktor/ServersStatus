@@ -25,7 +25,7 @@
       const text=node('div',turn.reply||(['queued','running'].includes(turn.status)?'Ожидаем ответ…':'Ответ отсутствует'));text.className='ai-answer';answer.append(text);
       if(turn.tools?.length){
         const details=node('details'),summary=node('summary','Источники и действия · '+turn.tools.length);details.className='ai-sources';details.append(summary);
-        for(const t of turn.tools){const row=node('div'),label=node('span','[S'+t.id+'] '+t.label);row.append(label,node('small',t.status==='running'?'Чтение…':t.status==='failed'?(t.error||'Ошибка'):'Прочитано'));
+        for(const t of turn.tools){const row=node('div'),label=node('span','[S'+t.id+'] '+t.label);row.append(label,node('small',t.status==='running'?'Чтение…':t.status==='failed'?(t.error||'Ошибка'):t.name==='web_search'?'Получены результаты':'Прочитано'));
           if(t.url&&t.status==='completed'){try{const url=new URL(t.url,location.origin);if(['http:','https:'].includes(url.protocol)){const link=node('a','Открыть источник ↗');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';row.append(link)}}catch(_){}}
           details.append(row);
         }answer.append(details);

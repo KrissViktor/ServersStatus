@@ -107,6 +107,14 @@ async def generate(db,job,messages,api_key):
             result=await session.execute(name,args)
             messages.append({'role':'assistant','content':None,'tool_calls':[{'id':'automatic_web','type':'function','function':{'name':name,'arguments':json.dumps(args)}}]})
             messages.append({'role':'tool','tool_call_id':'automatic_web','content':json.dumps(result,ensure_ascii=False)})
+            # Search snippets alone often do not contain the requested fact.
+            # Read up to two actual result pages, within the same four-call budget.
+            if name=='web_search' and 'error' not in result:
+                for index,source in enumerate(session.search_sources[:2]):
+                    args={'source_id':source};page=await session.execute('web_page',args)
+                    identifier='automatic_page_'+str(index)
+                    messages.append({'role':'assistant','content':None,'tool_calls':[{'id':identifier,'type':'function','function':{'name':'web_page','arguments':json.dumps(args)}}]})
+                    messages.append({'role':'tool','tool_call_id':identifier,'content':json.dumps(page,ensure_ascii=False)})
         async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(120,connect=5,write=10,pool=5)) as client:
             for step in range(rounds):
                 calls={};content='';finished=False

@@ -60,8 +60,9 @@ class ToolsTest(unittest.TestCase):
             self.assertEqual(payload['messages'][-1]['role'],'tool')
             self.assertIn('Weather forecast',payload['messages'][-1]['content'])
             return httpx.Response(200,content=b'data: {"choices":[{"delta":{"content":"Forecast [S1]"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
-        with patch('server.ai_tools.search',new_callable=AsyncMock,return_value=[{'url':'https://example.com/weather','title':'Weather forecast'}]) as search:
+        with patch('server.ai_tools.search',new_callable=AsyncMock,return_value=[{'url':'https://example.com/weather','title':'Weather forecast'}]) as search, patch('server.ai_tools.fetch',new_callable=AsyncMock,return_value={'url':'https://example.com/weather','type':'text/html','text':'<p>Weather forecast: tomorrow +5 C</p>'}) as page:
             result=self.generate(handler,s.job,messages)
+            page.assert_awaited_once_with('https://example.com/weather')
             search.assert_awaited_once_with('Какая погода завтра в Москве?')
         self.assertEqual(result['status'],'completed')
         self.assertEqual(self.client.get('/api/ai/chat/'+self.chat).json()['turns'][0]['tools'][0]['status'],'completed')
@@ -109,8 +110,18 @@ class WebTest(unittest.TestCase):
         self.assertFalse(ai_web.public_ip('::ffff:8.8.8.8'))
     def test_html_and_search(self):
         self.assertEqual(ai_web.page_text('<h1>Title</h1><script>secret</script><p>Body</p>','text/html'),'Title\nBody')
-        with patch('server.ai_web.fetch',new_callable=AsyncMock,return_value={'text':'<rss><channel><item><title>Guide</title><link>https://example.com/</link><description>Text</description></item></channel></rss>'}) as fetch:
-            result=asyncio.run(ai_web.search('safe query'));self.assertEqual(result[0]['title'],'Guide');self.assertIn('safe%20query',fetch.call_args.args[0])
+        with patch('server.ai_web.fetch',new_callable=AsyncMock,return_value={'url':'https://www.google.com/search','text':'<html><a href="/url?q=https%3A%2F%2Fexample.com%2F&amp;sa=U"><h3>Guide</h3></a><div>Useful snippet</div></html>'}) as fetch:
+            result=asyncio.run(ai_web.search('safe query'));self.assertEqual(result[0]['title'],'Guide');self.assertIn('safe%20query',fetch.call_args.args[0]);self.assertTrue(fetch.call_args.args[0].startswith('https://www.google.com/search?'));self.assertIn('Useful snippet',result[0]['snippet'])
+    def test_google_block_pages_are_errors_and_no_bing_fallback(self):
+        for url,text in [('https://www.google.com/sorry/','unusual traffic'),('https://consent.google.com/','consent'),('https://www.google.com/search','Please enable JavaScript')]:
+            with self.subTest(url=url),patch('server.ai_web.fetch',new_callable=AsyncMock,return_value={'url':url,'text':text}) as fetch:
+                with self.assertRaises(ai_web.WebError):asyncio.run(ai_web.search('weather'))
+                self.assertEqual(fetch.await_count,1);self.assertIn('www.google.com',fetch.call_args.args[0])
+    def test_google_parser_filters_private_links_and_deduplicates(self):
+        parser=ai_web.GoogleResults()
+        parser.feed('<a href="http://127.0.0.1/"><h3>Private</h3></a><a href="https://example.com/a"><h3>Forecast <span>tomorrow</span></h3></a><p>+5 degrees</p><a href="https://example.com/a"><h3>Duplicate</h3></a>')
+        self.assertEqual(len(parser.items),1);self.assertEqual(parser.items[0]['title'],'Forecast tomorrow');self.assertIn('+5 degrees',parser.items[0]['snippet'])
+
     def test_mixed_dns_and_response_limits(self):
         import httpx
         import socket

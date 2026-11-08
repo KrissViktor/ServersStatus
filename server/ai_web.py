@@ -5,8 +5,7 @@ from html.parser import HTMLParser
 import ipaddress
 import re
 import socket
-from urllib.parse import urlsplit,urlunsplit,urljoin,quote
-import xml.etree.ElementTree as ET
+from urllib.parse import urlsplit,urlunsplit,urljoin,quote,parse_qs
 import httpx
 
 class WebError(Exception):pass
@@ -102,17 +101,47 @@ def page_text(content,kind):
     return '\n'.join(re.sub(r'[ \t]+',' ',line).strip() for line in content.splitlines() if line.strip())[:4000]
 
 
+class GoogleResults(HTMLParser):
+    """Extract result headings and adjacent snippets without CSS class coupling."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.anchor=None;self.heading=False;self.title=[];self.items=[];self.current=None;self.skip=0
+    def handle_starttag(self,tag,attrs):
+        attrs=dict(attrs)
+        if tag in ('script','style','noscript'):self.skip+=1
+        if tag=='a':self.anchor=attrs.get('href','')
+        if tag=='h3' and self.anchor:
+            self.heading=True;self.title=[]
+    def handle_data(self,data):
+        if self.skip:return
+        if self.heading:self.title.append(data)
+        elif self.current and len(self.current['snippet'])<700:self.current['snippet']+=' '+data.strip()
+    def handle_endtag(self,tag):
+        if tag in ('script','style','noscript') and self.skip:self.skip-=1
+        if tag=='h3' and self.heading:
+            self.heading=False;href=urljoin('https://www.google.com',self.anchor or '')
+            parsed=urlsplit(href)
+            if parsed.hostname in ('www.google.com','google.com') and parsed.path=='/url':
+                query=parse_qs(parsed.query);href=(query.get('q') or query.get('url') or [''])[0]
+            try:
+                url=normalize_url(href);host=urlsplit(url).hostname
+                if host in ('google.com','www.google.com','accounts.google.com','consent.google.com','support.google.com'):return
+            except WebError:return
+            title=' '.join(' '.join(self.title).split())[:200]
+            if title and not any(item['url']==url for item in self.items):
+                self.current={'url':url,'title':title,'snippet':''};self.items.append(self.current)
+        if tag=='a':self.anchor=None
+
+
 async def search(query):
-    if not query.strip():raise WebError('Введите поисковый запрос рядом с переключателем «Интернет»')
-    result=await fetch('https://www.bing.com/search?format=rss&q='+quote(query[:300],safe=''))
-    if '<!DOCTYPE' in result['text'].upper() or '<!ENTITY' in result['text'].upper():raise WebError('Поисковик вернул неподдерживаемый формат')
-    try:root=ET.fromstring(result['text'])
-    except ET.ParseError:raise WebError('Поисковик не ответил RSS-выдачей. Попробуйте позже или укажите прямую ссылку в вопросе.')
-    items=[]
-    for item in root.findall('.//item')[:8]:
-        try:url=normalize_url(item.findtext('link') or '')
-        except WebError:continue
-        items.append({'url':url,'title':html.unescape(item.findtext('title') or url)[:200],'snippet':page_text(item.findtext('description') or '', 'text/html')[:300]})
-        if len(items)==5:break
-    if not items:raise WebError('В поисковой выдаче нет подходящих результатов. Можно указать прямую ссылку.')
+    if not query.strip():raise WebError('Введите вопрос или поисковый запрос')
+    result=await fetch('https://www.google.com/search?hl=ru&num=5&gbv=1&q='+quote(query[:300],safe=''))
+    host=urlsplit(result['url']).hostname
+    text=result['text'];lower=text.lower()
+    if host in ('consent.google.com','accounts.google.com') or any(marker in lower for marker in ('/sorry/','unusual traffic','detected unusual','g-recaptcha','our systems have detected')):
+        raise WebError('Google запросил CAPTCHA или согласие. Автоматический поиск временно недоступен; можно указать прямую ссылку.')
+    parser=GoogleResults();parser.feed(text)
+    items=parser.items[:5]
+    for item in items:item['snippet']=' '.join(item['snippet'].split())[:600]
+    if not items:raise WebError('Google не вернул читаемую выдачу (возможно, требуется JavaScript или согласие). Можно указать прямую ссылку; Bing не используется.')
     return items

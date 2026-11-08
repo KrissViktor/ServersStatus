@@ -48,7 +48,7 @@ def summarize(row):
 
 class Session:
     def __init__(self,db,job,messages):
-        self.db=db;self.job=job;self.calls=0;self.urls={};self.direct_source=None;self.budget=6000
+        self.db=db;self.job=job;self.calls=0;self.urls={};self.direct_source=None;self.search_sources=[];self.budget=6000
         self.portal=bool(job.get('portal_access'));self.internet=bool(job.get('internet_access'))
         self.query=redact(job.get('web_query') or job.get('question') or '')[:300]
         if self.internet:
@@ -97,10 +97,13 @@ class Session:
                 if not active or active[0]!='running':raise WebError('Запрос остановлен')
             self.validate(name,args)
             if name=='web_search':
-                label='Поиск: '+self.query
+                label='Google: '+self.query
                 data=await search(self.query)
-                for item in data:item['source_id']=self.add_url(item['url'])
-                url='https://www.bing.com/search?q='+quote(self.query,safe='')
+                self.search_sources=[]
+                for item in data:
+                    item['source_id']=self.add_url(item['url'])
+                    if item['source_id']:self.search_sources.append(item['source_id'])
+                url='https://www.google.com/search?q='+quote(self.query,safe='')
             elif name=='web_page':
                 source=args['source_id']
                 if source not in self.urls:raise WebError('Ссылка не дана пользователем и не найдена в поиске')
