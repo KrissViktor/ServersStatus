@@ -11,7 +11,8 @@ function Resolve-CpuRelease {
         $expected='https://github.com/ggml-org/llama.cpp/releases/download/'+[Uri]::EscapeDataString([string]$Release.tag_name)+'/nightly-tag.txt'
         if($url -cne $expected){throw 'Unexpected nightly pointer URL'}
         $response=Invoke-WebRequest -UseBasicParsing -Uri $url -Headers $Headers
-        $tag=([string]$response.Content).Trim()
+        $text=if($response.Content -is [byte[]]){[Text.Encoding]::UTF8.GetString($response.Content)}else{[string]$response.Content}
+        $tag=$text.Trim()
         if($tag -notmatch '^b[0-9]{1,10}$'){throw 'Invalid official nightly tag'}
         Write-Host ('Release '+$Release.tag_name+' points to binary release '+$tag)
         $Release=Invoke-RestMethod -Uri ('https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/'+$tag) -Headers $Headers

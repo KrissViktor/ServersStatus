@@ -5,7 +5,7 @@ $cpu=@{name='llama-b12110-bin-win-cpu-x64.zip';browser_download_url='https://git
 $binary=@{tag_name='b12110';assets=@($cpu,@{name='llama-b12110-bin-win-cpu-arm64.zip'},@{name='llama-b12110-bin-win-cuda-13.4-x64.zip'})}
 $stable=@{tag_name='v0.9.0';assets=@(@{name='nightly-tag.txt';browser_download_url='https://github.com/ggml-org/llama.cpp/releases/download/v0.9.0/nightly-tag.txt'})}
 $script:calls=0
-function Invoke-WebRequest {param([switch]$UseBasicParsing,$Uri,$Headers) $script:calls++;return @{Content="b12110`n"}}
+function Invoke-WebRequest {param([switch]$UseBasicParsing,$Uri,$Headers) $script:calls++;return @{Content=[Text.Encoding]::UTF8.GetBytes("b12110`n")}}
 function Invoke-RestMethod {param($Uri,$Headers) if($Uri -ne 'https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b12110'){throw 'Unexpected endpoint'};$script:calls++;return $binary}
 $result=Resolve-CpuRelease -Release $binary -Headers @{}
 if($result.asset.name -ne $cpu.name -or $script:calls -ne 0){throw 'Direct CPU selection failed'}
