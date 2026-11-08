@@ -3,30 +3,15 @@
   if(!input)return;
   const list=panel.querySelector('#console-completions'),count=panel.querySelector('#console-editor-count');
   const windows=panel.dataset.shell==='powershell';
-  const commands=windows?[
-    ['Get-Process','Процессы и потребление ресурсов'],['Get-Service','Службы и их состояния'],['Get-ComputerInfo','Сведения о Windows'],['Get-Volume','Тома и свободное место'],['Get-Disk','Физические диски'],['Get-NetAdapter','Сетевые адаптеры'],['Get-NetIPConfiguration','IP, шлюзы и DNS'],['Get-NetTCPConnection','TCP-подключения'],['Get-WinEvent','Журнал событий'],['Get-HotFix','Установленные обновления'],['Get-Item','Сведения о файле'],['Get-ChildItem','Файлы и папки'],['Get-Content','Содержимое файла'],['Get-Location','Текущая папка'],['Set-Location','Перейти в папку'],['Get-Date','Текущее время'],['Get-Help','Справка команды'],['Get-Command','Доступные команды'],['Select-Object','Выбрать поля / первые строки'],['Where-Object','Фильтр объектов'],['Sort-Object','Сортировка объектов'],['Format-Table','Вывести таблицу'],['Measure-Object','Подсчитать значения'],['Write-Output','Вывести текст'],['Read-Host','Прочитать ответ'],['Test-Connection','Проверить доступность узла'],['Test-NetConnection','Проверить порт/соединение'],['whoami','Учётная запись выполнения'],['hostname','Имя компьютера'],['ipconfig','Конфигурация сети'],['Resolve-DnsName','Проверить DNS']
-  ]:[
-    ['uptime','Время работы и средняя нагрузка'],['df','Свободное место файловых систем'],['du','Размер файлов и папок'],['free','Использование оперативной памяти'],['ps','Список процессов'],['top','Процессы: используйте -b -n 1 для разового отчёта'],['systemctl','Состояние и управление systemd'],['journalctl','Журналы systemd'],['ip','Интерфейсы, адреса и маршруты'],['ss','Сетевые соединения'],['ls','Список файлов'],['pwd','Текущая папка'],['cd','Перейти в папку'],['cat','Содержимое файла'],['head','Первые строки'],['tail','Последние строки'],['grep','Поиск в тексте'],['find','Поиск файлов'],['sort','Сортировка строк'],['wc','Подсчёт строк/слов'],['date','Текущее время'],['uname','Сведения о ядре'],['hostname','Имя компьютера'],['whoami','Учётная запись выполнения'],['id','Пользователь и группы'],['printf','Вывести текст'],['read','Прочитать ответ'],['lsblk','Блочные устройства'],['lscpu','Сведения о CPU'],['getent','Системные справочники'],['command','Найти команду: command -v имя']
-  ];
-  const parameters=windows?{
-    'get-process':['-Name','-Id','-IncludeUserName'], 'get-service':['-Name','-DisplayName'], 'get-content':['-Path','-Tail','-Wait','-Encoding','-Raw'], 'get-childitem':['-Path','-Filter','-Recurse','-Force'], 'get-winevent':['-LogName','-MaxEvents','-FilterHashtable'], 'select-object':['-First','-Last','-Property','-ExpandProperty'], 'sort-object':['-Property','-Descending','-Unique'], 'where-object':['-Property','-EQ','-Like'], 'get-help':['-Name','-Examples','-Detailed'], 'test-netconnection':['-ComputerName','-Port','-InformationLevel'], 'test-connection':['-ComputerName','-Count'], 'format-table':['-AutoSize','-Property']
-  }:{
-    systemctl:['status','list-units','list-unit-files','show','is-active','is-enabled','--type=service','--all','--no-pager'],journalctl:['-u','-n','--since','--until','--no-pager','-b'],df:['-h','-T','-i'],du:['-h','-s','--max-depth=1'],free:['-h','-m'],ps:['aux','-ef','-eo','--sort=-%cpu','--sort=-%mem'],top:['-b','-n'],ip:['address','route','link','-brief'],ss:['-tulpn','-tun'],ls:['-lah','-l','-a'],tail:['-n','-f'],head:['-n'],grep:['-i','-n','-r','-E'],uname:['-a','-r'],lsblk:['-f','-o']
-  };
-  const examples=windows?[
-    {label:'Пример: состояние сервера',insert:"Get-Date\nGet-Process | Sort-Object CPU -Descending | Select-Object -First 10\nGet-Service | Where-Object Status -eq 'Running'\nGet-Volume",help:'Несколько диагностических команд одним запуском'},
-    {label:'Пример: последние события',insert:'Get-WinEvent -LogName System -MaxEvents 20 | Select-Object TimeCreated, Id, LevelDisplayName, Message',help:'Последние 20 системных событий'}
-  ]:[
-    {label:'Пример: состояние сервера',insert:'date\nuptime\nfree -h\ndf -h /\nps aux --sort=-%cpu | head -n 11',help:'Несколько диагностических команд одним запуском'},
-    {label:'Пример: службы',insert:'systemctl list-units --type=service --all --no-pager',help:'Службы systemd без интерактивного просмотрщика'}
-  ];
+  const catalog=/*CONSOLE_CATALOG*/{};
+  const {commands,parameters,examples}=catalog[windows?'windows':'linux'];
   let items=[],selected=0,range=null,composing=false;
   const node=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n};
   function hide(){list.hidden=true;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant')}
   function updateCount(){const lines=input.value?input.value.split('\n').filter(s=>s.trim()).length:0;count.textContent='Строк: '+lines+' · '+input.value.length+'/4000';}
   function context(){
-    const end=input.selectionStart,before=input.value.slice(0,end),match=before.match(/[\w./:$-]*$/u),token=match?.[0]||'',start=end-token.length;
-    const segment=before.slice(0,start).split(/[\n;|]/).at(-1).trim();
+    const end=input.selectionStart,before=input.value.slice(0,end),match=before.match(/[\p{L}\p{N}_./:$%=-]*$/u),token=match?.[0]||'',start=end-token.length;
+    const segment=before.slice(0,start).split(/[\n;|&]/).at(-1).trim();
     return {start,end,token,command:segment.split(/\s+/)[0].toLowerCase(),first:!segment};
   }
   function paint(){
@@ -36,10 +21,14 @@
   }
   function suggest(force=false){
     updateCount();if(composing||input.selectionStart!==input.selectionEnd){hide();return}
-    range=context();if(!force&&!range.token){hide();return}
-    const q=range.token.toLowerCase();
-    items=(range.first?commands.map(([label,help])=>({label,insert:label,help})): (parameters[range.command]||[]).map(label=>({label,insert:label,help:'Параметр / аргумент '+range.command}))).filter(v=>v.label.toLowerCase().startsWith(q)&&v.insert!==range.token).slice(0,12);
-    if(force&&range.first&&!q)items.push(...examples);
+    range=context();if(!force&&!range.token&&range.first){hide();return}
+    const q=range.token.toLocaleLowerCase('ru');
+    const candidates=range.first?[...commands.map(([label,help])=>({label,insert:label,help})),...examples]:
+      (parameters[range.command]||[]).map(label=>({label,insert:label,help:'Параметр / аргумент '+range.command}));
+    const rank=v=>{const name=v.label.toLocaleLowerCase('ru');return !q?0:name===q?0:name.startsWith(q)?1:name.includes(q)?2:3};
+    items=candidates.filter(v=>(!q||v.label.toLocaleLowerCase('ru').includes(q)||v.help.toLocaleLowerCase('ru').includes(q))&&v.insert!==range.token).sort((a,b)=>rank(a)-rank(b));
+    count.textContent+=' · Подсказок: '+items.length;
+
     selected=0;paint();
   }
   function choose(index=selected){

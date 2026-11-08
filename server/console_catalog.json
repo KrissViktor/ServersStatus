@@ -1,0 +1,3157 @@
+{
+  "windows": {
+    "commands": [
+      [
+        "ping",
+        "Сеть · Проверить доступность узла ICMP"
+      ],
+      [
+        "tracert",
+        "Сеть · Маршрут пакетов до узла"
+      ],
+      [
+        "pathping",
+        "Сеть · Маршрут и потери пакетов"
+      ],
+      [
+        "ipconfig",
+        "Сеть · IP-адреса, DNS и DHCP"
+      ],
+      [
+        "nslookup",
+        "Сеть · Запрос DNS"
+      ],
+      [
+        "netstat",
+        "Сеть · Соединения, порты и статистика"
+      ],
+      [
+        "route",
+        "Сеть · Таблица маршрутизации"
+      ],
+      [
+        "arp",
+        "Сеть · Таблица соседей ARP"
+      ],
+      [
+        "getmac",
+        "Сеть · MAC-адреса адаптеров"
+      ],
+      [
+        "netsh",
+        "Сеть · Диагностика и настройка сети"
+      ],
+      [
+        "curl.exe",
+        "Сеть · HTTP-запросы без PowerShell-алиаса"
+      ],
+      [
+        "Test-Connection",
+        "Сеть · Ping средствами PowerShell"
+      ],
+      [
+        "Test-NetConnection",
+        "Сеть · Проверить узел и TCP-порт"
+      ],
+      [
+        "Resolve-DnsName",
+        "Сеть · DNS-записи домена"
+      ],
+      [
+        "Get-NetAdapter",
+        "Сеть · Сетевые адаптеры"
+      ],
+      [
+        "Get-NetAdapterStatistics",
+        "Сеть · Счётчики трафика и ошибок"
+      ],
+      [
+        "Get-NetIPConfiguration",
+        "Сеть · IP, шлюзы и DNS"
+      ],
+      [
+        "Get-NetIPAddress",
+        "Сеть · IP-адреса интерфейсов"
+      ],
+      [
+        "Get-NetIPInterface",
+        "Сеть · Параметры IP-интерфейсов"
+      ],
+      [
+        "Get-NetRoute",
+        "Сеть · Маршруты IPv4/IPv6"
+      ],
+      [
+        "Get-NetNeighbor",
+        "Сеть · Соседи сети"
+      ],
+      [
+        "Get-NetTCPConnection",
+        "Сеть · TCP-соединения и PID"
+      ],
+      [
+        "Get-NetUDPEndpoint",
+        "Сеть · UDP-порты и PID"
+      ],
+      [
+        "Get-DnsClientServerAddress",
+        "Сеть · Адреса DNS-серверов"
+      ],
+      [
+        "Get-DnsClientCache",
+        "Сеть · DNS-кэш"
+      ],
+      [
+        "Clear-DnsClientCache",
+        "Сеть · Очистить DNS-кэш"
+      ],
+      [
+        "Get-NetConnectionProfile",
+        "Сеть · Профили сети"
+      ],
+      [
+        "Get-NetFirewallProfile",
+        "Сеть · Профили брандмауэра"
+      ],
+      [
+        "Get-NetFirewallRule",
+        "Сеть · Правила брандмауэра"
+      ],
+      [
+        "Get-NetFirewallPortFilter",
+        "Сеть · Порты правил брандмауэра"
+      ],
+      [
+        "Get-NetAdapterBinding",
+        "Сеть · Привязки протоколов адаптера"
+      ],
+      [
+        "Get-SmbConnection",
+        "Сеть · Активные SMB-подключения"
+      ],
+      [
+        "Get-SmbSession",
+        "Сеть · SMB-сеансы сервера"
+      ],
+      [
+        "Get-SmbShare",
+        "Сеть · Сетевые папки SMB"
+      ],
+      [
+        "Get-SmbOpenFile",
+        "Сеть · Открытые по SMB файлы"
+      ],
+      [
+        "Test-Path",
+        "Сеть · Проверить существование файла или сетевого пути"
+      ],
+      [
+        "Get-Process",
+        "Процессы и службы · Процессы и потребление ресурсов"
+      ],
+      [
+        "Stop-Process",
+        "Процессы и службы · Завершить процесс"
+      ],
+      [
+        "Wait-Process",
+        "Процессы и службы · Дождаться завершения процесса"
+      ],
+      [
+        "Start-Process",
+        "Процессы и службы · Запустить программу"
+      ],
+      [
+        "Get-Service",
+        "Процессы и службы · Службы и состояния"
+      ],
+      [
+        "Start-Service",
+        "Процессы и службы · Запустить службу"
+      ],
+      [
+        "Stop-Service",
+        "Процессы и службы · Остановить службу"
+      ],
+      [
+        "Restart-Service",
+        "Процессы и службы · Перезапустить службу"
+      ],
+      [
+        "Suspend-Service",
+        "Процессы и службы · Приостановить службу, если она поддерживает паузу"
+      ],
+      [
+        "Resume-Service",
+        "Процессы и службы · Возобновить службу"
+      ],
+      [
+        "Set-Service",
+        "Процессы и службы · Изменить параметры службы"
+      ],
+      [
+        "New-Service",
+        "Процессы и службы · Создать службу"
+      ],
+      [
+        "Get-ScheduledTask",
+        "Процессы и службы · Запланированные задачи"
+      ],
+      [
+        "Get-ScheduledTaskInfo",
+        "Процессы и службы · Последний запуск и результат задачи"
+      ],
+      [
+        "Start-ScheduledTask",
+        "Процессы и службы · Запустить задачу"
+      ],
+      [
+        "Stop-ScheduledTask",
+        "Процессы и службы · Остановить задачу"
+      ],
+      [
+        "Enable-ScheduledTask",
+        "Процессы и службы · Включить задачу"
+      ],
+      [
+        "Disable-ScheduledTask",
+        "Процессы и службы · Выключить задачу"
+      ],
+      [
+        "tasklist",
+        "Процессы и службы · Процессы и службы через системную утилиту"
+      ],
+      [
+        "taskkill",
+        "Процессы и службы · Завершить процесс по PID или имени"
+      ],
+      [
+        "sc.exe",
+        "Процессы и службы · Службы SCM; использовать .exe, sc в PowerShell — другой алиас"
+      ],
+      [
+        "schtasks.exe",
+        "Процессы и службы · Планировщик задач"
+      ],
+      [
+        "Get-Job",
+        "Процессы и службы · Фоновые задания PowerShell"
+      ],
+      [
+        "Receive-Job",
+        "Процессы и службы · Получить вывод задания"
+      ],
+      [
+        "Stop-Job",
+        "Процессы и службы · Остановить задание"
+      ],
+      [
+        "hostname",
+        "Система и диагностика · Имя компьютера"
+      ],
+      [
+        "whoami",
+        "Система и диагностика · Учётная запись и права"
+      ],
+      [
+        "systeminfo",
+        "Система и диагностика · Операционная система и оборудование"
+      ],
+      [
+        "Get-ComputerInfo",
+        "Система и диагностика · Подробные сведения о Windows"
+      ],
+      [
+        "Get-CimInstance",
+        "Система и диагностика · Сведения WMI/CIM: ОС, CPU, память, BIOS"
+      ],
+      [
+        "Get-CimClass",
+        "Система и диагностика · Доступные классы CIM"
+      ],
+      [
+        "Get-WmiObject",
+        "Система и диагностика · WMI для Windows PowerShell 5.1"
+      ],
+      [
+        "Get-HotFix",
+        "Система и диагностика · Установленные исправления"
+      ],
+      [
+        "Get-Counter",
+        "Система и диагностика · Счётчики производительности"
+      ],
+      [
+        "Get-Date",
+        "Система и диагностика · Текущая дата и время"
+      ],
+      [
+        "Get-TimeZone",
+        "Система и диагностика · Часовой пояс"
+      ],
+      [
+        "Get-Culture",
+        "Система и диагностика · Региональные параметры"
+      ],
+      [
+        "Get-UICulture",
+        "Система и диагностика · Язык интерфейса"
+      ],
+      [
+        "Get-Host",
+        "Система и диагностика · Версия и параметры оболочки"
+      ],
+      [
+        "Get-Variable",
+        "Система и диагностика · Переменные сеанса"
+      ],
+      [
+        "Get-PSDrive",
+        "Система и диагностика · Диски и провайдеры PowerShell"
+      ],
+      [
+        "Get-PSProvider",
+        "Система и диагностика · Провайдеры PowerShell"
+      ],
+      [
+        "Get-ExecutionPolicy",
+        "Система и диагностика · Политика выполнения скриптов"
+      ],
+      [
+        "Get-AuthenticodeSignature",
+        "Система и диагностика · Цифровая подпись файла"
+      ],
+      [
+        "Get-Tpm",
+        "Система и диагностика · Состояние TPM"
+      ],
+      [
+        "Get-BitLockerVolume",
+        "Система и диагностика · Шифрование BitLocker при наличии модуля"
+      ],
+      [
+        "Get-MpComputerStatus",
+        "Система и диагностика · Статус Microsoft Defender при наличии"
+      ],
+      [
+        "Get-MpThreatDetection",
+        "Система и диагностика · Обнаружения Defender при наличии"
+      ],
+      [
+        "Get-MpPreference",
+        "Система и диагностика · Параметры Defender"
+      ],
+      [
+        "Get-WindowsFeature",
+        "Система и диагностика · Роли Windows Server при наличии ServerManager"
+      ],
+      [
+        "Get-WindowsOptionalFeature",
+        "Система и диагностика · Дополнительные компоненты Windows"
+      ],
+      [
+        "Get-WindowsPackage",
+        "Система и диагностика · Пакеты компонентов Windows"
+      ],
+      [
+        "Get-Module",
+        "Система и диагностика · Модули PowerShell"
+      ],
+      [
+        "Import-Module",
+        "Система и диагностика · Загрузить модуль в текущий запуск"
+      ],
+      [
+        "Get-Command",
+        "Система и диагностика · Команды и установленные функции"
+      ],
+      [
+        "Get-Help",
+        "Система и диагностика · Справка команды"
+      ],
+      [
+        "Get-History",
+        "Система и диагностика · История текущей оболочки, не история панели"
+      ],
+      [
+        "w32tm",
+        "Система и диагностика · Диагностика синхронизации времени"
+      ],
+      [
+        "powercfg",
+        "Система и диагностика · Энергопитание и диагностика"
+      ],
+      [
+        "sfc.exe",
+        "Система и диагностика · Проверка системных файлов; возможны изменения"
+      ],
+      [
+        "DISM.exe",
+        "Система и диагностика · Обслуживание образа и компонентов Windows"
+      ],
+      [
+        "bcdedit.exe",
+        "Система и диагностика · Конфигурация загрузки; изменение влияет на запуск"
+      ],
+      [
+        "reg.exe",
+        "Система и диагностика · Чтение и изменение реестра"
+      ],
+      [
+        "net.exe",
+        "Система и диагностика · Учётные записи, службы и сетевые ресурсы"
+      ],
+      [
+        "quser.exe",
+        "Система и диагностика · Пользователи RDP"
+      ],
+      [
+        "query.exe",
+        "Система и диагностика · Сеансы, пользователи и службы"
+      ],
+      [
+        "qwinsta.exe",
+        "Система и диагностика · Сеансы терминального сервера"
+      ],
+      [
+        "logoff.exe",
+        "Система и диагностика · Завершить сеанс пользователя"
+      ],
+      [
+        "Restart-Computer",
+        "Система и диагностика · Перезагрузить компьютер"
+      ],
+      [
+        "Stop-Computer",
+        "Система и диагностика · Выключить компьютер"
+      ],
+      [
+        "shutdown.exe",
+        "Система и диагностика · Выключение, перезапуск или отмена таймера"
+      ],
+      [
+        "Get-Disk",
+        "Диски и файлы · Физические диски"
+      ],
+      [
+        "Get-PhysicalDisk",
+        "Диски и файлы · Физические носители Storage Spaces"
+      ],
+      [
+        "Get-Partition",
+        "Диски и файлы · Разделы дисков"
+      ],
+      [
+        "Get-Volume",
+        "Диски и файлы · Тома и свободное место"
+      ],
+      [
+        "Get-StoragePool",
+        "Диски и файлы · Пулы хранения"
+      ],
+      [
+        "Get-StorageReliabilityCounter",
+        "Диски и файлы · Доступные показатели здоровья дисков"
+      ],
+      [
+        "Get-ChildItem",
+        "Диски и файлы · Файлы, папки и элементы провайдера"
+      ],
+      [
+        "Get-Item",
+        "Диски и файлы · Сведения об элементе"
+      ],
+      [
+        "Get-ItemProperty",
+        "Диски и файлы · Свойства файла или ключа реестра"
+      ],
+      [
+        "Get-Content",
+        "Диски и файлы · Содержимое файла"
+      ],
+      [
+        "Set-Content",
+        "Диски и файлы · Перезаписать содержимое файла"
+      ],
+      [
+        "Add-Content",
+        "Диски и файлы · Дополнить файл"
+      ],
+      [
+        "Get-Location",
+        "Диски и файлы · Текущая папка"
+      ],
+      [
+        "Set-Location",
+        "Диски и файлы · Перейти в папку"
+      ],
+      [
+        "Push-Location",
+        "Диски и файлы · Сохранить папку и перейти"
+      ],
+      [
+        "Pop-Location",
+        "Диски и файлы · Вернуться в сохранённую папку"
+      ],
+      [
+        "New-Item",
+        "Диски и файлы · Создать файл, папку или ключ"
+      ],
+      [
+        "Copy-Item",
+        "Диски и файлы · Копировать файл или папку"
+      ],
+      [
+        "Move-Item",
+        "Диски и файлы · Переместить файл или папку"
+      ],
+      [
+        "Rename-Item",
+        "Диски и файлы · Переименовать элемент"
+      ],
+      [
+        "Remove-Item",
+        "Диски и файлы · Удалить файл, папку или ключ"
+      ],
+      [
+        "Get-Acl",
+        "Диски и файлы · Права доступа"
+      ],
+      [
+        "Set-Acl",
+        "Диски и файлы · Изменить права доступа"
+      ],
+      [
+        "Get-FileHash",
+        "Диски и файлы · Контрольная сумма файла"
+      ],
+      [
+        "Select-String",
+        "Диски и файлы · Поиск текста в файлах"
+      ],
+      [
+        "Compare-Object",
+        "Диски и файлы · Сравнить наборы объектов"
+      ],
+      [
+        "Compress-Archive",
+        "Диски и файлы · Упаковать ZIP"
+      ],
+      [
+        "Expand-Archive",
+        "Диски и файлы · Распаковать ZIP"
+      ],
+      [
+        "robocopy.exe",
+        "Диски и файлы · Копирование каталогов; /MIR удаляет лишние файлы получателя"
+      ],
+      [
+        "icacls.exe",
+        "Диски и файлы · Права NTFS"
+      ],
+      [
+        "fsutil.exe",
+        "Диски и файлы · Сведения и обслуживание файловой системы"
+      ],
+      [
+        "chkdsk.exe",
+        "Диски и файлы · Проверка файловой системы"
+      ],
+      [
+        "mountvol.exe",
+        "Диски и файлы · Точки подключения томов"
+      ],
+      [
+        "dir",
+        "Диски и файлы · Алиас Get-ChildItem"
+      ],
+      [
+        "cd",
+        "Диски и файлы · Алиас Set-Location"
+      ],
+      [
+        "pwd",
+        "Диски и файлы · Алиас Get-Location"
+      ],
+      [
+        "type",
+        "Диски и файлы · Алиас Get-Content"
+      ],
+      [
+        "cls",
+        "Диски и файлы · Очистить вывод текущей оболочки, не историю панели"
+      ],
+      [
+        "Get-WinEvent",
+        "Журналы и данные · События современных журналов Windows"
+      ],
+      [
+        "Get-EventLog",
+        "Журналы и данные · Классические журналы Windows"
+      ],
+      [
+        "wevtutil.exe",
+        "Журналы и данные · Список журналов и события"
+      ],
+      [
+        "Select-Object",
+        "Журналы и данные · Выбрать поля и первые строки"
+      ],
+      [
+        "Where-Object",
+        "Журналы и данные · Фильтр объектов"
+      ],
+      [
+        "ForEach-Object",
+        "Журналы и данные · Действие для каждого объекта"
+      ],
+      [
+        "Sort-Object",
+        "Журналы и данные · Сортировка объектов"
+      ],
+      [
+        "Group-Object",
+        "Журналы и данные · Группировка объектов"
+      ],
+      [
+        "Measure-Object",
+        "Журналы и данные · Подсчёт и сумма значений"
+      ],
+      [
+        "Format-Table",
+        "Журналы и данные · Табличный вывод"
+      ],
+      [
+        "Format-List",
+        "Журналы и данные · Подробный вывод свойств"
+      ],
+      [
+        "Out-String",
+        "Журналы и данные · Преобразовать вывод в текст"
+      ],
+      [
+        "Out-File",
+        "Журналы и данные · Сохранить вывод в файл"
+      ],
+      [
+        "ConvertTo-Json",
+        "Журналы и данные · Преобразовать объекты в JSON"
+      ],
+      [
+        "ConvertFrom-Json",
+        "Журналы и данные · Разобрать JSON"
+      ],
+      [
+        "ConvertTo-Csv",
+        "Журналы и данные · Преобразовать в CSV"
+      ],
+      [
+        "ConvertFrom-Csv",
+        "Журналы и данные · Разобрать CSV"
+      ],
+      [
+        "Export-Csv",
+        "Журналы и данные · Записать CSV в файл"
+      ],
+      [
+        "Import-Csv",
+        "Журналы и данные · Прочитать CSV"
+      ],
+      [
+        "Write-Output",
+        "Журналы и данные · Вывести объект или текст"
+      ],
+      [
+        "Write-Host",
+        "Журналы и данные · Вывести текст"
+      ],
+      [
+        "Read-Host",
+        "Журналы и данные · Прочитать ответ через интерактивный ввод панели"
+      ],
+      [
+        "Start-Sleep",
+        "Журналы и данные · Пауза в пределах общего таймаута"
+      ],
+      [
+        "Measure-Command",
+        "Журналы и данные · Замерить длительность блока"
+      ],
+      [
+        "Get-LocalUser",
+        "Журналы и данные · Локальные пользователи при наличии модуля"
+      ],
+      [
+        "Get-LocalGroup",
+        "Журналы и данные · Локальные группы"
+      ],
+      [
+        "Get-LocalGroupMember",
+        "Журналы и данные · Участники локальной группы"
+      ],
+      [
+        "Get-ADUser",
+        "Журналы и данные · Пользователи AD при наличии RSAT"
+      ],
+      [
+        "Get-ADComputer",
+        "Журналы и данные · Компьютеры AD при наличии RSAT"
+      ],
+      [
+        "Get-ADGroupMember",
+        "Журналы и данные · Участники группы AD"
+      ],
+      [
+        "Get-SqlInstance",
+        "Журналы и данные · SQL Server при наличии SqlServer-модуля"
+      ],
+      [
+        "Invoke-Sqlcmd",
+        "Журналы и данные · SQL-запрос при наличии SqlServer-модуля; запрос может менять данные"
+      ],
+      [
+        "Invoke-WebRequest",
+        "Журналы и данные · HTTP-запрос"
+      ],
+      [
+        "Invoke-RestMethod",
+        "Журналы и данные · HTTP/REST-запрос с разбором ответа"
+      ],
+      [
+        "where.exe",
+        "Файлы · Найти исполняемый файл в PATH"
+      ],
+      [
+        "findstr.exe",
+        "Текст · Поиск строк и регулярных выражений"
+      ],
+      [
+        "certutil.exe",
+        "Сертификаты · Хранилище, сертификаты и хэши"
+      ],
+      [
+        "gpresult.exe",
+        "Политики · Применённые групповые политики"
+      ],
+      [
+        "gpupdate.exe",
+        "Политики · Обновить групповые политики"
+      ],
+      [
+        "nltest.exe",
+        "Домен · Диагностика контроллеров домена"
+      ],
+      [
+        "auditpol.exe",
+        "Журналы · Параметры аудита"
+      ],
+      [
+        "Get-PnpDevice",
+        "Устройства · Состояние PnP при наличии модуля"
+      ],
+      [
+        "Get-Printer",
+        "Печать · Принтеры при наличии PrintManagement"
+      ],
+      [
+        "Get-PrintJob",
+        "Печать · Очередь заданий принтера"
+      ],
+      [
+        "Get-CimAssociatedInstance",
+        "Система · Связанные экземпляры CIM"
+      ],
+      [
+        "Test-ComputerSecureChannel",
+        "Домен · Проверить доверительный канал компьютера"
+      ]
+    ],
+    "parameters": {
+      "ping": [
+        "-n",
+        "-w",
+        "-l",
+        "-f",
+        "-a",
+        "-t",
+        "-i",
+        "-S",
+        "-4",
+        "-6"
+      ],
+      "tracert": [
+        "-d",
+        "-h",
+        "-w",
+        "-4",
+        "-6"
+      ],
+      "pathping": [
+        "-n",
+        "-h",
+        "-q",
+        "-p",
+        "-w"
+      ],
+      "ipconfig": [
+        "/all",
+        "/displaydns",
+        "/flushdns",
+        "/release",
+        "/renew"
+      ],
+      "nslookup": [
+        "-type=A",
+        "-type=AAAA",
+        "-type=MX",
+        "-type=TXT",
+        "-type=NS"
+      ],
+      "netstat": [
+        "-ano",
+        "-an",
+        "-r",
+        "-s",
+        "-b"
+      ],
+      "route": [
+        "print",
+        "print -4",
+        "print -6"
+      ],
+      "arp": [
+        "-a",
+        "-g"
+      ],
+      "getmac": [
+        "/v",
+        "/fo table",
+        "/fo csv"
+      ],
+      "netsh": [
+        "interface show interface",
+        "interface ipv4 show config",
+        "winhttp show proxy",
+        "advfirewall show allprofiles"
+      ],
+      "curl.exe": [
+        "-I",
+        "-v",
+        "-L",
+        "--connect-timeout",
+        "--max-time",
+        "-o",
+        "-H",
+        "-X"
+      ],
+      "whoami": [
+        "/all",
+        "/user",
+        "/groups",
+        "/priv"
+      ],
+      "systeminfo": [
+        "/fo list",
+        "/fo csv"
+      ],
+      "quser.exe": [
+        "/server:"
+      ],
+      "query.exe": [
+        "user",
+        "session",
+        "process"
+      ],
+      "qwinsta.exe": [
+        "/server:"
+      ],
+      "tasklist": [
+        "/svc",
+        "/v",
+        "/fo table",
+        "/fi"
+      ],
+      "sc.exe": [
+        "query",
+        "queryex",
+        "qc",
+        "qdescription",
+        "enumdepend",
+        "start",
+        "stop"
+      ],
+      "schtasks.exe": [
+        "/query",
+        "/fo LIST",
+        "/v"
+      ],
+      "wevtutil.exe": [
+        "el",
+        "gl",
+        "qe"
+      ],
+      "shutdown.exe": [
+        "/r",
+        "/s",
+        "/a",
+        "/t",
+        "/c"
+      ],
+      "reg.exe": [
+        "query",
+        "export"
+      ],
+      "w32tm": [
+        "/query",
+        "/status",
+        "/configuration",
+        "/source",
+        "/peers"
+      ],
+      "powercfg": [
+        "/list",
+        "/getactivescheme",
+        "/a"
+      ],
+      "sfc.exe": [
+        "/verifyonly",
+        "/scannow"
+      ],
+      "dism.exe": [
+        "/Online",
+        "/Cleanup-Image",
+        "/CheckHealth",
+        "/ScanHealth",
+        "/RestoreHealth"
+      ],
+      "get-process": [
+        "-Name",
+        "-Id",
+        "-IncludeUserName",
+        "-FileVersionInfo"
+      ],
+      "stop-process": [
+        "-Name",
+        "-Id",
+        "-Force",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "start-process": [
+        "-FilePath",
+        "-ArgumentList",
+        "-WorkingDirectory",
+        "-Wait",
+        "-PassThru",
+        "-NoNewWindow"
+      ],
+      "wait-process": [
+        "-Name",
+        "-Id",
+        "-Timeout"
+      ],
+      "get-service": [
+        "-Name",
+        "-DisplayName",
+        "-DependentServices",
+        "-RequiredServices"
+      ],
+      "start-service": [
+        "-Name",
+        "-DisplayName",
+        "-PassThru",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "stop-service": [
+        "-Name",
+        "-DisplayName",
+        "-Force",
+        "-PassThru",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "restart-service": [
+        "-Name",
+        "-DisplayName",
+        "-Force",
+        "-PassThru",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "set-service": [
+        "-Name",
+        "-DisplayName",
+        "-StartupType",
+        "-Status",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "get-scheduledtask": [
+        "-TaskName",
+        "-TaskPath"
+      ],
+      "get-scheduledtaskinfo": [
+        "-TaskName",
+        "-TaskPath"
+      ],
+      "get-ciminstance": [
+        "-ClassName",
+        "-Namespace",
+        "-Filter",
+        "-Property",
+        "-Query"
+      ],
+      "get-wmiobject": [
+        "-Class",
+        "-Namespace",
+        "-Filter",
+        "-Property",
+        "-Query"
+      ],
+      "get-counter": [
+        "-Counter",
+        "-SampleInterval",
+        "-MaxSamples",
+        "-ListSet"
+      ],
+      "get-computerinfo": [
+        "-Property"
+      ],
+      "get-hotfix": [
+        "-Id",
+        "-Description"
+      ],
+      "get-volume": [
+        "-DriveLetter",
+        "-FileSystemLabel"
+      ],
+      "get-disk": [
+        "-Number",
+        "-FriendlyName",
+        "-SerialNumber"
+      ],
+      "get-partition": [
+        "-DiskNumber",
+        "-DriveLetter"
+      ],
+      "get-netadapter": [
+        "-Name",
+        "-IncludeHidden",
+        "-Physical"
+      ],
+      "get-netadapterstatistics": [
+        "-Name"
+      ],
+      "get-netipaddress": [
+        "-InterfaceAlias",
+        "-InterfaceIndex",
+        "-AddressFamily",
+        "-IPAddress"
+      ],
+      "get-netipconfiguration": [
+        "-InterfaceAlias",
+        "-InterfaceIndex",
+        "-Detailed",
+        "-All"
+      ],
+      "get-netroute": [
+        "-AddressFamily",
+        "-InterfaceAlias",
+        "-DestinationPrefix"
+      ],
+      "get-nettcpconnection": [
+        "-LocalPort",
+        "-RemotePort",
+        "-State",
+        "-OwningProcess"
+      ],
+      "get-netudpendpoint": [
+        "-LocalPort",
+        "-OwningProcess"
+      ],
+      "test-netconnection": [
+        "-ComputerName",
+        "-Port",
+        "-InformationLevel",
+        "-TraceRoute"
+      ],
+      "test-connection": [
+        "-ComputerName",
+        "-Count",
+        "-Delay",
+        "-Quiet"
+      ],
+      "resolve-dnsname": [
+        "-Name",
+        "-Type",
+        "-Server",
+        "-DnsOnly"
+      ],
+      "get-netfirewallrule": [
+        "-DisplayName",
+        "-Name",
+        "-Enabled",
+        "-Direction",
+        "-Action"
+      ],
+      "get-smbsession": [
+        "-ClientComputerName",
+        "-ClientUserName"
+      ],
+      "get-smbshare": [
+        "-Name",
+        "-Special"
+      ],
+      "get-winevent": [
+        "-LogName",
+        "-MaxEvents",
+        "-FilterHashtable",
+        "-FilterXPath",
+        "-Oldest",
+        "-ListLog"
+      ],
+      "get-eventlog": [
+        "-LogName",
+        "-Newest",
+        "-EntryType",
+        "-Source",
+        "-After",
+        "-Before"
+      ],
+      "get-childitem": [
+        "-Path",
+        "-LiteralPath",
+        "-Filter",
+        "-Recurse",
+        "-Force",
+        "-File",
+        "-Directory",
+        "-Depth"
+      ],
+      "get-item": [
+        "-Path",
+        "-LiteralPath",
+        "-Force"
+      ],
+      "get-itemproperty": [
+        "-Path",
+        "-Name"
+      ],
+      "get-content": [
+        "-Path",
+        "-LiteralPath",
+        "-Tail",
+        "-TotalCount",
+        "-Wait",
+        "-Encoding",
+        "-Raw"
+      ],
+      "set-content": [
+        "-Path",
+        "-Value",
+        "-Encoding",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "add-content": [
+        "-Path",
+        "-Value",
+        "-Encoding",
+        "-WhatIf"
+      ],
+      "copy-item": [
+        "-Path",
+        "-Destination",
+        "-Recurse",
+        "-Force",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "move-item": [
+        "-Path",
+        "-Destination",
+        "-Force",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "remove-item": [
+        "-Path",
+        "-Recurse",
+        "-Force",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "rename-item": [
+        "-Path",
+        "-NewName",
+        "-WhatIf"
+      ],
+      "new-item": [
+        "-Path",
+        "-Name",
+        "-ItemType",
+        "-Value",
+        "-Force",
+        "-WhatIf"
+      ],
+      "test-path": [
+        "-Path",
+        "-PathType"
+      ],
+      "set-location": [
+        "-Path",
+        "-LiteralPath"
+      ],
+      "get-filehash": [
+        "-Path",
+        "-Algorithm"
+      ],
+      "get-acl": [
+        "-Path"
+      ],
+      "select-string": [
+        "-Path",
+        "-Pattern",
+        "-SimpleMatch",
+        "-CaseSensitive",
+        "-Context"
+      ],
+      "select-object": [
+        "-First",
+        "-Last",
+        "-Skip",
+        "-Property",
+        "-ExpandProperty",
+        "-Unique"
+      ],
+      "where-object": [
+        "-Property",
+        "-EQ",
+        "-NE",
+        "-Like",
+        "-Match",
+        "-GT",
+        "-LT"
+      ],
+      "sort-object": [
+        "-Property",
+        "-Descending",
+        "-Unique"
+      ],
+      "group-object": [
+        "-Property",
+        "-NoElement"
+      ],
+      "measure-object": [
+        "-Property",
+        "-Sum",
+        "-Average",
+        "-Minimum",
+        "-Maximum",
+        "-Line",
+        "-Word",
+        "-Character"
+      ],
+      "format-table": [
+        "-AutoSize",
+        "-Property",
+        "-Wrap"
+      ],
+      "format-list": [
+        "-Property"
+      ],
+      "out-string": [
+        "-Width",
+        "-Stream"
+      ],
+      "out-file": [
+        "-FilePath",
+        "-Encoding",
+        "-Append",
+        "-Width",
+        "-WhatIf"
+      ],
+      "convertto-json": [
+        "-Depth",
+        "-Compress"
+      ],
+      "convertfrom-json": [
+        "-InputObject"
+      ],
+      "export-csv": [
+        "-Path",
+        "-NoTypeInformation",
+        "-Encoding",
+        "-Delimiter",
+        "-Append"
+      ],
+      "import-csv": [
+        "-Path",
+        "-Encoding",
+        "-Delimiter"
+      ],
+      "get-command": [
+        "-Name",
+        "-Module",
+        "-CommandType"
+      ],
+      "get-help": [
+        "-Name",
+        "-Examples",
+        "-Detailed",
+        "-Full",
+        "-Parameter"
+      ],
+      "get-module": [
+        "-ListAvailable",
+        "-Name"
+      ],
+      "get-localuser": [
+        "-Name",
+        "-SID"
+      ],
+      "get-localgroupmember": [
+        "-Group"
+      ],
+      "get-aduser": [
+        "-Identity",
+        "-Filter",
+        "-Properties",
+        "-SearchBase"
+      ],
+      "get-adcomputer": [
+        "-Identity",
+        "-Filter",
+        "-Properties"
+      ],
+      "get-adgroupmember": [
+        "-Identity",
+        "-Recursive"
+      ],
+      "invoke-sqlcmd": [
+        "-ServerInstance",
+        "-Database",
+        "-Query",
+        "-QueryTimeout"
+      ],
+      "invoke-webrequest": [
+        "-Uri",
+        "-Method",
+        "-Headers",
+        "-Body",
+        "-TimeoutSec",
+        "-UseBasicParsing"
+      ],
+      "invoke-restmethod": [
+        "-Uri",
+        "-Method",
+        "-Headers",
+        "-Body",
+        "-TimeoutSec"
+      ],
+      "start-sleep": [
+        "-Seconds",
+        "-Milliseconds"
+      ],
+      "get-date": [
+        "-Format"
+      ],
+      "restart-computer": [
+        "-Force",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "stop-computer": [
+        "-Force",
+        "-WhatIf",
+        "-Confirm"
+      ],
+      "where.exe": [
+        "/R",
+        "/Q",
+        "/F",
+        "/T"
+      ],
+      "findstr.exe": [
+        "/I",
+        "/S",
+        "/N",
+        "/R",
+        "/C:"
+      ],
+      "certutil.exe": [
+        "-store",
+        "-dump",
+        "-hashfile"
+      ],
+      "gpresult.exe": [
+        "/r",
+        "/scope computer",
+        "/scope user"
+      ],
+      "gpupdate.exe": [
+        "/target:computer",
+        "/target:user",
+        "/force"
+      ],
+      "nltest.exe": [
+        "/dsgetdc:",
+        "/dclist:",
+        "/sc_query:"
+      ],
+      "auditpol.exe": [
+        "/get",
+        "/category:*"
+      ],
+      "net.exe": [
+        "view",
+        "share",
+        "session",
+        "user",
+        "localgroup",
+        "statistics",
+        "start"
+      ],
+      "Get-PnpDevice": [
+        "-PresentOnly",
+        "-Class",
+        "-Status",
+        "-FriendlyName"
+      ],
+      "Get-Printer": [
+        "-Name",
+        "-Full"
+      ],
+      "Get-PrintJob": [
+        "-PrinterName",
+        "-ID"
+      ],
+      "dir": [
+        "-Path",
+        "-LiteralPath",
+        "-Filter",
+        "-Recurse",
+        "-Force",
+        "-File",
+        "-Directory",
+        "-Depth"
+      ],
+      "type": [
+        "-Path",
+        "-LiteralPath",
+        "-Tail",
+        "-TotalCount",
+        "-Wait",
+        "-Encoding",
+        "-Raw"
+      ],
+      "cd": [
+        "-Path",
+        "-LiteralPath"
+      ]
+    },
+    "examples": [
+      {
+        "label": "Пример: состояние сервера",
+        "insert": "Get-Date\nGet-Process | Sort-Object CPU -Descending | Select-Object -First 10\nGet-Service | Where-Object Status -eq 'Running'\nGet-Volume",
+        "help": "Несколько диагностических команд одним запуском"
+      },
+      {
+        "label": "Пример: ping",
+        "insert": "ping -n 4 1.1.1.1",
+        "help": "Четыре ICMP-запроса; замените адрес"
+      },
+      {
+        "label": "Пример: проверка TCP-порта",
+        "insert": "Test-NetConnection -ComputerName localhost -Port 1433",
+        "help": "Проверить порт SQL Server; замените адрес и порт"
+      },
+      {
+        "label": "Пример: маршрут до узла",
+        "insert": "tracert -d 1.1.1.1",
+        "help": "Маршрут без DNS-разрешения"
+      },
+      {
+        "label": "Пример: DNS-записи",
+        "insert": "Resolve-DnsName -Name example.com -Type A",
+        "help": "IPv4-записи домена; замените домен"
+      },
+      {
+        "label": "Пример: сетевая конфигурация",
+        "insert": "Get-NetIPConfiguration\nGet-NetAdapterStatistics",
+        "help": "Адреса и счётчики адаптеров"
+      },
+      {
+        "label": "Пример: слушающие порты",
+        "insert": "Get-NetTCPConnection -State Listen | Select-Object LocalAddress, LocalPort, OwningProcess",
+        "help": "TCP-порты и PID"
+      },
+      {
+        "label": "Пример: последние события",
+        "insert": "Get-WinEvent -LogName System -MaxEvents 20 | Select-Object TimeCreated, Id, LevelDisplayName, Message",
+        "help": "Последние 20 системных событий"
+      },
+      {
+        "label": "Пример: ошибки приложений",
+        "insert": "Get-WinEvent -FilterHashtable @{LogName='Application'; Level=2} -MaxEvents 20",
+        "help": "Ошибки в журнале Application"
+      },
+      {
+        "label": "Пример: службы 1C и SQL",
+        "insert": "Get-Service | Where-Object { $_.Name -match '1c|mssql|sqlagent' -or $_.DisplayName -match '1c|SQL Server' }",
+        "help": "Найти службы по именам и описаниям"
+      },
+      {
+        "label": "Пример: свободное место",
+        "insert": "Get-Volume | Select-Object DriveLetter, FileSystemLabel, HealthStatus, SizeRemaining, Size",
+        "help": "Размеры и здоровье томов"
+      },
+      {
+        "label": "Пример: топ памяти",
+        "insert": "Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 15 Name, Id, WorkingSet64",
+        "help": "15 процессов по резидентной памяти"
+      },
+      {
+        "label": "Пример: загрузочная дата",
+        "insert": "Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, LastBootUpTime",
+        "help": "ОС и последняя загрузка"
+      },
+      {
+        "label": "Пример: процессор",
+        "insert": "Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed",
+        "help": "CPU и ядра"
+      },
+      {
+        "label": "Пример: обновления Windows",
+        "insert": "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 15",
+        "help": "Последние установленные исправления"
+      },
+      {
+        "label": "Пример: RDP-пользователи",
+        "insert": "quser.exe",
+        "help": "Список пользователей и ID сеансов"
+      },
+      {
+        "label": "Пример: последние резервные копии",
+        "insert": "Get-ChildItem -Path 'D:\\backup' -Filter '*.bak' -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 20 FullName, Length, LastWriteTime",
+        "help": "Замените путь; только список файлов .bak"
+      },
+      {
+        "label": "Пример: SQL версия",
+        "insert": "Invoke-Sqlcmd -ServerInstance localhost -Query 'SELECT @@VERSION AS version'",
+        "help": "Требуется модуль SqlServer; чтение версии"
+      },
+      {
+        "label": "Пример: версия PowerShell",
+        "insert": "$PSVersionTable",
+        "help": "Версии оболочки и CLR"
+      }
+    ]
+  },
+  "linux": {
+    "commands": [
+      [
+        "ping",
+        "Сеть · Проверить доступность узла ICMP"
+      ],
+      [
+        "ping6",
+        "Сеть · Проверить узел по IPv6"
+      ],
+      [
+        "tracepath",
+        "Сеть · Маршрут и MTU"
+      ],
+      [
+        "traceroute",
+        "Сеть · Маршрут пакетов при наличии утилиты"
+      ],
+      [
+        "mtr",
+        "Сеть · Маршрут и потери; для отчёта -r -c 5"
+      ],
+      [
+        "ip",
+        "Сеть · Адреса, интерфейсы, маршруты и соседи"
+      ],
+      [
+        "ss",
+        "Сеть · Порты и соединения"
+      ],
+      [
+        "netstat",
+        "Сеть · Сетевые соединения при наличии net-tools"
+      ],
+      [
+        "ifconfig",
+        "Сеть · Интерфейсы при наличии net-tools"
+      ],
+      [
+        "route",
+        "Сеть · Маршруты при наличии net-tools"
+      ],
+      [
+        "arp",
+        "Сеть · Таблица соседей при наличии net-tools"
+      ],
+      [
+        "hostname",
+        "Сеть · Имя компьютера"
+      ],
+      [
+        "hostnamectl",
+        "Сеть · Имя узла и ОС"
+      ],
+      [
+        "resolvectl",
+        "Сеть · DNS systemd-resolved при наличии"
+      ],
+      [
+        "dig",
+        "Сеть · DNS-запросы при наличии bind-utils/dnsutils"
+      ],
+      [
+        "nslookup",
+        "Сеть · DNS-запросы"
+      ],
+      [
+        "host",
+        "Сеть · Разрешение DNS-имён"
+      ],
+      [
+        "getent",
+        "Сеть · Системные справочники, hosts/passwd/group"
+      ],
+      [
+        "curl",
+        "Сеть · HTTP-запросы и диагностика"
+      ],
+      [
+        "wget",
+        "Сеть · Загрузка по HTTP/HTTPS"
+      ],
+      [
+        "openssl",
+        "Сеть · TLS и сертификаты"
+      ],
+      [
+        "nmcli",
+        "Сеть · NetworkManager: подключения и устройства"
+      ],
+      [
+        "networkctl",
+        "Сеть · Сеть systemd-networkd при наличии"
+      ],
+      [
+        "ethtool",
+        "Сеть · Скорость и состояние Ethernet"
+      ],
+      [
+        "bridge",
+        "Сеть · Мосты и VLAN"
+      ],
+      [
+        "nft",
+        "Сеть · Правила nftables"
+      ],
+      [
+        "iptables",
+        "Сеть · Правила iptables"
+      ],
+      [
+        "firewall-cmd",
+        "Сеть · Правила firewalld"
+      ],
+      [
+        "ufw",
+        "Сеть · Правила UFW при наличии"
+      ],
+      [
+        "tcpdump",
+        "Сеть · Захват пакетов при наличии прав; ограничивайте -c"
+      ],
+      [
+        "nc",
+        "Сеть · Проверка TCP/UDP при наличии netcat"
+      ],
+      [
+        "ssh",
+        "Сеть · SSH-клиент; интерактивный терминал не предоставляется"
+      ],
+      [
+        "scp",
+        "Сеть · Копирование через SSH"
+      ],
+      [
+        "rsync",
+        "Сеть · Синхронизация файлов; --delete удаляет лишние"
+      ],
+      [
+        "ps",
+        "Процессы и службы · Процессы и их ресурсы"
+      ],
+      [
+        "top",
+        "Процессы и службы · Пакетный отчёт: -b -n 1"
+      ],
+      [
+        "pgrep",
+        "Процессы и службы · Найти PID по имени"
+      ],
+      [
+        "pidof",
+        "Процессы и службы · PID указанной программы"
+      ],
+      [
+        "pstree",
+        "Процессы и службы · Дерево процессов"
+      ],
+      [
+        "kill",
+        "Процессы и службы · Отправить сигнал процессу"
+      ],
+      [
+        "pkill",
+        "Процессы и службы · Отправить сигнал по имени процесса"
+      ],
+      [
+        "killall",
+        "Процессы и службы · Завершить процессы по имени"
+      ],
+      [
+        "nice",
+        "Процессы и службы · Запуск с приоритетом"
+      ],
+      [
+        "renice",
+        "Процессы и службы · Изменить приоритет процесса"
+      ],
+      [
+        "timeout",
+        "Процессы и службы · Ограничить время выполнения команды"
+      ],
+      [
+        "systemctl",
+        "Процессы и службы · Службы systemd и управление ими"
+      ],
+      [
+        "journalctl",
+        "Процессы и службы · Журналы systemd"
+      ],
+      [
+        "service",
+        "Процессы и службы · Службы SysV/совместимость"
+      ],
+      [
+        "loginctl",
+        "Процессы и службы · Пользовательские сеансы systemd"
+      ],
+      [
+        "crontab",
+        "Процессы и службы · Задания cron пользователя"
+      ],
+      [
+        "atq",
+        "Процессы и службы · Очередь отложенных заданий"
+      ],
+      [
+        "lsof",
+        "Процессы и службы · Открытые файлы и соединения"
+      ],
+      [
+        "fuser",
+        "Процессы и службы · Процессы, использующие файл"
+      ],
+      [
+        "pidstat",
+        "Процессы и службы · Статистика процессов при наличии sysstat"
+      ],
+      [
+        "vmstat",
+        "Процессы и службы · CPU, память и ввод/вывод"
+      ],
+      [
+        "iostat",
+        "Процессы и службы · Дисковые операции при наличии sysstat"
+      ],
+      [
+        "mpstat",
+        "Процессы и службы · Статистика CPU при наличии sysstat"
+      ],
+      [
+        "sar",
+        "Процессы и службы · Системная статистика при наличии sysstat"
+      ],
+      [
+        "uptime",
+        "Система · Время работы и средняя нагрузка"
+      ],
+      [
+        "free",
+        "Система · Оперативная память и swap"
+      ],
+      [
+        "uname",
+        "Система · Сведения о ядре"
+      ],
+      [
+        "lscpu",
+        "Система · Архитектура и CPU"
+      ],
+      [
+        "lsmem",
+        "Система · Диапазоны оперативной памяти"
+      ],
+      [
+        "dmidecode",
+        "Система · DMI/BIOS при наличии прав"
+      ],
+      [
+        "lspci",
+        "Система · Устройства PCI"
+      ],
+      [
+        "lsusb",
+        "Система · Устройства USB"
+      ],
+      [
+        "lsmod",
+        "Система · Модули ядра"
+      ],
+      [
+        "modinfo",
+        "Система · Сведения о модуле ядра"
+      ],
+      [
+        "dmesg",
+        "Система · Сообщения ядра при наличии прав"
+      ],
+      [
+        "sensors",
+        "Система · Датчики при наличии lm-sensors"
+      ],
+      [
+        "whoami",
+        "Система · Текущая учётная запись"
+      ],
+      [
+        "id",
+        "Система · UID, GID и группы"
+      ],
+      [
+        "who",
+        "Система · Вошедшие пользователи"
+      ],
+      [
+        "w",
+        "Система · Пользователи и активность"
+      ],
+      [
+        "last",
+        "Система · История входов"
+      ],
+      [
+        "lastlog",
+        "Система · Последний вход пользователей"
+      ],
+      [
+        "groups",
+        "Система · Группы пользователя"
+      ],
+      [
+        "date",
+        "Система · Текущее время"
+      ],
+      [
+        "timedatectl",
+        "Система · Системное время и синхронизация"
+      ],
+      [
+        "localectl",
+        "Система · Язык и раскладка"
+      ],
+      [
+        "locale",
+        "Система · Региональные параметры"
+      ],
+      [
+        "printenv",
+        "Система · Переменные окружения; вывод может содержать секреты"
+      ],
+      [
+        "env",
+        "Система · Окружение или запуск с заданными переменными"
+      ],
+      [
+        "which",
+        "Система · Путь к исполняемому файлу"
+      ],
+      [
+        "command",
+        "Система · Поиск команды и встроенные операции Bash"
+      ],
+      [
+        "type",
+        "Система · Как оболочка интерпретирует команду"
+      ],
+      [
+        "help",
+        "Система · Справка встроенных команд Bash"
+      ],
+      [
+        "history",
+        "Система · История текущей оболочки, не история панели"
+      ],
+      [
+        "reboot",
+        "Система · Перезагрузить сервер"
+      ],
+      [
+        "shutdown",
+        "Система · Выключение или перезапуск"
+      ],
+      [
+        "sysctl",
+        "Система · Параметры ядра; -w изменяет настройки"
+      ],
+      [
+        "ulimit",
+        "Система · Лимиты текущей оболочки"
+      ],
+      [
+        "sestatus",
+        "Система · Состояние SELinux"
+      ],
+      [
+        "getenforce",
+        "Система · Режим SELinux"
+      ],
+      [
+        "getconf",
+        "Система · Системные ограничения и параметры"
+      ],
+      [
+        "rpm",
+        "Система · Пакеты RPM"
+      ],
+      [
+        "rpmquery",
+        "Система · Запрос установленных RPM"
+      ],
+      [
+        "rpmverify",
+        "Система · Проверка файлов RPM"
+      ],
+      [
+        "dnf",
+        "Система · Пакеты CentOS/RHEL/Fedora"
+      ],
+      [
+        "yum",
+        "Система · Пакеты CentOS/RHEL совместимость"
+      ],
+      [
+        "apt",
+        "Система · Пакеты Debian/Ubuntu"
+      ],
+      [
+        "apt-cache",
+        "Система · Информация о пакетах APT"
+      ],
+      [
+        "dpkg",
+        "Система · Пакеты Debian/Ubuntu"
+      ],
+      [
+        "snap",
+        "Система · Snap-пакеты при наличии"
+      ],
+      [
+        "df",
+        "Диски и файлы · Свободное место файловых систем"
+      ],
+      [
+        "du",
+        "Диски и файлы · Размер файлов и папок"
+      ],
+      [
+        "lsblk",
+        "Диски и файлы · Диски и разделы"
+      ],
+      [
+        "blkid",
+        "Диски и файлы · UUID и тип файловой системы"
+      ],
+      [
+        "findmnt",
+        "Диски и файлы · Подключённые файловые системы"
+      ],
+      [
+        "mount",
+        "Диски и файлы · Точки монтирования; с аргументами может менять подключения"
+      ],
+      [
+        "ls",
+        "Диски и файлы · Файлы и папки"
+      ],
+      [
+        "pwd",
+        "Диски и файлы · Текущая папка"
+      ],
+      [
+        "cd",
+        "Диски и файлы · Перейти в папку"
+      ],
+      [
+        "pushd",
+        "Диски и файлы · Сохранить папку и перейти"
+      ],
+      [
+        "popd",
+        "Диски и файлы · Вернуться в сохранённую папку"
+      ],
+      [
+        "stat",
+        "Диски и файлы · Размер, владелец и даты файла"
+      ],
+      [
+        "file",
+        "Диски и файлы · Тип содержимого файла"
+      ],
+      [
+        "cat",
+        "Диски и файлы · Содержимое файла"
+      ],
+      [
+        "head",
+        "Диски и файлы · Первые строки"
+      ],
+      [
+        "tail",
+        "Диски и файлы · Последние строки"
+      ],
+      [
+        "sed",
+        "Диски и файлы · Преобразование текста; -i изменяет файл"
+      ],
+      [
+        "awk",
+        "Диски и файлы · Поля и обработка текста"
+      ],
+      [
+        "grep",
+        "Диски и файлы · Поиск текста"
+      ],
+      [
+        "find",
+        "Диски и файлы · Поиск файлов; действия могут изменять файлы"
+      ],
+      [
+        "locate",
+        "Диски и файлы · Поиск по индексу при наличии"
+      ],
+      [
+        "readlink",
+        "Диски и файлы · Цель символической ссылки"
+      ],
+      [
+        "realpath",
+        "Диски и файлы · Полный путь"
+      ],
+      [
+        "basename",
+        "Диски и файлы · Имя без каталога"
+      ],
+      [
+        "dirname",
+        "Диски и файлы · Каталог пути"
+      ],
+      [
+        "sort",
+        "Диски и файлы · Сортировка строк"
+      ],
+      [
+        "uniq",
+        "Диски и файлы · Повторяющиеся строки"
+      ],
+      [
+        "cut",
+        "Диски и файлы · Извлечение полей"
+      ],
+      [
+        "tr",
+        "Диски и файлы · Замена символов"
+      ],
+      [
+        "wc",
+        "Диски и файлы · Число строк, слов и байт"
+      ],
+      [
+        "xargs",
+        "Диски и файлы · Запуск команды для входных аргументов"
+      ],
+      [
+        "tee",
+        "Диски и файлы · Вывод на экран и запись в файл"
+      ],
+      [
+        "printf",
+        "Диски и файлы · Вывести текст"
+      ],
+      [
+        "read",
+        "Диски и файлы · Прочитать строку через интерактивный ввод панели"
+      ],
+      [
+        "cp",
+        "Диски и файлы · Копировать файл или папку"
+      ],
+      [
+        "mv",
+        "Диски и файлы · Переместить или переименовать"
+      ],
+      [
+        "rm",
+        "Диски и файлы · Удалить файл или папку"
+      ],
+      [
+        "mkdir",
+        "Диски и файлы · Создать папку"
+      ],
+      [
+        "rmdir",
+        "Диски и файлы · Удалить пустую папку"
+      ],
+      [
+        "touch",
+        "Диски и файлы · Создать файл или изменить даты"
+      ],
+      [
+        "ln",
+        "Диски и файлы · Создать ссылку"
+      ],
+      [
+        "chmod",
+        "Диски и файлы · Изменить права"
+      ],
+      [
+        "chown",
+        "Диски и файлы · Изменить владельца"
+      ],
+      [
+        "chgrp",
+        "Диски и файлы · Изменить группу"
+      ],
+      [
+        "getfacl",
+        "Диски и файлы · Список ACL при наличии"
+      ],
+      [
+        "setfacl",
+        "Диски и файлы · Изменить ACL"
+      ],
+      [
+        "namei",
+        "Диски и файлы · Права компонентов пути"
+      ],
+      [
+        "tar",
+        "Диски и файлы · Архивация файлов"
+      ],
+      [
+        "gzip",
+        "Диски и файлы · Сжатие gzip"
+      ],
+      [
+        "gunzip",
+        "Диски и файлы · Распаковка gzip"
+      ],
+      [
+        "zip",
+        "Диски и файлы · ZIP-архивы при наличии"
+      ],
+      [
+        "unzip",
+        "Диски и файлы · Распаковка ZIP"
+      ],
+      [
+        "sha256sum",
+        "Диски и файлы · Контрольная сумма SHA256"
+      ],
+      [
+        "sha512sum",
+        "Диски и файлы · Контрольная сумма SHA512"
+      ],
+      [
+        "md5sum",
+        "Диски и файлы · Контрольная сумма MD5"
+      ],
+      [
+        "smartctl",
+        "Диски и файлы · SMART дисков при наличии smartmontools"
+      ],
+      [
+        "nvme",
+        "Диски и файлы · Диагностика NVMe при наличии"
+      ],
+      [
+        "swapon",
+        "Диски и файлы · Состояние swap; с аргументами может включать swap"
+      ],
+      [
+        "zpool",
+        "Диски и файлы · Пулы ZFS при наличии"
+      ],
+      [
+        "zfs",
+        "Диски и файлы · Файловые системы ZFS при наличии"
+      ],
+      [
+        "pvs",
+        "Диски и файлы · Физические тома LVM"
+      ],
+      [
+        "vgs",
+        "Диски и файлы · Группы LVM"
+      ],
+      [
+        "lvs",
+        "Диски и файлы · Логические тома LVM"
+      ],
+      [
+        "docker",
+        "Приложения · Контейнеры Docker при наличии прав"
+      ],
+      [
+        "podman",
+        "Приложения · Контейнеры Podman"
+      ],
+      [
+        "nginx",
+        "Приложения · Проверка и сведения Nginx"
+      ],
+      [
+        "apachectl",
+        "Приложения · Диагностика Apache при наличии"
+      ],
+      [
+        "httpd",
+        "Приложения · Apache на CentOS/RHEL"
+      ],
+      [
+        "mysql",
+        "Приложения · Клиент MySQL/MariaDB при наличии"
+      ],
+      [
+        "mariadb",
+        "Приложения · Клиент MariaDB"
+      ],
+      [
+        "psql",
+        "Приложения · Клиент PostgreSQL при наличии"
+      ],
+      [
+        "redis-cli",
+        "Приложения · Клиент Redis при наличии"
+      ],
+      [
+        "sqlcmd",
+        "Приложения · Клиент SQL Server при наличии"
+      ],
+      [
+        "php",
+        "Приложения · Интерпретатор PHP"
+      ],
+      [
+        "python3",
+        "Приложения · Интерпретатор Python"
+      ],
+      [
+        "node",
+        "Приложения · Интерпретатор Node.js"
+      ],
+      [
+        "git",
+        "Приложения · Репозитории Git"
+      ],
+      [
+        "jq",
+        "Приложения · Обработка JSON при наличии"
+      ],
+      [
+        "echo",
+        "Текст · Вывести строку"
+      ],
+      [
+        "sleep",
+        "Оболочка · Пауза в пределах таймаута задания"
+      ],
+      [
+        "test",
+        "Оболочка · Проверить условие"
+      ],
+      [
+        "man",
+        "Справка · Руководство; -P cat отключает интерактивный просмотрщик"
+      ],
+      [
+        "info",
+        "Справка · Руководства; --output=- для текстового вывода"
+      ],
+      [
+        "bash",
+        "Оболочка · Скрипты Bash без полноценного терминала"
+      ],
+      [
+        "sh",
+        "Оболочка · Скрипты POSIX shell"
+      ],
+      [
+        "diff",
+        "Текст · Сравнить файлы"
+      ],
+      [
+        "comm",
+        "Текст · Сравнить отсортированные строки"
+      ],
+      [
+        "paste",
+        "Текст · Объединить столбцы"
+      ],
+      [
+        "column",
+        "Текст · Форматировать таблицу"
+      ],
+      [
+        "strings",
+        "Файлы · Найти печатные строки в бинарном файле"
+      ],
+      [
+        "lsattr",
+        "Файлы · Атрибуты файловой системы"
+      ],
+      [
+        "chronyc",
+        "Время · Синхронизация chrony"
+      ],
+      [
+        "ntpq",
+        "Время · Состояние NTP при наличии"
+      ]
+    ],
+    "parameters": {
+      "ping": [
+        "-c",
+        "-W",
+        "-w",
+        "-i",
+        "-s",
+        "-4",
+        "-6"
+      ],
+      "ping6": [
+        "-c",
+        "-W",
+        "-w"
+      ],
+      "traceroute": [
+        "-n",
+        "-m",
+        "-w",
+        "-I",
+        "-T"
+      ],
+      "tracepath": [
+        "-n",
+        "-m"
+      ],
+      "mtr": [
+        "-r",
+        "-c",
+        "-n",
+        "-w"
+      ],
+      "ip": [
+        "address",
+        "route",
+        "link",
+        "neigh",
+        "-brief",
+        "-s",
+        "-4",
+        "-6"
+      ],
+      "ss": [
+        "-tulpn",
+        "-tun",
+        "-lntp",
+        "-s",
+        "-a"
+      ],
+      "netstat": [
+        "-tulpn",
+        "-rn",
+        "-s"
+      ],
+      "curl": [
+        "-I",
+        "-v",
+        "-L",
+        "--connect-timeout",
+        "--max-time",
+        "-o",
+        "-H",
+        "-X",
+        "--fail",
+        "--silent",
+        "--show-error"
+      ],
+      "wget": [
+        "--spider",
+        "--server-response",
+        "--timeout",
+        "-O",
+        "-q"
+      ],
+      "openssl": [
+        "version",
+        "s_client",
+        "x509",
+        "verify",
+        "dgst"
+      ],
+      "resolvectl": [
+        "status",
+        "query",
+        "statistics"
+      ],
+      "nmcli": [
+        "general status",
+        "device status",
+        "device show",
+        "connection show"
+      ],
+      "networkctl": [
+        "list",
+        "status"
+      ],
+      "ethtool": [
+        "-i",
+        "-S",
+        "-k"
+      ],
+      "nft": [
+        "list ruleset",
+        "list tables"
+      ],
+      "iptables": [
+        "-L",
+        "-n",
+        "-v",
+        "-S"
+      ],
+      "firewall-cmd": [
+        "--state",
+        "--list-all",
+        "--list-all-zones",
+        "--get-active-zones"
+      ],
+      "ufw": [
+        "status",
+        "status verbose",
+        "status numbered"
+      ],
+      "tcpdump": [
+        "-i",
+        "-c",
+        "-n",
+        "-nn",
+        "-s",
+        "-w"
+      ],
+      "nc": [
+        "-z",
+        "-v",
+        "-w"
+      ],
+      "rsync": [
+        "-av",
+        "--dry-run",
+        "--progress",
+        "--exclude"
+      ],
+      "ps": [
+        "aux",
+        "-ef",
+        "-eo",
+        "--sort=-%cpu",
+        "--sort=-%mem"
+      ],
+      "pgrep": [
+        "-a",
+        "-f",
+        "-u",
+        "-l"
+      ],
+      "pkill": [
+        "-f",
+        "-u",
+        "-TERM",
+        "-KILL"
+      ],
+      "kill": [
+        "-l",
+        "-TERM",
+        "-KILL",
+        "-STOP",
+        "-CONT"
+      ],
+      "top": [
+        "-b",
+        "-n",
+        "-o",
+        "-p"
+      ],
+      "systemctl": [
+        "status",
+        "list-units",
+        "list-unit-files",
+        "show",
+        "is-active",
+        "is-enabled",
+        "list-timers",
+        "list-dependencies",
+        "cat",
+        "--failed",
+        "--type=service",
+        "--all",
+        "--no-pager",
+        "start",
+        "stop",
+        "restart",
+        "reload",
+        "enable",
+        "disable",
+        "daemon-reload"
+      ],
+      "journalctl": [
+        "-u",
+        "-n",
+        "--since",
+        "--until",
+        "--no-pager",
+        "-b",
+        "-p",
+        "-k",
+        "--disk-usage",
+        "--output=short-iso"
+      ],
+      "loginctl": [
+        "list-sessions",
+        "list-users",
+        "session-status",
+        "user-status"
+      ],
+      "service": [
+        "--status-all"
+      ],
+      "crontab": [
+        "-l",
+        "-e"
+      ],
+      "lsof": [
+        "-i",
+        "-n",
+        "-P",
+        "-p"
+      ],
+      "fuser": [
+        "-v",
+        "-m"
+      ],
+      "vmstat": [
+        "-s",
+        "-d",
+        "-w"
+      ],
+      "iostat": [
+        "-x",
+        "-h",
+        "-d",
+        "-c"
+      ],
+      "mpstat": [
+        "-P",
+        "-u"
+      ],
+      "pidstat": [
+        "-p",
+        "-u",
+        "-r",
+        "-d"
+      ],
+      "sar": [
+        "-u",
+        "-r",
+        "-n",
+        "-d"
+      ],
+      "free": [
+        "-h",
+        "-m",
+        "-g"
+      ],
+      "uname": [
+        "-a",
+        "-r",
+        "-m"
+      ],
+      "lscpu": [
+        "-e",
+        "-J"
+      ],
+      "lsmem": [
+        "--summary"
+      ],
+      "lspci": [
+        "-nn",
+        "-k",
+        "-v"
+      ],
+      "lsusb": [
+        "-t",
+        "-v"
+      ],
+      "dmesg": [
+        "-T",
+        "--level=err,warn"
+      ],
+      "who": [
+        "-a",
+        "-b"
+      ],
+      "last": [
+        "-n",
+        "-F"
+      ],
+      "hostname": [
+        "-f",
+        "-I"
+      ],
+      "hostnamectl": [
+        "status"
+      ],
+      "getent": [
+        "hosts",
+        "passwd",
+        "group",
+        "services"
+      ],
+      "timedatectl": [
+        "status",
+        "show",
+        "timesync-status"
+      ],
+      "sysctl": [
+        "-a",
+        "-n"
+      ],
+      "rpm": [
+        "-qa",
+        "-qi",
+        "-ql",
+        "-qf",
+        "-V"
+      ],
+      "dnf": [
+        "list installed",
+        "info",
+        "check-update",
+        "history",
+        "repolist",
+        "update",
+        "install",
+        "remove",
+        "--assumeno"
+      ],
+      "yum": [
+        "list installed",
+        "info",
+        "check-update",
+        "repolist",
+        "--assumeno"
+      ],
+      "apt": [
+        "list --installed",
+        "show",
+        "policy",
+        "update",
+        "upgrade",
+        "install",
+        "remove",
+        "--simulate"
+      ],
+      "apt-cache": [
+        "policy",
+        "show",
+        "search"
+      ],
+      "dpkg": [
+        "-l",
+        "-s",
+        "-L"
+      ],
+      "snap": [
+        "list",
+        "info",
+        "changes"
+      ],
+      "ulimit": [
+        "-a",
+        "-n",
+        "-u"
+      ],
+      "sensors": [
+        "-u",
+        "-j"
+      ],
+      "df": [
+        "-h",
+        "-T",
+        "-i"
+      ],
+      "du": [
+        "-h",
+        "-s",
+        "--max-depth=1",
+        "-x"
+      ],
+      "lsblk": [
+        "-f",
+        "-o",
+        "-J",
+        "-b"
+      ],
+      "blkid": [
+        "-o"
+      ],
+      "findmnt": [
+        "-o",
+        "-T",
+        "-t"
+      ],
+      "ls": [
+        "-lah",
+        "-l",
+        "-a",
+        "-h",
+        "-t",
+        "-S",
+        "-R"
+      ],
+      "stat": [
+        "-c",
+        "-f"
+      ],
+      "file": [
+        "-b",
+        "-i",
+        "-L"
+      ],
+      "head": [
+        "-n",
+        "-c"
+      ],
+      "tail": [
+        "-n",
+        "-c",
+        "-f"
+      ],
+      "sed": [
+        "-n",
+        "-E",
+        "-e"
+      ],
+      "awk": [
+        "-F",
+        "-v"
+      ],
+      "grep": [
+        "-i",
+        "-n",
+        "-r",
+        "-E",
+        "-v",
+        "-c",
+        "-l",
+        "-A",
+        "-B",
+        "-C"
+      ],
+      "find": [
+        "-name",
+        "-iname",
+        "-type",
+        "-size",
+        "-mtime",
+        "-maxdepth",
+        "-user",
+        "-print"
+      ],
+      "sort": [
+        "-n",
+        "-r",
+        "-h",
+        "-k",
+        "-u"
+      ],
+      "uniq": [
+        "-c",
+        "-d"
+      ],
+      "cut": [
+        "-d",
+        "-f",
+        "-c"
+      ],
+      "wc": [
+        "-l",
+        "-w",
+        "-c",
+        "-m"
+      ],
+      "cp": [
+        "-a",
+        "-r",
+        "-i",
+        "-v"
+      ],
+      "mv": [
+        "-i",
+        "-v"
+      ],
+      "rm": [
+        "-i",
+        "-r",
+        "-v"
+      ],
+      "mkdir": [
+        "-p",
+        "-m"
+      ],
+      "ln": [
+        "-s",
+        "-f"
+      ],
+      "chmod": [
+        "-R",
+        "-v"
+      ],
+      "chown": [
+        "-R",
+        "-v"
+      ],
+      "getfacl": [
+        "-p",
+        "-R"
+      ],
+      "namei": [
+        "-l"
+      ],
+      "tar": [
+        "-tf",
+        "-tvf",
+        "-czf",
+        "-xzf",
+        "-C"
+      ],
+      "unzip": [
+        "-l",
+        "-d",
+        "-t"
+      ],
+      "smartctl": [
+        "-a",
+        "-H",
+        "-i"
+      ],
+      "nvme": [
+        "list",
+        "smart-log",
+        "id-ctrl"
+      ],
+      "swapon": [
+        "--show",
+        "-s"
+      ],
+      "zpool": [
+        "status",
+        "list",
+        "iostat"
+      ],
+      "zfs": [
+        "list",
+        "get"
+      ],
+      "pvs": [
+        "-o"
+      ],
+      "vgs": [
+        "-o"
+      ],
+      "lvs": [
+        "-o"
+      ],
+      "docker": [
+        "ps",
+        "ps -a",
+        "images",
+        "stats --no-stream",
+        "inspect",
+        "logs",
+        "version",
+        "info",
+        "compose",
+        "container",
+        "volume",
+        "network"
+      ],
+      "podman": [
+        "ps",
+        "ps -a",
+        "images",
+        "stats --no-stream",
+        "inspect",
+        "logs",
+        "info"
+      ],
+      "nginx": [
+        "-t",
+        "-T",
+        "-v"
+      ],
+      "apachectl": [
+        "-t",
+        "-S",
+        "-M"
+      ],
+      "httpd": [
+        "-t",
+        "-S",
+        "-M"
+      ],
+      "mysql": [
+        "--version",
+        "--host",
+        "--user",
+        "--database",
+        "--execute"
+      ],
+      "mariadb": [
+        "--version",
+        "--host",
+        "--user",
+        "--database",
+        "--execute"
+      ],
+      "psql": [
+        "--version",
+        "-h",
+        "-U",
+        "-d",
+        "-c"
+      ],
+      "redis-cli": [
+        "PING",
+        "INFO",
+        "CLIENT LIST",
+        "DBSIZE"
+      ],
+      "sqlcmd": [
+        "-S",
+        "-d",
+        "-Q",
+        "-l"
+      ],
+      "php": [
+        "-v",
+        "-m",
+        "-i"
+      ],
+      "python3": [
+        "--version",
+        "-c",
+        "-m"
+      ],
+      "node": [
+        "--version",
+        "-e"
+      ],
+      "git": [
+        "status",
+        "log",
+        "diff",
+        "branch",
+        "remote",
+        "show",
+        "rev-parse"
+      ],
+      "jq": [
+        ".",
+        "-r",
+        "-c",
+        "-s"
+      ],
+      "command": [
+        "-v",
+        "-V"
+      ],
+      "man": [
+        "-P cat",
+        "-k",
+        "-f"
+      ],
+      "info": [
+        "--output=-"
+      ],
+      "diff": [
+        "-u",
+        "-r",
+        "-q"
+      ],
+      "comm": [
+        "-12",
+        "-23",
+        "-13"
+      ],
+      "column": [
+        "-t",
+        "-s"
+      ],
+      "strings": [
+        "-n"
+      ],
+      "chronyc": [
+        "tracking",
+        "sources",
+        "sourcestats"
+      ],
+      "ntpq": [
+        "-p",
+        "-pn"
+      ],
+      "bash": [
+        "--version",
+        "-n",
+        "-c"
+      ],
+      "sh": [
+        "-n",
+        "-c"
+      ]
+    },
+    "examples": [
+      {
+        "label": "Пример: состояние сервера",
+        "insert": "date\nuptime\nfree -h\ndf -h /\nps aux --sort=-%cpu | head -n 11",
+        "help": "Несколько диагностических команд одним запуском"
+      },
+      {
+        "label": "Пример: ping",
+        "insert": "ping -c 4 -W 2 1.1.1.1",
+        "help": "Четыре ICMP-запроса с таймаутом"
+      },
+      {
+        "label": "Пример: службы",
+        "insert": "systemctl list-units --type=service --all --no-pager",
+        "help": "Службы systemd без интерактивного просмотрщика"
+      },
+      {
+        "label": "Пример: ошибки служб",
+        "insert": "systemctl --failed --no-pager",
+        "help": "Службы в состоянии failed"
+      },
+      {
+        "label": "Пример: журнал службы",
+        "insert": "journalctl -u serversstatus-agent -n 50 --no-pager",
+        "help": "Замените имя службы"
+      },
+      {
+        "label": "Пример: ошибки загрузки",
+        "insert": "journalctl -b -p err -n 50 --no-pager",
+        "help": "Последние ошибки текущей загрузки"
+      },
+      {
+        "label": "Пример: порты",
+        "insert": "ss -tulpn",
+        "help": "Слушающие TCP/UDP-порты; PID доступен по правам"
+      },
+      {
+        "label": "Пример: сеть",
+        "insert": "ip -brief address\nip route",
+        "help": "Адреса и маршруты"
+      },
+      {
+        "label": "Пример: DNS",
+        "insert": "getent hosts example.com",
+        "help": "Разрешение имени через системный resolver"
+      },
+      {
+        "label": "Пример: HTTP-заголовки",
+        "insert": "curl -I --connect-timeout 5 --max-time 10 https://example.com",
+        "help": "Замените адрес; ограниченное время запроса"
+      },
+      {
+        "label": "Пример: топ CPU",
+        "insert": "ps aux --sort=-%cpu | head -n 16",
+        "help": "15 процессов по CPU"
+      },
+      {
+        "label": "Пример: топ памяти",
+        "insert": "ps aux --sort=-%mem | head -n 16",
+        "help": "15 процессов по памяти"
+      },
+      {
+        "label": "Пример: диски",
+        "insert": "lsblk -f\ndf -hT",
+        "help": "Файловые системы и свободное место"
+      },
+      {
+        "label": "Пример: размер папок",
+        "insert": "du -h --max-depth=1 /var 2>/dev/null | sort -h",
+        "help": "Размеры каталогов /var; может занять время"
+      },
+      {
+        "label": "Пример: последние входы",
+        "insert": "last -n 15",
+        "help": "15 последних записей входа"
+      },
+      {
+        "label": "Пример: CentOS пакеты",
+        "insert": "rpm -qa | sort | head -n 40",
+        "help": "Первые 40 установленных RPM"
+      },
+      {
+        "label": "Пример: контейнеры",
+        "insert": "docker ps\ndocker stats --no-stream",
+        "help": "Контейнеры и разовая статистика при наличии доступа"
+      },
+      {
+        "label": "Пример: Nginx конфигурация",
+        "insert": "nginx -t",
+        "help": "Проверка синтаксиса без перезапуска"
+      },
+      {
+        "label": "Пример: версия PostgreSQL",
+        "insert": "psql -c 'SELECT version();'",
+        "help": "Требуется настроенное подключение PostgreSQL"
+      },
+      {
+        "label": "Пример: версия MySQL",
+        "insert": "mysql --execute='SELECT VERSION();'",
+        "help": "Требуется настроенное подключение MySQL"
+      }
+    ]
+  }
+}
