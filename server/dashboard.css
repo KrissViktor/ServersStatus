@@ -41,3 +41,8 @@ button:hover{background:#262626}
 .task-metric{--plot:#83b8df;--grid:#3b4b56}
 .task-metric.task-ram{--plot:#bca6dc;--grid:#4b4255}
 .credits{color:#a6a6a6}
+
+/* Detail sections remain compact until explicitly opened. */
+.server-fold{padding:0}.server-fold>summary{font-size:20px;font-weight:650;color:var(--text);padding:20px 26px}.server-fold>section{padding:0 26px 24px}.section-fold{margin-top:16px;padding-top:12px}.section-fold>summary{font-size:15px;font-weight:600;color:var(--text);padding:4px 0 12px}.section-fold>section.extended{border-top:0;margin-top:0;padding-top:12px}.section-fold[open]>summary,.server-fold[open]>summary{margin-bottom:8px}.update-history-heading{position:sticky;top:0;z-index:2;background:var(--panel);padding:12px 0;margin-bottom:0;border-bottom:1px solid var(--line)}[data-update-history]:focus-visible{outline:2px solid var(--muted);outline-offset:3px}@media(max-width:760px){.server-fold>summary{padding:16px 18px}.server-fold>section{padding:0 18px 18px}}
+
+.section-fold{margin-top:8px;padding-top:8px}.section-fold>summary{padding-bottom:8px}.fold-grid{border-top:0;margin-top:0;padding-top:0;gap:0 28px}

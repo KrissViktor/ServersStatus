@@ -15,10 +15,9 @@
       for (const target of targets) {
         const source = next.getElementById(target.id);
         if (source && source.innerHTML !== target.innerHTML) {
-          const expanded = [...target.querySelectorAll('details')].map(detail => detail.open);
-          [...source.querySelectorAll('details')].forEach((detail,index) => {
-            if (index < expanded.length) detail.open = expanded[index];
-          });
+          const key=detail=>detail.dataset.foldKey || detail.querySelector('summary')?.textContent.trim();
+          const expanded = new Map([...target.querySelectorAll('details')].map(detail=>[key(detail),detail.open]));
+          for (const detail of source.querySelectorAll('details'))if(expanded.has(key(detail)))detail.open=expanded.get(key(detail));
           target.innerHTML = source.innerHTML;
         }
       }

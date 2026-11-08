@@ -91,6 +91,7 @@ def detail_page(row, csrf):
     from .console_ui import section as console_section
     content+=console_section(row['id'],csrf,data)
     if data.get('windows_updates'):
-        content += '<section class="server"><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
+        content += '<section class="server"><h3>Управление Windows</h3><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
     content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'
-    return page(content, refresh=True)
+    from .folding import fold_sections
+    return page(fold_sections(content), refresh=True)

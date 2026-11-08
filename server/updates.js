@@ -1,6 +1,18 @@
 (() => {
   if (!document.querySelector('[data-updates-root]'))return;
   let busy=false;
+  for (const history of document.querySelectorAll('[data-update-history]')) {
+    const deactivate=()=>{history.classList.remove('scroll-active');history.style.overflowY='hidden';history.style.overscrollBehaviorY='auto'};
+    history.addEventListener('click',()=>{history.focus({preventScroll:true});history.classList.add('scroll-active');history.style.overflowY='auto';history.style.overscrollBehaviorY='contain'});
+    history.addEventListener('focusin',()=>{history.classList.add('scroll-active');history.style.overflowY='auto';history.style.overscrollBehaviorY='contain'});
+    history.addEventListener('focusout',event=>{if(!history.contains(event.relatedTarget))deactivate()});
+    history.addEventListener('pointerleave',()=>{if(history.contains(document.activeElement))document.activeElement.blur();deactivate()});
+    history.addEventListener('wheel',event=>{
+      if (!history.classList.contains('scroll-active')) {
+        event.preventDefault();window.scrollBy({left:event.deltaX,top:event.deltaY,behavior:'instant'});
+      }
+    },{passive:false});
+  }
   setInterval(async()=>{
     if (busy || document.hidden)return;
     busy=true;
@@ -27,7 +39,9 @@
         const opened=new Map([...history.querySelectorAll('details')].map(n=>[n.dataset.updateJob,n.open]));
         for (const detail of freshHistory.querySelectorAll('details'))if(opened.has(detail.dataset.updateJob))detail.open=opened.get(detail.dataset.updateJob);
         if (history.innerHTML!==freshHistory.innerHTML) {
-          const top=history.scrollTop;history.innerHTML=freshHistory.innerHTML;history.scrollTop=top;
+          const top=history.scrollTop, focused=history.contains(document.activeElement);
+          history.innerHTML=freshHistory.innerHTML;history.scrollTop=top;
+          if(focused)history.focus({preventScroll:true});
         }
       }
     } catch (_) {} finally {busy=false;}

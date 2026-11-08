@@ -154,7 +154,7 @@ def server_card(row, now):
     for disk in monitored_disks(data):
         percent = min(100, number(disk.get('used_percent')))
         content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p></div>'
-    content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section><div class="secondary"><section><h3>Службы</h3>'
+    content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section><div class="secondary fold-grid"><section><h3>Службы</h3>'
     services = data.get('services', [])
     if not services:
         content += '<p class="empty small">Контроль служб не настроен</p>'
@@ -188,7 +188,8 @@ def server_card(row, now):
         content += '<p class="muted legend">Свежесть файла не подтверждает возможность восстановления SQL.</p>'
     from .metrics_ui import extended_sections
     content += '</section></div>' + extended_sections(data) + '<details><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
-    return content
+    from .folding import fold_sections
+    return fold_sections(content)
 
 
 def dashboard(rows, q='', view='all'):
