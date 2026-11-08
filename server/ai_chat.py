@@ -102,6 +102,13 @@ async def generate(db,job,messages,api_key):
         # Fetch current public context before generation: small local models may
         # answer from training data instead of choosing a tool themselves.
         if session.internet:
+            from .ai_weather import requested,answer
+            if requested(session.query) and not session.direct_source:
+                weather=await session.execute('weather',{})
+                if 'error' in weather:
+                    reply='Не удалось получить прогноз: '+weather['error']+' ['+weather['source']+']. Источник и причина указаны ниже.'
+                else:reply=answer(json.loads(weather['data']),weather['source'])
+                done=True;return
             name='web_page' if session.direct_source and not job.get('web_query') else 'web_search'
             args={'source_id':session.direct_source} if name=='web_page' else {}
             result=await session.execute(name,args)

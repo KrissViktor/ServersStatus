@@ -53,7 +53,7 @@ class ToolsTest(unittest.TestCase):
 
     def test_automatic_search_before_model_without_separate_query(self):
         import httpx
-        s=self.session(internet_access=True,question='Какая погода завтра в Москве?')
+        s=self.session(internet_access=True,question='Найди новости Москвы')
         with a.db() as c:messages=ai_chat.context(c,s.job)
         def handler(request):
             payload=json.loads(request.content)
@@ -63,7 +63,7 @@ class ToolsTest(unittest.TestCase):
         with patch('server.ai_tools.search',new_callable=AsyncMock,return_value=[{'url':'https://example.com/weather','title':'Weather forecast'}]) as search, patch('server.ai_tools.fetch',new_callable=AsyncMock,return_value={'url':'https://example.com/weather','type':'text/html','text':'<p>Weather forecast: tomorrow +5 C</p>'}) as page:
             result=self.generate(handler,s.job,messages)
             page.assert_awaited_once_with('https://example.com/weather')
-            search.assert_awaited_once_with('Какая погода завтра в Москве?')
+            search.assert_awaited_once_with('Найди новости Москвы')
         self.assertEqual(result['status'],'completed')
         self.assertEqual(self.client.get('/api/ai/chat/'+self.chat).json()['turns'][0]['tools'][0]['status'],'completed')
 

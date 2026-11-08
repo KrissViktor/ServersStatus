@@ -34,7 +34,7 @@ PORTAL=[tool('servers','Список серверов: ID, имя, связь, C
  tool('history','Средняя/максимальная/минимальная загрузка CPU/RAM за последние часы.',{'agent':AGENT,'hours':{'type':'integer','minimum':1,'maximum':168}},['agent']),
  tool('processes','Последние процессы: топ по CPU или памяти.',{'agent':AGENT,'sort':{'type':'string','enum':['cpu','ram']}},['agent']),
  tool('services','Последние состояния служб; поиск по имени/описанию.',{'agent':AGENT,'query':{'type':'string','maxLength':100}},['agent'])]
-WEB=[tool('web_search','Найти в интернете по неизменяемому запросу, введённому пользователем. Нельзя добавлять данные портала.'),tool('web_page','Прочитать публичную страницу из пользовательской ссылки или результатов поиска. Используй source_id W1/W2 из списка.',{'source_id':{'type':'string','pattern':'^W[0-9]+$'}},['source_id'])]
+WEB=[tool('weather','Прогноз погоды для города из текущего пользовательского вопроса. Не принимает данные портала.'),tool('web_search','Найти в интернете по неизменяемому запросу, введённому пользователем. Нельзя добавлять данные портала.'),tool('web_page','Прочитать публичную страницу из пользовательской ссылки или результатов поиска. Используй source_id W1/W2 из списка.',{'source_id':{'type':'string','pattern':'^W[0-9]+$'}},['source_id'])]
 
 
 def stamp(value):
@@ -96,7 +96,11 @@ class Session:
                 active=c.execute('SELECT status FROM ai_turns WHERE id=?',(self.job['id'],)).fetchone()
                 if not active or active[0]!='running':raise WebError('Запрос остановлен')
             self.validate(name,args)
-            if name=='web_search':
+            if name=='weather':
+                from .ai_weather import forecast
+                label='Прогноз Open-Meteo';url='https://open-meteo.com/'
+                data,url=await forecast(self.query)
+            elif name=='web_search':
                 label='Google: '+self.query
                 data=await search(self.query)
                 self.search_sources=[]
