@@ -69,7 +69,7 @@ def access_page(request,db,csrf,message='',fragment=False):
     elif step==2:
         label='Код из Telegram: 6 цифр';pattern='[0-9]{6}';maxlength=6;autocomplete='one-time-code'
     else:
-        label='Второй код из Telegram: 6 цифр и знаков';pattern='.{6}';maxlength=6;autocomplete='off'
+        label='Второй код из Telegram: 6 цифр и латинских букв';pattern='[A-Za-z0-9]{6}';maxlength=6;autocomplete='off'
     return render(body+f'<section class="server"><h2>Шаг {step} из 3</h2><form method="post" action="/console-access"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>{label}<input type="password" name="code" required pattern="{pattern}" maxlength="{maxlength}" autocomplete="{autocomplete}" autofocus></label><button>Продолжить</button></form><p class="muted">Каждый код действует 5 минут. Доступ откроется только после всех трёх шагов.</p></section>')
 
 
@@ -130,7 +130,7 @@ def register(app,db,authenticated,csrf_token):
                         nonce=secrets.token_hex(16)
                         if step==1:otp=''.join(secrets.choice(string.digits) for _ in range(6))
                         else:
-                            chars=[secrets.choice(string.digits),secrets.choice('!@#$%&*?')]+[secrets.choice(string.digits+'!@#$%&*?') for _ in range(4)]
+                            chars=[secrets.choice(string.digits),secrets.choice(string.ascii_letters)]+[secrets.choice(string.digits+string.ascii_letters) for _ in range(4)]
                             secrets.SystemRandom().shuffle(chars);otp=''.join(chars)
                         if not error:c.execute('INSERT INTO console_challenges VALUES (?,0,?,?,?,?) ON CONFLICT(session) DO UPDATE SET step=0,nonce=excluded.nonce,digest=excluded.digest,expires=excluded.expires,created=excluded.created',(session,nonce,code_hash(config,session,nonce,otp),time.time()+300,time.time()))
                         if not error:

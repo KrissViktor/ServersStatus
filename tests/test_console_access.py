@@ -48,7 +48,7 @@ class ConsoleAccessTest(unittest.TestCase):
         self.assertFalse(self.client.get('/console-access/status').json()['unlocked'])
         self.assertEqual(self.enter(numeric).status_code,303)
         mixed=self.codes[-1][0];self.assertEqual(len(mixed),6)
-        self.assertTrue(any(v.isdigit() for v in mixed));self.assertTrue(any(not v.isdigit() for v in mixed))
+        self.assertTrue(any(v.isdigit() for v in mixed));self.assertTrue(any(v.isalpha() for v in mixed));self.assertRegex(mixed,r'^[A-Za-z0-9]{6}$')
         with a.db() as c:
             challenge=dict(c.execute('SELECT * FROM console_challenges').fetchone())
             self.assertNotEqual(challenge['digest'],mixed)
