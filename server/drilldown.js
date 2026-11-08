@@ -77,7 +77,7 @@
   dialog.addEventListener('click',event=>{const zoomButton=event.target.closest('[data-zoom]'),panButton=event.target.closest('[data-pan]');if(zoomButton)zoom(zoomButton.dataset.zoom==='out');if(panButton)pan(Number(panButton.dataset.pan))});
   dialog.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();pan(event.key==='ArrowLeft'?-1:1)}});
   plot.addEventListener('wheel',event=>{event.preventDefault();if(!pending)zoom(event.deltaY>0,Math.max(0,Math.min(1,(event.clientX-plot.getBoundingClientRect().left)/plot.clientWidth)))},{passive:false});
-  plot.addEventListener('pointerdown',event=>{if(event.button!==0 || !points.length)return;drag={x:event.clientX,offset:0};plot.setPointerCapture(event.pointerId)});
+  plot.addEventListener('pointerdown',event=>{if(event.button!==0 || !points.length)return;event.preventDefault();drag={x:event.clientX,offset:0};plot.setPointerCapture(event.pointerId)});
   plot.addEventListener('pointermove',event=>{if(!drag)return;drag.offset=-(event.clientX-drag.x)/Math.max(1,plot.clientWidth-103)*(domain[1]-domain[0]);render(drag.offset)});
   plot.addEventListener('pointerup',()=>{if(!drag)return;const offset=drag.offset;drag=null;if(Math.abs(offset)>1){center=Math.max(0,center+offset);load()}else render()});
   plot.addEventListener('pointercancel',()=>{drag=null;render()});
