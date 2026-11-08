@@ -927,3 +927,9 @@ Cancel теперь удаляет ещё не переданные ответы
 Прошли 13 тестов консоли. Публичная страница Windows Actions #42430909325
 подтвердила success для Test remote console engine с реальными Windows
 Read-Host/Unicode/EOF/cancel; затем началась сборка EXE.
+
+Windows Actions https://github.com/KrissViktor/ServersStatus/actions/runs/42430909325
+завершился успешно целиком: engine, проверка PowerShell, file-lock/rollback,
+сборка службы, frozen service/self-update, GUI и Publish public GitHub release.
+Агент с вводом ответов опубликован (код 779da04); изменение приоритета cancel
+в aa136df относится только к панели и не требует отдельной Windows-сборки.
