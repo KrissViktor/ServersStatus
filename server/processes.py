@@ -1,4 +1,4 @@
-"""Latest full process list and compact, explicitly linked historical snapshots."""
+"""Latest full process list and full, explicitly linked historical snapshots."""
 import hmac
 import json
 import zlib
@@ -39,12 +39,7 @@ def store(c,agent,data,now=None):
         report=c.execute('SELECT agent,received FROM reports WHERE rowid=?',(data.report_id,)).fetchone()
         if not report or report['agent']!=agent or data.report_received is None or abs(report['received']-data.report_received)>.000001:
             raise HTTPException(409,'Отчёт для снимка процессов не найден или изменился')
-        valid_cpu=[p for p in data.items if p.cpu_percent is not None and data.status=='available']
-        valid_ram=[p for p in data.items if p.memory_bytes is not None and data.status=='available']
-        top_cpu=sorted(valid_cpu,key=lambda p:(-p.cpu_percent,p.pid))[:10]
-        top_ram=sorted(valid_ram,key=lambda p:(-p.memory_bytes,p.pid))[:10]
-        entries={p.pid:p.model_dump() for p in top_cpu+top_ram}
-        compact={'status':data.status,'items':list(entries.values()),'total':data.total,'unreadable':data.unreadable,'truncated':data.truncated,'cpu_pids':[p.pid for p in top_cpu],'ram_pids':[p.pid for p in top_ram]}
+        compact={**data.model_dump(exclude={'report_id','report_received'}),'archive_format':'full_v1'}
         encoded=zlib.compress(json.dumps(compact,ensure_ascii=False,separators=(',',':')).encode('utf-8'))
         c.execute('INSERT OR IGNORE INTO process_history VALUES (?,?,?,?,?)',(data.report_id,agent,report['received'],received,encoded))
     c.execute('INSERT INTO latest_processes VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data',(agent,received,data.model_dump_json()))

@@ -48,23 +48,19 @@ def snapshot(c,agent,identifier):
     content='<header class="snapshot-heading"><h2>Снимок · '+esc(stamp)+'</h2><p class="muted">Исходный отчёт #'+str(identifier)+'. Состояние на момент измерения.</p></header>'+server_card(card,row['received'],historical=True)
     process=c.execute('SELECT data,process_received FROM process_history WHERE report=? AND agent=? AND received=?',(identifier,agent,row['received'])).fetchone()
     compact=json.loads(zlib.decompress(process['data']).decode('utf-8')) if process else None
-    content+='<section class="server snapshot-processes"><h3>Процессы в этом измерении</h3>'
-    if compact is None:
-        content+='<p class="muted">'+esc(missing_process_reason(c,agent,row['received']))+'</p>'
-    elif compact.get('status','available')!='available':
-        content+='<p class="muted">В этом измерении агент не смог прочитать список процессов. Проверьте права службы на сервере.</p>'
+    process_result={'snapshot':compact,'received':row['received']}
+    if compact is None:process_result['message']=missing_process_reason(c,agent,row['received'])
+    elif compact.get('status')!='available':process_result['message']='В этом измерении агент не смог прочитать список процессов. Проверьте права службы агента.'
+    elif 'archive_format' not in compact:compact['archive_format']='legacy_top'
+    service=c.execute('SELECT received,data FROM service_history WHERE agent=? AND received<=? ORDER BY received DESC,id DESC LIMIT 1',(agent,row['received'])).fetchone()
+    if service:
+        services={'inventory':json.loads(zlib.decompress(service['data']).decode('utf-8')),'received':service['received']}
     else:
-        content+='<p class="muted">Топ-10 по CPU и топ-10 по памяти. Всего процессов: '+str(compact['total'])+'; ограничены права: '+str(compact['unreadable'])+'. CPU — доля общей мощности сервера.</p>'
-        if compact.get('truncated'):content+='<p class="notice">Исходный список был сокращён агентом; часть процессов может отсутствовать.</p>'
-        by_pid={p['pid']:p for p in compact['items']}
-        for key,title in [('cpu_pids','Наибольшая загрузка CPU'),('ram_pids','Наибольший объём памяти')]:
-            content+='<h4>'+title+'</h4><div class="table-scroll"><table class="metric-table"><thead><tr><th>Процесс / PID</th><th>Пользователь</th><th>CPU</th><th>Память</th></tr></thead><tbody>'
-            for pid in compact[key]:
-                p=by_pid[pid]
-                content+='<tr><td>'+esc(p['name'])+' · '+str(pid)+'</td><td>'+esc(p['username'] or '—')+'</td><td>'+esc(f"{p['cpu_percent']:.2f}%" if p['cpu_percent'] is not None else '—')+'</td><td>'+size(p['memory_bytes'])+'</td></tr>'
-            content+='</tbody></table></div>'
-        content+='<p class="muted legend">Процессы и общие метрики измеряются в одном цикле агента. Показатели помогают найти источник нагрузки; это снимок, а не трассировка всех событий.</p>'
-    return {'report_id':identifier,'received':row['received'],'html':content+'</section>','processes_available':compact is not None and compact.get('status','available')=='available'}
+        services={'inventory':None,'received':None,'message':'Полный список служб для этого момента не сохранён. История служб начинается после обновления портала и первого сбора. Текущие службы в старый снимок не подставляются.'}
+    from .task_manager import section
+    content+=section(agent,{'processes':process_result,'services':services})
+    return {'report_id':identifier,'received':row['received'],'html':content,'processes_available':compact is not None and compact.get('status','available')=='available'}
+
 
 
 def register(app,db,authenticated):

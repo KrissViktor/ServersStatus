@@ -119,7 +119,7 @@
       const response=await fetch(url,{signal:controller.signal,credentials:'same-origin',cache:'no-store'});
       if(!response.ok){let text='Не удалось получить снимок';try{text=(await response.json()).detail||text}catch(_){}throw new Error(text)}
       const data=await response.json();if(selected?.report_id!==identifier || !dialog.open)return;
-      snapshotContent.innerHTML=data.html;snapshotContent.scrollIntoView({block:'start',behavior:'smooth'});
+      snapshotContent.innerHTML=data.html;window.initTaskManagers?.(snapshotContent);snapshotContent.scrollIntoView({block:'start',behavior:'smooth'});
     }catch(error){if(error.name!=='AbortError' && selected?.report_id===identifier)snapshotContent.textContent=error.message}
   });
   new ResizeObserver(()=>{if(dialog.open && points.length && !drag)render()}).observe(plot);

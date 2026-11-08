@@ -88,10 +88,8 @@ def detail_page(row, csrf,console_access=False):
     content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None)
     from .forecast import forecast_html
     content += (forecast_html(dict(row).get('forecasts', {}), row['received'] is None or time.time()-row['received']>=180, monitored_disks(json.loads(row['data'] or '{}'))) if can_history() else '') + '</div>'
-    from .processes_ui import process_section
-    content += process_section(row['id'])
-    from .services import section as services_section
-    content += services_section(row['id'])
+    from .task_manager import section as task_section,assets as task_assets
+    content += task_section(row['id'])+task_assets()
     data=json.loads(row['data'] or '{}')
     from .console_ui import section as console_section
     if console_access:content+=console_section(row['id'],csrf,data)

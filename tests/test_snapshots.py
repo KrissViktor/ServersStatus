@@ -46,12 +46,12 @@ class HistoricalSnapshotsTest(unittest.TestCase):
         self.assertEqual(self.client.get('/api/history/other/snapshot',params={'report_id':first['report_id']}).status_code,404)
         self.client.cookies.clear();self.assertEqual(self.client.get('/api/history/pc/snapshot',params={'report_id':first['report_id']}).status_code,401)
 
-    def test_compact_history_is_capped_linked_and_not_filled_from_current(self):
+    def test_full_history_is_linked_and_not_filled_from_current(self):
         first=self.report();self.assertEqual(self.processes(first,count=1000).status_code,200)
         with a.db() as c:
             blob=c.execute('SELECT data FROM process_history WHERE report=?',(first['report_id'],)).fetchone()[0]
-            archived=json.loads(zlib.decompress(blob));self.assertLessEqual(len(archived['items']),20)
-            self.assertEqual(len(archived['cpu_pids']),10);self.assertEqual(len(archived['ram_pids']),10)
+            archived=json.loads(zlib.decompress(blob));self.assertEqual(len(archived['items']),1000)
+            self.assertEqual(archived['archive_format'],'full_v1')
         bad={**first,'report_received':first['report_received']+1}
         self.assertEqual(self.processes(bad).status_code,409)
         other=self.client.post('/api/report/other',headers={'Authorization':'Bearer other-key'},json=self.data).json()
@@ -93,3 +93,30 @@ class HistoricalSnapshotsTest(unittest.TestCase):
             c.execute('DELETE FROM report_maintenance')
             self.assertEqual(cleanup(c,self.now),1)
             self.assertEqual(c.execute('SELECT count(*) FROM process_history').fetchone()[0],0)
+
+    def test_services_are_historical_deduplicated_and_never_from_future(self):
+        from server.services import store
+        from server.snapshots import snapshot
+        payload={'status':'available','platform':'linux','items':[{'name':'old.service','status':'running','details':{'MainPID':'123'}}],'total':1}
+        with a.db() as c:
+            store(c,'pc',payload,self.now-30);store(c,'pc',payload,self.now-20)
+            identifier=c.execute('INSERT INTO reports VALUES (?,?,?)',('pc',self.now-10,json.dumps(self.data))).lastrowid
+            store(c,'pc',{**payload,'items':[{'name':'FUTURE.service','status':'stopped'}]},self.now)
+            self.assertEqual(c.execute('SELECT count(*) FROM service_history').fetchone()[0],2)
+            html=snapshot(c,'pc',identifier)['html']
+            self.assertIn('old.service',html);self.assertNotIn('FUTURE.service',html)
+            old=c.execute('INSERT INTO reports VALUES (?,?,?)',('pc',self.now-100,json.dumps(self.data))).lastrowid
+            self.assertIn('Полный список служб для этого момента не сохранён',snapshot(c,'pc',old)['html'])
+            c.execute('DELETE FROM report_maintenance')
+            store(c,'pc',{**payload,'items':[]},self.now-(RETENTION_DAYS+2)*86400)
+            store(c,'pc',{**payload,'items':[{'name':'boundary','status':'running'}]},self.now-(RETENTION_DAYS+1)*86400)
+            cleanup(c,self.now)
+            self.assertEqual(c.execute('SELECT count(*) FROM service_history').fetchone()[0],3)
+
+    def test_legacy_top_history_is_labelled_without_fabricated_processes(self):
+        report=self.report()
+        legacy={'status':'available','items':[{'pid':1,'name':'legacy-process','cpu_percent':50}],'total':100,'cpu_pids':[1],'ram_pids':[1]}
+        with a.db() as c:
+            c.execute('INSERT INTO process_history VALUES (?,?,?,?,?)',(report['report_id'],'pc',report['report_received'],self.now,zlib.compress(json.dumps(legacy).encode())))
+        result=self.client.get('/api/history/pc/snapshot',params={'report_id':report['report_id']}).json()
+        self.assertIn('legacy_top',result['html']);self.assertIn('legacy-process',result['html'])

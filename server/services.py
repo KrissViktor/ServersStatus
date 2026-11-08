@@ -2,16 +2,15 @@
 import hmac
 import json
 import time
-from pathlib import Path
-from urllib.parse import quote
+import zlib
 from fastapi import Request,HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel,Field,ValidationError
 from .console import read_body
-from .dashboard import esc
 
-SCHEMA='CREATE TABLE IF NOT EXISTS latest_services(agent TEXT PRIMARY KEY,received REAL,data TEXT);'
-SCRIPT=Path(__file__).with_name('services.js').read_text(encoding='utf-8')
+SCHEMA='''CREATE TABLE IF NOT EXISTS latest_services(agent TEXT PRIMARY KEY,received REAL,data TEXT);
+CREATE TABLE IF NOT EXISTS service_history(id INTEGER PRIMARY KEY,agent TEXT,received REAL,data BLOB);
+CREATE INDEX IF NOT EXISTS service_history_agent_time ON service_history(agent,received,id);'''
 
 class Service(BaseModel):
     name:str=Field(min_length=1,max_length=255)
@@ -32,12 +31,15 @@ def store(c,agent,payload,now=None):
     data=Inventory.model_validate(payload)
     if any(len(k)>100 or len(v)>4096 for item in data.items for k,v in item.details.items()):raise ValueError('Service detail too long')
     if not c.execute('SELECT 1 FROM agents WHERE id=?',(agent,)).fetchone():return False
-    c.execute('INSERT INTO latest_services VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data',(agent,time.time() if now is None else now,data.model_dump_json()))
+    received=time.time() if now is None else now
+    encoded=data.model_dump_json()
+    previous=c.execute('SELECT data FROM latest_services WHERE agent=?',(agent,)).fetchone()
+    # Store a revision only when the inventory changes; timestamp is server reception,
+    # never backdated into a report whose service inventory was not yet known.
+    if not previous or previous['data']!=encoded or not c.execute('SELECT 1 FROM service_history WHERE agent=? LIMIT 1',(agent,)).fetchone():
+        c.execute('INSERT INTO service_history(agent,received,data) VALUES (?,?,?)',(agent,received,zlib.compress(encoded.encode('utf-8'))))
+    c.execute('INSERT INTO latest_services VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data',(agent,received,encoded))
     return True
-
-
-def section(agent):
-    return '<section class="server all-services-panel" data-services-url="/api/servers/'+esc(quote(agent,safe=''))+'/services"><h2>Все службы</h2><p class="muted services-info" role="status">Загрузка списка служб…</p><div class="searchbar"><label>Поиск<input type="search" class="services-search" placeholder="Имя, описание, пользователь, путь…"></label><label>Состояние<select class="services-filter"><option value="all">Все</option><option value="running">🟢 Работает</option><option value="stopped">🔴 Остановлена</option><option value="paused">🟡 На паузе</option><option value="failed">🔴 Ошибка</option><option value="other">Остальные</option></select></label><button type="button" class="services-expand" aria-expanded="false">Показать все</button></div><div class="table-scroll services-table"><table class="metric-table"><thead><tr><th>Имя / описание</th><th>Состояние</th><th>PID</th><th>Автозапуск</th><th>Пользователь</th><th>Подробности</th></tr></thead><tbody class="services-rows"></tbody></table></div><p class="muted legend">Полный список обновляется агентом раз в минуту. Сведения доступны в пределах прав службы агента. Эти состояния показываются для справки; уведомления используют отдельный настроенный список контролируемых служб.</p></section><script>'+SCRIPT+'</script>'
 
 
 def register(app,db,authenticated,digest):

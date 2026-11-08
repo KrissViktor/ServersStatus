@@ -17,6 +17,13 @@ def cleanup(connection,now):
         connection.execute('DELETE FROM console_delivery_rate WHERE created<?',(now-60,))
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='process_history'").fetchone():
         connection.execute('DELETE FROM process_history WHERE report IN (SELECT rowid FROM reports WHERE received<? ORDER BY received LIMIT ?)',(now-RETENTION_DAYS*86400,CLEANUP_BATCH))
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='service_history'").fetchone():
+        # Keep the last revision before the boundary to describe unchanged services
+        # in retained reports; remove earlier obsolete revisions in bounded batches.
+        connection.execute('''DELETE FROM service_history WHERE id IN (
+            SELECT h.id FROM service_history h WHERE h.received<? AND h.id<>(
+                SELECT s.id FROM service_history s WHERE s.agent=h.agent AND s.received<?
+                ORDER BY s.received DESC,s.id DESC LIMIT 1) LIMIT ?)''',(now-RETENTION_DAYS*86400,now-RETENTION_DAYS*86400,CLEANUP_BATCH))
     cursor=connection.execute('''DELETE FROM reports WHERE rowid IN (
         SELECT rowid FROM reports WHERE received<? ORDER BY received LIMIT ?
     )''',(now-RETENTION_DAYS*86400,CLEANUP_BATCH))

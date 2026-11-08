@@ -420,6 +420,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM latest_reports WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_processes WHERE agent=?', (name,))
                 c.execute('DELETE FROM latest_services WHERE agent=?', (name,))
+                c.execute('DELETE FROM service_history WHERE agent=?', (name,))
                 c.execute('DELETE FROM process_history WHERE agent=?', (name,))
                 c.execute('DELETE FROM windows_commands WHERE agent=?', (name,))
                 c.execute('DELETE FROM rdp_operations WHERE agent=?', (name,))
