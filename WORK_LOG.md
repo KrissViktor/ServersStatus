@@ -1720,3 +1720,7 @@ Windows AI CI #7 (4a6750c) и #8 (96e6b88) успешно прошли release r
 Языки: PowerShell 5.1, C# (тестовая программа), YAML, Markdown.
 Проверки: diff --check; Windows CI запускает новые проверки и прежний smoke-test
 службы. Реальные Windows/модель/настройки пользователя не изменялись.
+
+Итог: Windows AI service CI #9 (9af1d35) успешно прошёл release regression,
+новый Test-Setup (проверенный кэш/повреждения/независимый exit code/логи DLL/CPU)
+и native LocalService smoke-test на Windows Server 2022 / PS5.1.
