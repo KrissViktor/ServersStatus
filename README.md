@@ -588,7 +588,7 @@ GitHub новые задачи не создаются. История уста�
 
 ### Локальная модель на Windows (первый этап)
 
-Подготовлен установщик для `windows-04 / WIN-4JJ50EC22U2`: CPU llama.cpp,
+Подготовлен установщик для `windows-02 / WIN-CU629F0N7II`: CPU llama.cpp,
 Qwen3-14B Q4_K_M и отдельная ограниченная Windows-служба без Python/Docker.
 Инструкция: [deploy/ai-windows/README.md](deploy/ai-windows/README.md).
 Текущий этап — локальная установка и измерение скорости; чат, защищённая связь

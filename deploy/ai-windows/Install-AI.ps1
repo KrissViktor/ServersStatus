@@ -14,7 +14,7 @@ param(
 $ErrorActionPreference='Stop'
 $root='C:\ProgramData\ServersStatusAI'
 if(Get-NetTCPConnection -LocalPort 8091 -State Listen -ErrorAction SilentlyContinue){throw 'TCP port 8091 is already in use'}
-if (!$AllowOtherComputer -and $env:COMPUTERNAME -ne 'WIN-4JJ50EC22U2') { throw 'Prepared for WIN-4JJ50EC22U2 (windows-04). Use -AllowOtherComputer only intentionally.' }
+if (!$AllowOtherComputer -and $env:COMPUTERNAME -ne 'WIN-CU629F0N7II') { throw 'Prepared for WIN-CU629F0N7II (windows-02). Use -AllowOtherComputer only intentionally.' }
 if (Get-Service ServersStatusAI -ErrorAction SilentlyContinue) { throw 'Service already installed. Stop it and review existing settings; installation will not overwrite them.' }
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
 $ProgressPreference='SilentlyContinue'
@@ -115,8 +115,8 @@ if(!(Test-Path $csc)){throw '.NET Framework 4.x C# compiler not found'}
 & $csc /nologo /platform:x64 /target:exe "/out:$root\ServersStatusAI.exe" /reference:System.ServiceProcess.dll (Join-Path $PSScriptRoot 'AIService.cs')
 if($LASTEXITCODE){throw 'Service compilation failed'}
 Copy-Item (Join-Path $PSScriptRoot '*-AI.ps1') -Destination $root -Exclude Install-AI.ps1 -Force
-@{engine_tag=$release.tag_name;engine_sha256=$engineHash;model_revision=$modelRevision;model_sha256=$modelHash;agent='windows-04';installed_utc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content "$root\versions.json" -Encoding UTF8
-& sc.exe create ServersStatusAI binPath= ('"'+$root+'\ServersStatusAI.exe"') start= auto obj= 'NT AUTHORITY\LocalService' DisplayName= 'ServersStatus local AI (windows-04)' | Out-Null
+@{engine_tag=$release.tag_name;engine_sha256=$engineHash;model_revision=$modelRevision;model_sha256=$modelHash;agent='windows-02';installed_utc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content "$root\versions.json" -Encoding UTF8
+& sc.exe create ServersStatusAI binPath= ('"'+$root+'\ServersStatusAI.exe"') start= auto obj= 'NT AUTHORITY\LocalService' DisplayName= 'ServersStatus local AI (windows-02)' | Out-Null
 if($LASTEXITCODE){throw 'Failed to register Windows service'}
 & sc.exe failure ServersStatusAI reset= 3600 actions= restart/30000/restart/60000/restart/300000 | Out-Null
 if($LASTEXITCODE){throw 'Failed to configure service recovery'}

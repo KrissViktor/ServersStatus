@@ -1,4 +1,4 @@
-# Локальная модель — windows-04 / WIN-4JJ50EC22U2
+# Локальная модель — windows-02 / WIN-CU629F0N7II
 
 Первый этап: запустить и измерить локальный сервер модели на Windows Server
 2022 x64, i7-12700K, без отдельной видеокарты. Портал и агент не изменяются.
@@ -15,7 +15,7 @@
 - C#/.NET Framework служба `ServersStatusAI`, компилируется встроенным Windows
   `csc.exe`; отдельный Python, Docker и SDK устанавливать не нужно.
 - Каталог `C:\ProgramData\ServersStatusAI`, отдельный случайный API-ключ.
-  Агент `windows-04`, его конфигурация и ключ не используются и не меняются.
+  Агент `windows-02`, его конфигурация и ключ не используются и не меняются.
 - Оболочка LocalService, автозапуск, SCM recovery после сбоев. У пользователя
   службы только чтение кода/модели/настроек и запись в каталог логов.
 
@@ -49,7 +49,7 @@ Expand-Archive -LiteralPath "$dest\source.zip" -DestinationPath $dest -Force
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$dest\ServersStatus-main\deploy\ai-windows\Install-AI.ps1"
 ```
 
-Установщик рассчитан на `WIN-4JJ50EC22U2`. На другом ПК он остановится;
+Установщик рассчитан на `WIN-CU629F0N7II`. На другом ПК он остановится;
 `-AllowOtherComputer` нужен только при осознанной установке на другой сервер.
 Не запускайте установщик повторно поверх уже установленной службы.
 
