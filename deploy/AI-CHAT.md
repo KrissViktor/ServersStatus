@@ -9,20 +9,25 @@
 **Ключ не присылать в чат ChatGPT, Telegram, Git или журналы.**
 Он передаётся только в локальный защищённый файл на Raspi.
 
-1. На **Backup**, PowerShell от администратора, скопируйте ключ в свой буфер
-   обмена (команда не печатает его):
-
-```powershell
-Set-Clipboard -Value ([IO.File]::ReadAllText('C:\ProgramData\ServersStatusAI\api-key.txt').Trim())
-```
-
-2. На **Raspberry Pi** обновите портал и запустите настройку:
+1. Сначала на **Raspberry Pi** обновите портал и запустите настройку:
 
 ```bash
 cd /opt/ServersStatus
 sudo git pull --ff-only origin main
 sudo bash /opt/ServersStatus/deploy/ai-ssh/Enable-PortalAI.sh
 ```
+
+Дождитесь `Paste API key ... (hidden):` и оставьте терминал ожидающим ввода.
+
+2. Теперь на **Backup**, PowerShell от администратора, скопируйте ключ в свой
+   буфер обмена (команда не печатает его):
+
+```powershell
+Set-Clipboard -Value ([IO.File]::ReadAllText('C:\ProgramData\ServersStatusAI\api-key.txt').Trim())
+```
+
+Сразу вернитесь к ожидающему терминалу Raspi, вставьте ключ и нажмите Enter.
+Не копируйте другие команды между копированием ключа и его вставкой.
 
 В строке `Paste API key ... (hidden):` вставьте ключ из буфера и нажмите Enter.
 Символы не отображаются. Скрипт проверяет health и авторизацию `/v1/models`
