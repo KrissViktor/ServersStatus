@@ -9,6 +9,8 @@
   let runningId=null, sendingInput=false;
   let busy=false, fetching=false, snapshot='', submitted=null, refreshDelay=5000, timer=null;
   const node=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n};
+  const archiveLabel=archiveButton?.querySelector('[data-console-archive-label]'),state=panel.querySelector('[data-console-state]'),runLabel=panel.querySelector('[data-console-run-label]');
+  const setArchiveLabel=text=>{if(archiveLabel)archiveLabel.textContent=text};
   async function refresh() {
     if (busy || fetching || document.hidden) return;
     fetching=true;
@@ -18,6 +20,11 @@
       if (!response.ok) throw new Error();
       const result=await response.json();
       refreshDelay=result.jobs.some(job=>['queued','running'].includes(job.status)) ? 1000 : 5000;
+      const pendingJob=result.jobs.find(job=>['queued','running','uncertain'].includes(job.status));
+      const phase=!result.info.enabled?'disabled':!result.online?'offline':pendingJob?.status||'ready';
+      panel.dataset.consolePhase=phase;
+      if(state)state.textContent={ready:'Готов к запуску',queued:'Задание в очереди',running:'Выполняется',uncertain:'Проверьте результат',offline:'Нет связи',disabled:'Отключено'}[phase];
+      if(runLabel)runLabel.textContent=phase==='running'?'Выполняется':phase==='queued'?'В очереди':'Запустить';
       runningId=result.jobs.find(job=>job.status==='running')?.id || null;
       if (inputForm)inputForm.hidden=!runningId || !result.info.interactive_input;
       if (form) {
@@ -41,20 +48,21 @@
         if (pre)positions.set(item.dataset.jobId,{top:pre.scrollTop,follow:pre.scrollHeight-pre.clientHeight-pre.scrollTop<24});
       }
       for (const job of visibleJobs) {
-        const item=document.createElement('details');item.dataset.jobId=job.id;
+        const item=document.createElement('details');item.dataset.jobId=job.id;item.className='terminal-job';item.dataset.status=['queued','running','uncertain','succeeded','failed','timeout','cancelled'].includes(job.status)?job.status:'unknown';
         const old=[...history.querySelectorAll('details')].find(n=>n.dataset.jobId===String(job.id));
         item.open=old ? old.open : job===visibleJobs[0];
         const date=new Date(job.created*1000).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'});
-        item.append(node('summary','#'+job.id+' · '+date+' МСК · '+job.label));
-        item.append(node('pre',job.command));
+        const summary=node('summary',''),heading=node('span','#'+job.id+' · '+date+' МСК'),badge=node('span',job.label);heading.className='terminal-job-date';badge.className='terminal-job-badge';summary.append(heading,badge);item.append(summary);
+        const command=node('pre',job.command);command.className='terminal-job-command';item.append(command);
         const output=node('pre',job.result.output || (job.status==='queued' ? 'Ожидаем агента…' : job.status==='running' ? 'Команда выполняется, ожидаем вывод…' : 'Вывод отсутствует'));
         output.dataset.consoleOutput=job.id;
-        output.style.cssText='white-space:pre-wrap;overflow:auto;max-height:400px;background:#080808;padding:14px;border-radius:8px';
+        output.className='terminal-job-output';
         item.append(output);
-        if (job.result.exit_code!==null && job.result.exit_code!==undefined)item.append(node('p','Код завершения: '+job.result.exit_code));
+        if (job.result.exit_code!==null && job.result.exit_code!==undefined){const exit=node('p','exit '+job.result.exit_code);exit.className='terminal-job-exit';item.append(exit)}
         if (job.result.truncated)item.append(node('p','Вывод сокращён до 16 Кб.'));
         fragment.append(item);
       }
+      if(!visibleJobs.length){const empty=node('div','');empty.className='terminal-empty';empty.append(node('span','❯_'),node('p','Здесь появится вывод команд'),node('small','Напишите команду выше и нажмите Ctrl+Enter'));fragment.append(empty)}
       history.replaceChildren(fragment);
       for (const pre of history.querySelectorAll('[data-console-output]')) {
         const saved=positions.get(pre.dataset.consoleOutput);
@@ -81,12 +89,12 @@
     clearBefore=Math.max(clearBefore,...lastJobs.filter(job=>!['queued','running','uncertain'].includes(job.status)).map(job=>job.id));
     sessionStorage.setItem('console-clear:'+panel.dataset.agent,String(clearBefore));
     archive=false;extraJobs=[];nextCursor=null;snapshot='';history.replaceChildren();
-    archiveButton.textContent='Показать всю историю';scope.textContent='История за последний час · завершённые записи скрыты визуально';poll();
+    setArchiveLabel('Вся история');scope.textContent='последний час · экран очищен';poll();
   });
   archiveButton?.addEventListener('click',()=>{
     archive=!archive;extraJobs=[];nextCursor=null;snapshot='';
-    archiveButton.textContent=archive ? 'Вернуться к последнему часу' : 'Показать всю историю';
-    scope.textContent=archive ? 'Вся история за последние 6 месяцев' : 'История за последний час';poll();
+    setArchiveLabel(archive ? 'Последний час' : 'Вся история');archiveButton.setAttribute('aria-pressed',String(archive));
+    scope.textContent=archive ? 'за последние 6 месяцев' : 'за последний час';poll();
   });
   moreButton?.addEventListener('click',async()=>{
     if(!nextCursor || fetching)return;
