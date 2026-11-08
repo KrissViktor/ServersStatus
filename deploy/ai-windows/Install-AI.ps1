@@ -25,6 +25,8 @@ New-Item -ItemType Directory -Force -Path $root,"$root\engine","$root\models","$
 if ($LASTEXITCODE) { throw 'Failed to restrict installation ACL' }
 & icacls.exe "$root\logs" /grant:r '*S-1-5-19:(OI)(CI)M' | Out-Null
 if ($LASTEXITCODE) { throw 'Failed to configure log ACL' }
+$requiredDisk=if($ModelPath){(Get-Item -LiteralPath $ModelPath).Length+2GB}else{30GB}
+if((Get-PSDrive C).Free -lt $requiredDisk){throw 'Not enough free space on C: for model download/copy and merge. Need up to 30 GB.'}
 $headers=@{'User-Agent'='ServersStatus-AI-installer';'Accept'='application/vnd.github+json'}
 $releaseUrl=if($EngineTag -eq 'latest'){'https://api.github.com/repos/ggml-org/llama.cpp/releases/latest'}else{'https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/'+[Uri]::EscapeDataString($EngineTag)}
 Write-Host 'Reading official llama.cpp release metadata...'
@@ -85,8 +87,9 @@ if($ModelPath){
     if($split){
         $mergers=@(Get-ChildItem "$root\engine" -Filter llama-gguf-split.exe -Recurse)
         if($mergers.Count -ne 1){throw 'Verified shards downloaded, but engine has no GGUF merge tool. Use a single-file -ModelPath.'}
-        & $mergers[0].FullName --merge $parts[0] "$root\models\model.gguf"
-        if($LASTEXITCODE){throw 'GGUF merge failed'}
+        $previousPreference=$ErrorActionPreference
+        try{$ErrorActionPreference='Continue'; & $mergers[0].FullName --merge $parts[0] "$root\models\model.gguf"; $mergeExit=$LASTEXITCODE}finally{$ErrorActionPreference=$previousPreference}
+        if($mergeExit){throw 'GGUF merge failed'}
     }else{Move-Item $parts[0] "$root\models\model.gguf" -Force}
     $modelHash=(Get-FileHash "$root\models\model.gguf" -Algorithm SHA256).Hash.ToLowerInvariant()
     # Input shards were verified before merging; record each trusted input hash.
@@ -109,7 +112,7 @@ foreach($pair in @(@('Executable',$engine),@('Arguments',$arguments),@('WorkingD
 $settings.Save("$root\settings.xml")
 $csc="$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if(!(Test-Path $csc)){throw '.NET Framework 4.x C# compiler not found'}
-& $csc /nologo /target:exe "/out:$root\ServersStatusAI.exe" /reference:System.ServiceProcess.dll (Join-Path $PSScriptRoot 'AIService.cs')
+& $csc /nologo /platform:x64 /target:exe "/out:$root\ServersStatusAI.exe" /reference:System.ServiceProcess.dll (Join-Path $PSScriptRoot 'AIService.cs')
 if($LASTEXITCODE){throw 'Service compilation failed'}
 Copy-Item (Join-Path $PSScriptRoot '*-AI.ps1') -Destination $root -Exclude Install-AI.ps1 -Force
 @{engine_tag=$release.tag_name;engine_sha256=$engineHash;model_revision=$modelRevision;model_sha256=$modelHash;agent='windows-04';installed_utc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content "$root\versions.json" -Encoding UTF8

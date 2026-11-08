@@ -13,13 +13,13 @@ foreach($file in Get-ChildItem $PSScriptRoot -Filter '*.ps1'){
  $tokens=$null;$errors=$null;[Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)|Out-Null
  if($errors){throw ($file.Name+': '+($errors | Out-String))}
 }
-& $csc /nologo /target:exe "/out:$root\service.exe" /reference:System.ServiceProcess.dll "$PSScriptRoot\AIService.cs"
+& $csc /nologo /platform:x64 /target:exe "/out:$root\service.exe" /reference:System.ServiceProcess.dll "$PSScriptRoot\AIService.cs"
 if($LASTEXITCODE){throw 'Service did not compile'}
 @'
 using System;using System.Threading;
 class FakeModel {static void Main(){Console.WriteLine("fake-model-started");while(true)Thread.Sleep(100);}}
 '@ | Set-Content "$root\Fake.cs"
-& $csc /nologo /target:exe "/out:$root\fake.exe" "$root\Fake.cs"
+& $csc /nologo /platform:x64 /target:exe "/out:$root\fake.exe" "$root\Fake.cs"
 if($LASTEXITCODE){throw 'Fake engine did not compile'}
 $xml=New-Object Xml.XmlDocument;$xml.AppendChild($xml.CreateElement('Settings'))|Out-Null
 foreach($pair in @(@('Executable',"$root\fake.exe"),@('Arguments',''),@('WorkingDirectory',$root),@('CpuPercent',80),@('MemoryMB',256),@('ReserveMB',0))){$e=$xml.CreateElement($pair[0]);$e.InnerText=[string]$pair[1];$xml.DocumentElement.AppendChild($e)|Out-Null}
