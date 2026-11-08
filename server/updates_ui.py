@@ -9,9 +9,18 @@ SCRIPT=Path(__file__).with_name('updates.js').read_text()
 LABELS={'queued':('В очереди','neutral'),'running':('Установка','warning'),'applied':('Установлено','normal'),'failed':('Ошибка','danger')}
 
 
-def render(c,csrf):
+def render(c,csrf,result=None):
     packages=c.execute('SELECT p.*,d.built_at,d.commit_at FROM update_packages p LEFT JOIN update_package_dates d ON d.package=p.id').fetchall()
     content='<header class="topbar"><a href="/">← Все серверы</a></header><h1>Обновление агентов</h1><p class="muted">Текущая версия, последняя новая сборка (New) и ближайшая предыдущая (Older). Даты указаны по Москве.</p>'
+    if result and result.get('bulk')=='done':
+        from .updates import BULK_LABELS
+        summary=[]
+        for key,label in BULK_LABELS.items():
+            try:count=max(0,min(1000000,int(result.get(key,0))))
+            except (ValueError,TypeError):count=0
+            if count or key=='queued':summary.append(f'<li>{esc(label)}: <b>{count}</b></li>')
+        content+='<section class="server" role="status"><h2>Массовое обновление</h2><ul>'+''.join(summary)+'</ul><p class="muted">Результаты установки появятся в истории каждого агента.</p></section>'
+    content+=f'<section class="server"><h2>Обновить все агенты</h2><p>Проверить GitHub и отправить каждому доступному агенту последнюю новую версию для его платформы. Raspberry Pi обновляется вместе с порталом. Агенты без связи и с незавершёнными задачами будут пропущены.</p><form data-bulk-update method="post" action="/updates/all/latest"><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="check"><input type="checkbox" name="confirm" value="yes" required> Разрешаю короткий перезапуск служб агентов</label><button>Обновить все агенты</button><p class="muted" data-bulk-progress hidden role="status">Проверяем GitHub и создаём задачи…</p></form></section>'
     content+=f'<section class="server"><h2>Доступные версии</h2><p>Нажмите, чтобы получить новые сборки из GitHub.</p><form method="post" action="/updates/github/check"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Проверить GitHub</button></form></section><div data-updates-root>'
     from .updates import pending
     for row in c.execute('SELECT a.id,r.data,r.received,p.display_name FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_profiles p ON p.agent=a.id ORDER BY a.id').fetchall():

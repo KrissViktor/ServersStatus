@@ -1,6 +1,11 @@
 (() => {
   if (!document.querySelector('[data-updates-root]'))return;
   let busy=false;
+  const bulk=document.querySelector('[data-bulk-update]');
+  bulk?.addEventListener('submit',()=>{
+    bulk.querySelector('button').disabled=true;
+    bulk.querySelector('[data-bulk-progress]').hidden=false;
+  });
   for (const history of document.querySelectorAll('[data-update-history]')) {
     const deactivate=()=>{history.classList.remove('scroll-active');history.style.overflowY='hidden';history.style.overscrollBehaviorY='auto'};
     history.addEventListener('click',()=>{history.focus({preventScroll:true});history.classList.add('scroll-active');history.style.overflowY='auto';history.style.overscrollBehaviorY='contain'});

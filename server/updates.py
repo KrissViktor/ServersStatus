@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 import time
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
 from .dashboard import page
@@ -39,6 +39,39 @@ def confirm(c,agent,data):
         event(c,job['id'],'applied','Версия подтверждена отчётом агента',now)
 
 
+BULK_LABELS={'queued':'Задач создано','current':'Уже последняя версия или нет новой сборки',
+             'offline':'Нет свежего отчёта','unsupported':'Обновление через панель недоступно',
+             'busy':'Уже выполняется обновление или команда',
+             'unknown':'Не удалось определить текущую версию'}
+
+
+def enqueue_latest(c):
+    """Select only New per platform and queue eligible agents under one write lock."""
+    from .update_versions import choices,event,commit_date
+    c.execute('BEGIN IMMEDIATE')
+    packages=c.execute('SELECT p.*,d.built_at,d.commit_at FROM update_packages p LEFT JOIN update_package_dates d ON d.package=p.id').fetchall()
+    counts=dict.fromkeys(BULK_LABELS,0);now=time.time()
+    for row in c.execute('SELECT a.id,r.data,r.received FROM agents a LEFT JOIN current_reports r ON r.agent=a.id ORDER BY a.id').fetchall():
+        agent=row['id'];data=json.loads(row['data'] or '{}');platform=data.get('agent_platform')
+        if platform not in ('windows-x64','linux-source') or 'remote_update_v1' not in data.get('features',[]):
+            counts['unsupported']+=1;continue
+        if row['received'] is None or now-row['received']>120:
+            counts['offline']+=1;continue
+        if pending(c,agent) or c.execute("SELECT 1 FROM windows_commands WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone() or c.execute("SELECT 1 FROM console_jobs WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():
+            counts['busy']+=1;continue
+        current=data.get('agent_version')
+        if not current or (not any(p['platform']==platform and p['version']==current for p in packages) and not commit_date(current)):
+            counts['unknown']+=1;continue
+        options,_=choices(packages,platform,current)
+        package=next((p for p in options if p['label']=='New'),None)
+        if package is None:
+            counts['current']+=1;continue
+        job=c.execute("INSERT INTO agent_update_jobs(agent,package,status,message,created,updated) VALUES (?,?,'queued','Ожидание агента',?,?)",(agent,package['id'],now,now)).lastrowid
+        c.execute('INSERT INTO update_job_context VALUES (?,?)',(job,data.get('agent_version','неизвестна')))
+        event(c,job,'queued','Ожидание агента',now);counts['queued']+=1
+    return counts
+
+
 def register(app,db,authenticated,csrf_token,digest):
     def authorize(c,agent,request):
         row=c.execute('SELECT token FROM agents WHERE id=?',(agent,)).fetchone()
@@ -51,7 +84,7 @@ def register(app,db,authenticated,csrf_token,digest):
         from .updates_ui import render
         csrf=csrf_token(request)
         with db() as c:
-            return HTMLResponse(render(c,csrf))
+            return HTMLResponse(render(c,csrf,request.query_params))
 
     @app.post('/updates/github/check')
     async def check_github(request:Request):
@@ -66,6 +99,22 @@ def register(app,db,authenticated,csrf_token,digest):
         except Exception:
             return HTMLResponse(page('<h1>Не удалось проверить GitHub</h1><p>Проверьте доступ к github.com и наличие успешных опубликованных сборок для Windows и Linux. Каталог не изменён.</p><a href="/updates">Вернуться к обновлениям</a>'),status_code=502)
         return RedirectResponse('/updates',303)
+
+    @app.post('/updates/all/latest')
+    async def enqueue_all(request:Request):
+        if not authenticated(request):raise HTTPException(401)
+        body=await request.body()
+        if len(body)>4096:raise HTTPException(413)
+        form=parse_qs(body.decode())
+        if not hmac.compare_digest(form.get('csrf',[''])[0].encode(),csrf_token(request).encode()):raise HTTPException(403)
+        if form.get('confirm')!=['yes']:raise HTTPException(400,'Подтвердите перезапуск служб агентов')
+        import asyncio
+        from .github_updates import sync
+        try:await asyncio.to_thread(sync,db)
+        except Exception:
+            return HTMLResponse(page('<h1>Не удалось проверить GitHub</h1><p>Задачи массового обновления не созданы. Проверьте доступ к GitHub и повторите попытку.</p><a href="/updates">Вернуться к обновлениям</a>'),status_code=502)
+        with db() as c:counts=enqueue_latest(c)
+        return RedirectResponse('/updates?'+urlencode({'bulk':'done',**counts}),303)
 
     @app.post('/updates/{agent}')
     async def enqueue(agent:str,request:Request):
