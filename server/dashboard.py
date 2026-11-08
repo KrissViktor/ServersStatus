@@ -84,6 +84,8 @@ def memory_description(data):
     return size(used) + ' / ' + size(total) + ' · занято / всего'
 
 def page(content, refresh=False):
+    if '<header class="topbar"' in content:
+        content=content.replace('</header>','<a class="nav-link protection-link" href="/console-access">Снять защиту</a></header>',1)
     return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + ('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main></body></html>'
 
 

@@ -117,7 +117,7 @@ def register(app,db,authenticated,csrf_token,digest):
                 c.execute("UPDATE windows_commands SET status='reviewed',updated=? WHERE agent=? AND status='uncertain'",(time.time(),agent))
                 record(c,agent,'management','Администратор подтвердил локальную проверку неизвестного результата Windows')
             else:
-                if c.execute("SELECT 1 FROM console_jobs WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Дождитесь завершения консоли')
+                if c.execute("SELECT 1 FROM console_jobs WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Дождитесь завершения предыдущей операции')
                 if c.execute("SELECT 1 FROM agent_update_jobs WHERE agent=? AND status IN ('queued','running')",(agent,)).fetchone():raise HTTPException(409,'Дождитесь обновления агента')
                 reboot=c.execute("SELECT action,updated FROM windows_commands WHERE agent=? AND action IN ('reboot','cancel_reboot') AND status='succeeded' ORDER BY id DESC LIMIT 1",(agent,)).fetchone()
                 if reboot and reboot['action']=='reboot' and action in ('install','reboot') and row['received']-data.get('uptime_seconds',0)<reboot['updated']+5:

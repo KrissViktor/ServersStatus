@@ -8,6 +8,7 @@ User=serversstatus
 Group=serversstatus
 WorkingDirectory=/opt/ServersStatus
 Environment=STATUS_DB=/var/lib/serversstatus/status.sqlite3
+EnvironmentFile=-/etc/serversstatus-telegram.env
 StateDirectory=serversstatus
 UMask=0077
 ExecStart=/opt/ServersStatus/.venv/bin/python -m uvicorn server.app:app --host 127.0.0.1 --port 8000 --no-proxy-headers --limit-concurrency 32 --backlog 128 --timeout-keep-alive 5 --h11-max-incomplete-event-size 16384 --no-access-log

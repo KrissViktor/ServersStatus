@@ -78,7 +78,7 @@ def compact_card(row, now):
     return content + f'<p class="history-link"><a class="nav-link" href="{esc(url)}">Открыть сервер →</a> <a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">Графики нагрузки</a></p></article>'
 
 
-def detail_page(row, csrf):
+def detail_page(row, csrf,console_access=False):
     identifier = quote(row['id'], safe='')
     title = dict(row).get('display_name') or ''
     content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/settings/' + esc(identifier) + '">Настройки мониторинга</a><a class="nav-link" href="/servers/' + esc(identifier) + '">Обновить данные</a></header>'
@@ -89,7 +89,7 @@ def detail_page(row, csrf):
     content += process_section(row['id'])
     data=json.loads(row['data'] or '{}')
     from .console_ui import section as console_section
-    content+=console_section(row['id'],csrf,data)
+    if console_access:content+=console_section(row['id'],csrf,data)
     if data.get('windows_updates'):
         content += '<section class="server"><h3>Управление Windows</h3><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
     content += f'<section class="server"><h3>Название в панели</h3><p class="muted">Не меняет имя компьютера, идентификатор агента или ключ. Пустое поле возвращает техническое имя.</p><form method="post" action="/servers/{esc(identifier)}/name"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Понятное название<input name="display_name" maxlength="120" value="{esc(title)}" placeholder="SQL — ERP"></label><button>Сохранить название</button></form></section>'

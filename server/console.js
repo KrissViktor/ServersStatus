@@ -4,6 +4,8 @@
   const form=document.getElementById('console-form'), history=document.getElementById('console-history'), message=document.getElementById('console-message');
   if (!history) return;
   const review=document.getElementById('console-review'), inputForm=document.getElementById('console-input-form');
+  const clearButton=document.getElementById('console-clear'),archiveButton=document.getElementById('console-archive'),moreButton=document.getElementById('console-more'),scope=document.getElementById('console-scope');
+  let archive=false, extraJobs=[], nextCursor=null, lastJobs=[], clearBefore=Number(sessionStorage.getItem('console-clear:'+panel.dataset.agent) || 0);
   let runningId=null, sendingInput=false;
   let busy=false, fetching=false, snapshot='', submitted=null, refreshDelay=5000, timer=null;
   const node=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n};
@@ -11,7 +13,8 @@
     if (busy || fetching || document.hidden) return;
     fetching=true;
     try {
-      const response=await fetch(panel.dataset.url,{cache:'no-store',credentials:'same-origin'});
+      const response=await fetch(panel.dataset.url+'?archive='+archive,{cache:'no-store',credentials:'same-origin'});
+      if (response.status===401 || response.status===403) {clearTimeout(timer);panel.closest('details.server-fold')?.remove();panel.remove();return;}
       if (!response.ok) throw new Error();
       const result=await response.json();
       refreshDelay=result.jobs.some(job=>['queued','running'].includes(job.status)) ? 1000 : 5000;
@@ -24,7 +27,12 @@
       }
       const current=result.jobs.find(job=>job.id===submitted);
       if (current) message.textContent='Команда #'+current.id+': '+current.label+'.';
-      const serialized=JSON.stringify(result.jobs);
+      if (!extraJobs.length)nextCursor=result.next;
+      const seen=new Set(result.jobs.map(job=>job.id));
+      lastJobs=[...result.jobs,...extraJobs.filter(job=>!seen.has(job.id) && job.created>=result.cutoff)].sort((a,b)=>b.id-a.id);
+      const visibleJobs=lastJobs.filter(job=>archive || job.id>clearBefore || ['queued','running','uncertain'].includes(job.status));
+      if(moreButton)moreButton.hidden=!nextCursor;
+      const serialized=JSON.stringify(visibleJobs);
       if (serialized===snapshot) return;
       snapshot=serialized;
       const fragment=document.createDocumentFragment(), positions=new Map();
@@ -32,10 +40,10 @@
         const pre=item.querySelector('[data-console-output]');
         if (pre)positions.set(item.dataset.jobId,{top:pre.scrollTop,follow:pre.scrollHeight-pre.clientHeight-pre.scrollTop<24});
       }
-      for (const job of result.jobs) {
+      for (const job of visibleJobs) {
         const item=document.createElement('details');item.dataset.jobId=job.id;
         const old=[...history.querySelectorAll('details')].find(n=>n.dataset.jobId===String(job.id));
-        item.open=old ? old.open : job===result.jobs[0];
+        item.open=old ? old.open : job===visibleJobs[0];
         const date=new Date(job.created*1000).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'});
         item.append(node('summary','#'+job.id+' · '+date+' МСК · '+job.label));
         item.append(node('pre',job.command));
@@ -69,6 +77,27 @@
     } catch(error) {message.textContent=error.message;}
     finally {busy=false;poll();}
   }
+  clearButton?.addEventListener('click',()=>{
+    clearBefore=Math.max(clearBefore,...lastJobs.filter(job=>!['queued','running','uncertain'].includes(job.status)).map(job=>job.id));
+    sessionStorage.setItem('console-clear:'+panel.dataset.agent,String(clearBefore));
+    archive=false;extraJobs=[];nextCursor=null;snapshot='';history.replaceChildren();
+    archiveButton.textContent='Показать всю историю';scope.textContent='История за последний час · завершённые записи скрыты визуально';poll();
+  });
+  archiveButton?.addEventListener('click',()=>{
+    archive=!archive;extraJobs=[];nextCursor=null;snapshot='';
+    archiveButton.textContent=archive ? 'Вернуться к последнему часу' : 'Показать всю историю';
+    scope.textContent=archive ? 'Вся история за последние 6 месяцев' : 'История за последний час';poll();
+  });
+  moreButton?.addEventListener('click',async()=>{
+    if(!nextCursor || fetching)return;
+    fetching=true;
+    try {
+      const response=await fetch(panel.dataset.url+'?archive='+archive+'&before='+nextCursor,{cache:'no-store',credentials:'same-origin'});
+      if(!response.ok)throw new Error();
+      const result=await response.json();extraJobs=[...new Map([...lastJobs,...extraJobs,...result.jobs].map(job=>[job.id,job])).values()];nextCursor=result.next;snapshot='';
+    } catch(_){message.textContent='Не удалось загрузить историю.'}
+    finally{fetching=false;poll();}
+  });
   async function sendControl(action) {
     if (!runningId || sendingInput)return;
     sendingInput=true;
@@ -86,6 +115,6 @@
   inputForm?.querySelector('[data-console-cancel]').addEventListener('click',()=>sendControl('cancel'));
   form?.addEventListener('submit',event=>{event.preventDefault();submit()});
   review?.addEventListener('click',()=>submit(true));
-  async function poll(){clearTimeout(timer);await refresh();clearTimeout(timer);timer=setTimeout(poll,refreshDelay)}
+  async function poll(){clearTimeout(timer);await refresh();clearTimeout(timer);if(panel.isConnected)timer=setTimeout(poll,refreshDelay)}
   poll();
 })();

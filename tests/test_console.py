@@ -14,10 +14,12 @@ class ConsoleTest(unittest.TestCase):
         self.addCleanup(setattr,a,'DB',a.DB);a.DB=str(Path(self.tmp.name)/'db.sqlite3')
         from server.security import limiter
         limiter.reset()
-        self.client=TestClient(a.app);self.client.cookies.set('session','session')
+        self.client=TestClient(a.app,base_url='https://testserver');self.client.cookies.set('session','session');self.client.cookies.set('__Host-console-access','granted')
         with a.db() as c:
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('session'),time.time()+3600))
             c.execute('INSERT INTO agents VALUES (?,?)',('pc',a.digest('key')))
+            c.execute('INSERT INTO console_grants VALUES (?,?)',(a.digest('session'),time.time()+900))
+            c.execute('INSERT INTO console_grant_tokens VALUES (?,?)',(a.digest('session'),a.digest('granted')))
         self.headers={'Authorization':'Bearer key'}
         self.report={'hostname':'pc','cpu_percent':0,'memory_percent':1,'uptime_seconds':1000,'disks':[],'features':['console_v1'],'console':{'enabled':True,'shell':'bash','identity':'agent'}}
         self.client.post('/api/report/pc',headers=self.headers,json=self.report)

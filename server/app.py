@@ -23,7 +23,7 @@ from .retention import cleanup
 from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
-app = FastAPI(title='ServersStatus')
+app = FastAPI(title='ServersStatus',docs_url=None,redoc_url=None,openapi_url=None)
 login_slots = asyncio.Semaphore(2)
 
 
@@ -68,8 +68,12 @@ def db():
         connection.executescript(WINDOWS_SCHEMA)
         from .console import SCHEMA as CONSOLE_SCHEMA
         connection.executescript(CONSOLE_SCHEMA)
+        from .console import initialize_sequence
+        initialize_sequence(connection)
         from .update_versions import SCHEMA as VERSION_SCHEMA
         connection.executescript(VERSION_SCHEMA)
+        from .console_access import SCHEMA as ACCESS_SCHEMA
+        connection.executescript(ACCESS_SCHEMA)
         yield connection
         connection.commit()
     finally:
@@ -522,7 +526,13 @@ def server_detail(agent_id: str, request: Request):
     with db() as c:
         current_disks = {d.get('path') for d in monitored_disks(json.loads(row['data'] or '{}'))}
         row['forecasts'] = {path: value for path,value in load_forecasts(c, agent_id, time.time()).items() if path in current_disks}
-    return HTMLResponse(detail_page(row, csrf_token(request)))
+    from .console_access import unlocked
+    access=unlocked(request,db)
+    if not access:
+        data=json.loads(row['data'] or '{}');data.pop('console',None)
+        data['features']=[feature for feature in data.get('features',[]) if not feature.startswith('console')]
+        row['data']=json.dumps(data)
+    return HTMLResponse(detail_page(row, csrf_token(request),console_access=access))
 
 
 @app.post('/servers/{agent_id}/name')
@@ -593,8 +603,10 @@ def journal(request: Request, agent: str = '', level: str = '', before: int = 0)
     if level not in ('','warning','info') or len(agent)>255 or before<0:
         raise HTTPException(400)
     from .events import event_page
+    from .console_access import unlocked
+    access=unlocked(request,db)
     with db() as c:
-        rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before)).fetchall()
+        rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) AND (? OR category!='console') ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before,access)).fetchall()
     return HTMLResponse(event_page(rows,agent,level,before))
 
 @app.get('/bot', response_class=HTMLResponse)
@@ -618,3 +630,6 @@ register_windows(app,db,authenticated,csrf_token,digest)
 
 from .console import register as register_console
 register_console(app,db,authenticated,csrf_token,digest)
+
+from .console_access import register as register_console_access
+register_console_access(app,db,authenticated,csrf_token)

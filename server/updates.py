@@ -85,7 +85,7 @@ def register(app,db,authenticated,csrf_token,digest):
                 raise HTTPException(400,'Агент не готов или пакет не подходит')
             if pending(c,agent):raise HTTPException(409,'Уже выполняется обновление')
             if c.execute("SELECT 1 FROM windows_commands WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Сначала завершите команду управления Windows')
-            if c.execute("SELECT 1 FROM console_jobs WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Сначала завершите команду консоли')
+            if c.execute("SELECT 1 FROM console_jobs WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Сначала завершите предыдущую операцию')
             now=time.time()
             job_id=c.execute("INSERT INTO agent_update_jobs(agent,package,status,message,created,updated) VALUES (?,?,'queued','Ожидание агента',?,?)",(agent,package,now,now)).lastrowid
             c.execute('INSERT INTO update_job_context VALUES (?,?)',(job_id,data.get('agent_version','неизвестна')))
