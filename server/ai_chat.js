@@ -3,7 +3,10 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
   const form=panel.querySelector('#ai-form'),input=panel.querySelector('#ai-question'),history=panel.querySelector('#ai-messages'),list=panel.querySelector('#ai-chats'),send=panel.querySelector('#ai-send'),cancel=panel.querySelector('#ai-cancel'),fresh=panel.querySelector('#ai-new'),remove=panel.querySelector('#ai-delete'),message=panel.querySelector('#ai-message'),state=panel.closest('.ai-widget')?.querySelector('#ai-state')||document.querySelector('#ai-state');
   const portal=panel.querySelector('#ai-portal'),internet=panel.querySelector('#ai-internet'),searchBox=panel.querySelector('#ai-search-box'),query=panel.querySelector('#ai-search-query');
   internet.addEventListener('change',()=>{searchBox.hidden=!internet.checked});
-  const labels={queued:'В очереди',running:'Печатает…',completed:'Готово',failed:'Ошибка',cancelled:'Остановлено'};
+  const labels={queued:'В очереди',running:'Работает…',completed:'Готово',failed:'Ошибка',cancelled:'Остановлено'};
+  const stages={starting:'Начинаю обработку вопроса',preparing_answer:'Подготавливаю ответ по доступным данным',writing_answer:'Формирую ответ',reading_sources:'Читаю источники','tool:web_search':'Ищу источники в интернете','tool:web_page':'Читаю страницу','tool:web_discover':'Выбираю публичные сайты','tool:weather':'Получаю прогноз погоды','tool:currency':'Получаю официальный курс ЦБ','tool:servers':'Проверяю состояние серверов','tool:server_info':'Читаю сведения о сервере','tool:events':'Проверяю журнал событий','tool:history':'Изучаю историю нагрузки','tool:processes':'Читаю список процессов','tool:services':'Проверяю службы'};
+  function elapsed(){for(const el of panel.querySelectorAll('[data-ai-started]')){const seconds=Math.max(0,Math.floor(Date.now()/1000-Number(el.dataset.aiStarted)));el.textContent=seconds<60?seconds+' с':Math.floor(seconds/60)+' мин '+seconds%60+' с'}}
+  setInterval(elapsed,1000);
   let chat=null,busy=false,active=false,configured=false,timer=null,signature='',attempt=null;
   const id=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
   const node=(tag,text)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;return n};
@@ -22,10 +25,12 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
     for(const turn of turns){
       const q=node('article');q.className='ai-bubble ai-user';q.append(node('span','Вы'),node('p',turn.question));fragment.append(q);
       const answer=node('article');answer.className='ai-bubble ai-assistant';const header=node('header'),label=node('span','✦ Помощник'),status=node('small',labels[turn.status]||turn.status);header.append(label,status);answer.append(header);
-      const text=node('div',turn.reply||(['queued','running'].includes(turn.status)?'Ожидаем ответ…':'Ответ отсутствует'));text.className='ai-answer';answer.append(text);
-      if(turn.tools?.length){
-        const details=node('details'),summary=node('summary','Источники и действия · '+turn.tools.length);details.className='ai-sources';details.append(summary);
-        for(const t of turn.tools){const row=node('div'),label=node('span','[S'+t.id+'] '+t.label);row.append(label,node('small',t.status==='running'?'Чтение…':t.status==='failed'?(t.error||'Ошибка'):t.name==='web_search'?'Получены результаты':'Прочитано'));
+      const pending=['queued','running'].includes(turn.status);answer.setAttribute('aria-busy',String(pending));
+      if(pending){const progress=node('div'),dot=node('span'),description=node('span',turn.status==='queued'?'Ожидаю своей очереди':stages[turn.activity]||'Обрабатываю вопрос'),time=node('time');progress.className='ai-progress';progress.setAttribute('role','status');dot.className='ai-progress-dot';dot.setAttribute('aria-hidden','true');time.dataset.aiStarted=turn.created;time.setAttribute('aria-hidden','true');progress.append(dot,description,time);answer.append(progress)}
+      const text=node('div',turn.reply||(!pending?'Ответ отсутствует':''));text.className='ai-answer';if(!turn.reply&&pending)text.hidden=true;answer.append(text);
+      if(turn.tools?.length||(!pending&&turn.activity)){
+        const details=node('details'),summary=node('summary',(pending?'Этапы работы':'Как готовился ответ')+(turn.tools?.length?' · '+turn.tools.length:''));details.className='ai-sources ai-worklog';details.open=pending;details.append(summary);if(!turn.tools?.length)details.append(node('p',turn.status==='completed'?'Ответ подготовлен локальной моделью.':'Последний этап: '+(stages[turn.activity]||'Обработка вопроса')));
+        for(const t of turn.tools||[]){const row=node('div'),label=node('span','[S'+t.id+'] '+t.label);row.className='ai-work-step '+t.status;row.append(node('span',t.status==='running'?'◌':t.status==='failed'?'!':'✓'),label,node('small',t.status==='running'?'Выполняется…':t.status==='failed'?(t.error||'Ошибка'):t.name==='web_search'?'Получены результаты':'Готово'));
           if(t.url&&t.status==='completed'){try{const url=new URL(t.url,location.origin);if(['http:','https:'].includes(url.protocol)){const link=node('a','Открыть источник ↗');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';row.append(link)}}catch(_){}}
           details.append(row);
         }answer.append(details);
@@ -34,7 +39,7 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
       if(turn.reply){const copy=node('button','Копировать');copy.type='button';copy.className='ai-copy';copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(turn.reply);copy.textContent='Скопировано'}catch(_){message.textContent='Не удалось скопировать. Выделите нужный текст.'}});answer.append(copy)}
       fragment.append(answer);
     }
-    history.replaceChildren(fragment);history.scrollTop=follow?history.scrollHeight:top;
+    history.replaceChildren(fragment);elapsed();history.scrollTop=follow?history.scrollHeight:top;
   }
   async function load(){
     clearTimeout(timer);const wanted=chat;if(!wanted||document.hidden){if(wanted)timer=setTimeout(load,2000);return}

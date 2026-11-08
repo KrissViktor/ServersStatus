@@ -9,6 +9,7 @@ from .ai_web import normalize_url,fetch,page_text,page_links,search,WebError
 
 SCHEMA='''CREATE TABLE IF NOT EXISTS ai_tool_runs(id INTEGER PRIMARY KEY AUTOINCREMENT,turn INTEGER NOT NULL,name TEXT,label TEXT,url TEXT,status TEXT,error TEXT,created REAL);
 CREATE INDEX IF NOT EXISTS ai_tools_turn ON ai_tool_runs(turn,id);'''
+ACTIVITIES={'web_search':'Ищу источники в интернете','web_page':'Читаю страницу','web_discover':'Выбираю публичные сайты','weather':'Получаю прогноз погоды','currency':'Получаю официальный курс ЦБ','servers':'Проверяю состояние серверов','server_info':'Читаю сведения о сервере','events':'Проверяю журнал событий','history':'Изучаю историю нагрузки','processes':'Читаю список процессов','services':'Проверяю службы'}
 MAX_CALLS=6
 
 
@@ -71,6 +72,8 @@ class Session:
         with self.db() as c:
             cursor=c.execute("INSERT INTO ai_tool_runs(turn,name,label,url,status,error,created) SELECT id,?,?,?,'running','',? FROM ai_turns WHERE id=? AND owner=? AND status='running'",(name,label,url,time.time(),self.job['id'],self.job['owner']))
             if cursor.rowcount!=1:raise WebError('Запрос остановлен')
+            activity='tool:'+name if name in ACTIVITIES else 'reading_sources'
+            c.execute("UPDATE ai_turns SET activity=?,updated=? WHERE id=? AND status='running'",(activity,time.time(),self.job['id']))
             return cursor.lastrowid
     def finish(self,identifier,label,url='',error=''):
         with self.db() as c:c.execute('UPDATE ai_tool_runs SET label=?,url=?,status=?,error=? WHERE id=?',(label,url,'failed' if error else 'completed',error,identifier))
@@ -88,7 +91,7 @@ class Session:
     async def execute(self,name,args):
         self.calls+=1
         if self.calls>MAX_CALLS:return {'error':'Лимит инструментов исчерпан. Ответь по полученным сведениям.'}
-        identifier=self.trace(name,'Чтение источника')
+        identifier=self.trace(name,ACTIVITIES.get(name,'Чтение источника'))
         label=name;url=''
         try:
             with self.db() as c:

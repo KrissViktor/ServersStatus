@@ -22,7 +22,9 @@ CREATE INDEX IF NOT EXISTS ai_owner_chat ON ai_turns(owner,chat,id);
 CREATE INDEX IF NOT EXISTS ai_state ON ai_turns(status,created);
 CREATE UNIQUE INDEX IF NOT EXISTS ai_single_running ON ai_turns((1)) WHERE status='running';'''
 ORIGIN='http://127.0.0.1:18091'
-MAX_RUNTIME=180
+MAX_RUNTIME=540
+MAX_TOOL_RUNTIME=900
+MAX_QUEUE_WAIT=3*MAX_TOOL_RUNTIME
 MAX_REPLY=16384
 _lock=threading.Lock()
 SYSTEM='Ты локальный помощник портала мониторинга. Отвечай по-русски, понятно и по существу. Используй только разрешённые для вопроса инструменты чтения. Не выдумывай результаты проверок, даты и источники. Не выполняй команды, не меняй настройки, не запрашивай секреты. Доступ к 1С, файловой системе и консоли не предоставлен.'
@@ -46,7 +48,7 @@ def initialize(c):
     from .ai_tools import SCHEMA as TOOL_SCHEMA
     c.executescript(SCHEMA+TOOL_SCHEMA)
     columns={row[1] for row in c.execute('PRAGMA table_info(ai_turns)')}
-    for name,definition in [('portal_access','INTEGER NOT NULL DEFAULT 0'),('internet_access','INTEGER NOT NULL DEFAULT 0'),('web_query',"TEXT NOT NULL DEFAULT ''")]:
+    for name,definition in [('portal_access','INTEGER NOT NULL DEFAULT 0'),('internet_access','INTEGER NOT NULL DEFAULT 0'),('web_query',"TEXT NOT NULL DEFAULT ''"),('activity',"TEXT NOT NULL DEFAULT ''")]:
         if name not in columns:c.execute('ALTER TABLE ai_turns ADD COLUMN '+name+' '+definition)
     c.commit()
 
@@ -61,7 +63,7 @@ def key():
 
 def clean(c,now):
     c.execute("UPDATE ai_turns SET status='failed',error='Запрос прерван после перезапуска или потери связи',updated=? WHERE status='running' AND updated<?",(now,now-30))
-    c.execute("UPDATE ai_turns SET status='failed',error='Время ожидания в очереди истекло',updated=? WHERE status='queued' AND created<?",(now,now-600))
+    c.execute("UPDATE ai_turns SET status='failed',error='Время ожидания в очереди истекло',updated=? WHERE status='queued' AND created<?",(now,now-MAX_QUEUE_WAIT))
     c.execute('DELETE FROM ai_tool_runs WHERE turn IN (SELECT id FROM ai_turns WHERE created<?)',(now-186*86400,))
     c.execute('DELETE FROM ai_turns WHERE created<?',(now-186*86400,))
 
@@ -84,6 +86,11 @@ def _save(db,identifier,reply,status=None,error=''):
         c.execute("UPDATE ai_turns SET reply=?,updated=?,status=COALESCE(?,status),error=? WHERE id=? AND status='running'",(reply,time.time(),status,error,identifier))
 
 
+def _activity(db,identifier,value):
+    if value not in ('starting','preparing_answer','writing_answer'):return
+    with db() as c:c.execute("UPDATE ai_turns SET activity=?,updated=? WHERE id=? AND status='running'",(value,time.time(),identifier))
+
+
 def _active(db,identifier):
     with db() as c:row=c.execute('SELECT status FROM ai_turns WHERE id=?',(identifier,)).fetchone()
     return row is not None and row['status']=='running'
@@ -91,6 +98,7 @@ def _active(db,identifier):
 
 async def generate(db,job,messages,api_key):
     reply='';done=False;last_save=0
+    _activity(db,job['id'],'starting')
     from .ai_tools import Session
     session=Session(db,job,messages)
     from .ai_tools import MAX_CALLS
@@ -134,9 +142,10 @@ async def generate(db,job,messages,api_key):
                     identifier='automatic_page_'+str(index)
                     messages.append({'role':'assistant','content':None,'tool_calls':[{'id':identifier,'type':'function','function':{'name':'web_page','arguments':json.dumps(args)}}]})
                     messages.append({'role':'tool','tool_call_id':identifier,'content':json.dumps(page,ensure_ascii=False)})
-        async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(120,connect=5,write=10,pool=5)) as client:
+        async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(max(MAX_RUNTIME,MAX_TOOL_RUNTIME) if definitions else MAX_RUNTIME,connect=5,write=10,pool=5)) as client:
             for step in range(rounds):
-                calls={};content='';finished=False
+                calls={};content='';finished=False;writing=False
+                _activity(db,job['id'],'preparing_answer')
                 payload={'model':'serversstatus-local','messages':messages,'stream':True,'max_tokens':512,'temperature':0.6}
                 if definitions:payload.update(tools=definitions,tool_choice='auto' if step<rounds-1 and session.calls<MAX_CALLS else 'none')
                 async with client.stream('POST',ORIGIN+'/v1/chat/completions',headers={'Authorization':'Bearer '+api_key},json=payload) as response:
@@ -152,7 +161,9 @@ async def generate(db,job,messages,api_key):
                         if value.get('error'):raise ModelError('Модель сообщила об ошибке обработки запроса.')
                         for choice in value.get('choices',[]):
                             delta=choice.get('delta',{});part=delta.get('content')
-                            if isinstance(part,str):reply+=part;content+=part
+                            if isinstance(part,str) and part:
+                                if not writing:_activity(db,job['id'],'writing_answer');writing=True
+                                reply+=part;content+=part
                             if len(reply)>MAX_REPLY:raise ModelError('Достигнут лимит длины ответа. Уточните вопрос.')
                             for call in delta.get('tool_calls',[]):
                                 index=call.get('index',0)
@@ -185,10 +196,10 @@ async def generate(db,job,messages,api_key):
     task=None
     try:
         if not _active(db,job['id']):return
-        task=asyncio.create_task(consume());deadline=time.monotonic()+(max(MAX_RUNTIME,300) if definitions else MAX_RUNTIME)
+        task=asyncio.create_task(consume());deadline=time.monotonic()+(max(MAX_RUNTIME,MAX_TOOL_RUNTIME) if definitions else MAX_RUNTIME)
         while not task.done():
             if not _active(db,job['id']):task.cancel();return
-            if time.monotonic()>deadline:raise ModelError('Время ответа истекло. Попробуйте более короткий вопрос.')
+            if time.monotonic()>deadline:raise ModelError('Время ожидания ответа истекло. Модель может быть занята; попробуйте повторить запрос.')
             await asyncio.wait({task},timeout=.5)
             if time.monotonic()-last_save>1:
                 _save(db,job['id'],reply);last_save=time.monotonic()
@@ -266,11 +277,11 @@ def register(app,db,authenticated,csrf_token):
         owner=user(request);valid_chat(chat)
         with db() as c:
             clean(c,time.time())
-            rows=c.execute('SELECT id,question,reply,status,created,error,portal_access,internet_access FROM ai_turns WHERE owner=? AND chat=? ORDER BY id LIMIT 50',(owner,chat)).fetchall()
+            rows=c.execute('SELECT id,question,reply,status,created,error,portal_access,internet_access,activity FROM ai_turns WHERE owner=? AND chat=? ORDER BY id LIMIT 50',(owner,chat)).fetchall()
             if not rows:raise HTTPException(404)
             result=[]
             for row in rows:
-                item=dict(row);item['tools']=[dict(t) for t in c.execute('SELECT id,name,label,url,status,error FROM ai_tool_runs WHERE turn=? ORDER BY id',(row['id'],))];result.append(item)
+                item=dict(row);item['tools']=[dict(t) for t in c.execute('SELECT id,name,label,url,status,error,created FROM ai_tool_runs WHERE turn=? ORDER BY id',(row['id'],))];result.append(item)
         kick(db);return response({'turns':result})
 
     @app.post('/api/ai/ask')
