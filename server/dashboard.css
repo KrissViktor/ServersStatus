@@ -213,3 +213,5 @@ body:has(#chart-detail[open]){overflow:hidden}
 .section-browser-title .section-icon{width:25px;height:25px;margin:0}
 .section-browser .system-facts{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 @media(max-width:760px){.server-information.section-browser{grid-template-columns:54px minmax(0,1fr);gap:8px}.section-browser>.section-picker{padding:4px;gap:4px}.section-picker button{padding:7px;min-height:44px}.section-picker .section-icon{width:26px;height:26px}.server-information.section-browser .section-fold>section{padding:12px;min-height:260px}.section-browser-title{font-size:16px;flex-wrap:wrap}.section-browser .system-facts{grid-template-columns:1fr!important}.section-browser .disks{grid-template-columns:minmax(0,1fr)}}
+
+.hardware-summary{margin-top:24px;border-top:1px solid var(--line);padding-top:18px}.hardware-summary>h4{font-size:17px;margin:0 0 16px}.hardware-group{margin:18px 0}.hardware-group>h4{font-size:13px;color:#a9c8bd;margin:0 0 10px}.hardware-component{border:1px solid var(--line);padding:12px;border-radius:9px;margin:8px 0}.hardware-component dd{overflow-wrap:anywhere}

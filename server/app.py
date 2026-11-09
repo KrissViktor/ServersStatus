@@ -262,7 +262,10 @@ from .console import ConsoleInfo
 
 from .temperatures import TemperatureInfo
 
+from .hardware import HardwareInfo
+
 class Report(BaseModel):
+    hardware: HardwareInfo | None = None
     temperatures: TemperatureInfo | None = None
     console: ConsoleInfo | None = None
     windows_updates: WindowsInfo | None = None

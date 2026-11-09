@@ -12,6 +12,7 @@ def extended_sections(data,rdp_access=None):
     system = data.get('system')
     if not system:
         return '<section class="extended"><h3>Система и производительность</h3><p class="muted">Обновите агент для сведений об ОС, сети и дисковых операциях.</p></section>' + rdp_section(data,rdp_access) + windows_html
+    from .hardware import summary as hardware_summary
     facts = [
         ('Операционная система', system.get('distribution') or ' '.join(str(system.get(k) or '') for k in ('os', 'release', 'edition'))),
         ('Версия / сборка', system.get('version') or 'Недоступно'),
@@ -21,7 +22,7 @@ def extended_sections(data,rdp_access=None):
         ('RAM: занято / всего', memory_description(data)),
         ('Ядра / потоки', str(system.get('physical_cores') or '—') + ' / ' + str(system.get('logical_cores') or '—')),
         ('RAM: всего / доступно', size(system.get('memory_total_bytes')) + ' / ' + size(system.get('memory_available_bytes')))]
-    content = '<section class="extended"><h3>Система</h3><dl class="system-facts">' + ''.join('<div><dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd></div>' for label, value in facts) + '</dl></section><section class="extended"><h3>Сетевые интерфейсы</h3><div class="table-scroll"><table class="metric-table"><thead><tr><th>Интерфейс / IP</th><th>Состояние</th><th>Линк</th><th>Приём</th><th>Передача</th></tr></thead><tbody>'
+    content = '<section class="extended"><h3>Система</h3><dl class="system-facts">' + ''.join('<div><dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd></div>' for label, value in facts) + '</dl>' + hardware_summary(data) + '</section><section class="extended"><h3>Сетевые интерфейсы</h3><div class="table-scroll"><table class="metric-table"><thead><tr><th>Интерфейс / IP</th><th>Состояние</th><th>Линк</th><th>Приём</th><th>Передача</th></tr></thead><tbody>'
     for nic in data.get('network', []):
         content += '<tr><td><b>' + esc(nic['name']) + '</b><p class="muted">' + esc(', '.join(nic.get('addresses', [])) or 'Нет IP') + '</p></td><td>' + ('Работает' if nic['is_up'] else 'Отключён') + '</td><td>' + (str(nic['speed_mbps']) + ' Мбит/с' if nic.get('speed_mbps') else '—') + '</td><td>' + rate(nic.get('receive_bytes_per_second')) + '</td><td>' + rate(nic.get('send_bytes_per_second')) + '</td></tr>'
     content += '</tbody></table></div>'
