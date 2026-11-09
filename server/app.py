@@ -20,7 +20,7 @@ from .settings_ui import settings_page
 from .events import record
 from .disks import monitored_disks
 from .retention import cleanup
-from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login
+from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login, account_blocked_seconds, failed_account_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 app = FastAPI(title='ServersStatus',docs_url=None,redoc_url=None,openapi_url=None)
@@ -57,6 +57,7 @@ def db():
         CREATE TABLE IF NOT EXISTS event_state (key TEXT PRIMARY KEY,agent TEXT,body TEXT,active INTEGER);
         CREATE TABLE IF NOT EXISTS daily_delivery (day TEXT PRIMARY KEY,chunks TEXT,next_part INTEGER,retry_at REAL,completed INTEGER);
         CREATE TABLE IF NOT EXISTS auth_guard (address TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS account_auth_guard (name TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
         from .updates import SCHEMA
@@ -145,7 +146,7 @@ async def login(request: Request):
     address = client_address(request)
     now = time.time()
     with db() as c:
-        wait = blocked_seconds(c, address, now)
+        wait = max(blocked_seconds(c, address, now),account_blocked_seconds(c,name,now))
         if wait:
             raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
         user = c.execute('SELECT * FROM users WHERE name=?', (name,)).fetchone()
@@ -157,16 +158,21 @@ async def login(request: Request):
     valid = user is not None and (not enabled or enabled[0]) and hmac.compare_digest(calculated, user['password'])
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
-        wait = blocked_seconds(c, address, now)
+        wait = max(blocked_seconds(c, address, now),account_blocked_seconds(c,name,now))
         if wait:
             raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
         if not valid:
             wait = failed_login(c, address, now)
-            if wait:
+            if user is not None and (not enabled or enabled[0]):
+                account_wait=failed_account_login(c,name,now)
+                if account_wait:record(c,'','users','Временно заблокирован вход пользователя '+name,'warning',now)
+                wait=max(wait,account_wait)
+            if blocked_seconds(c,address,now):
                 record(c, '', 'security', 'IP заблокирован после двух ошибок входа: '+address, 'warning',now)
         else:
             # Successful login clears the error counter, not escalation history.
             c.execute('UPDATE auth_guard SET failures=0 WHERE address=?', (address,))
+            c.execute('UPDATE account_auth_guard SET failures=0 WHERE name=?',(name,))
             token = secrets.token_urlsafe(32)
             c.execute('DELETE FROM sessions WHERE expires<?', (now,))
             current=c.execute('SELECT password FROM users WHERE name=?',(name,)).fetchone()
@@ -177,7 +183,7 @@ async def login(request: Request):
             c.execute('DELETE FROM session_users WHERE token NOT IN (SELECT token FROM sessions)')
     if not valid:
         if wait:
-            raise HTTPException(429, 'Две ошибки входа: адрес временно заблокирован', headers={'Retry-After': str(wait)})
+            raise HTTPException(429, 'Две ошибки входа: вход временно заблокирован', headers={'Retry-After': str(wait)})
         raise HTTPException(401, 'Неверный логин или пароль')
     response = RedirectResponse('/', status_code=303)
     response.set_cookie('session', token, httponly=True, secure=os.environ.get('STATUS_INSECURE_LOCAL') != '1', samesite='strict', max_age=28800)

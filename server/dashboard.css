@@ -184,3 +184,4 @@ body:has(#chart-detail[open]){overflow:hidden}
 .task-snapshot-marker{stroke:#e1bd70;stroke-width:1;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}.task-point[data-snapshot-point]{opacity:1;fill:#e1bd70;stroke:#111;stroke-width:1;r:3.5;vector-effect:non-scaling-stroke}
 
 .snapshot-axis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.snapshot-axis span:nth-child(2){text-align:center}.snapshot-axis span:last-child{text-align:right}
+.user-ip-row{flex-wrap:wrap;gap:10px}.user-ip-row>span{overflow-wrap:anywhere;min-width:0}.user-create small{display:block;color:var(--muted);font-size:11px;font-weight:400;line-height:1.5;margin-top:5px}.user-card>form{margin-top:12px}.user-card .notice{font-size:12px;line-height:1.6;overflow-wrap:anywhere}

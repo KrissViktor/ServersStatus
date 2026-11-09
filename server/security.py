@@ -77,3 +77,17 @@ def failed_login(connection, address, now):
         strikes=excluded.strikes, blocked_until=excluded.blocked_until''',
         (address, failures, strikes, str(blocked_until)))
     return max(0, blocked_until - int(now))
+
+
+def account_blocked_seconds(connection,name,now):
+    row=connection.execute('SELECT blocked_until FROM account_auth_guard WHERE name=?',(name,)).fetchone()
+    return max(0,int(row['blocked_until'])-int(now)) if row else 0
+
+
+def failed_account_login(connection,name,now):
+    row=connection.execute('SELECT failures,strikes FROM account_auth_guard WHERE name=?',(name,)).fetchone()
+    failures,strikes=(row['failures'],row['strikes']) if row else (0,0)
+    failures+=1;until=0
+    if failures>=2:until=int(now)+900*3**strikes;strikes+=1;failures=0
+    connection.execute("INSERT INTO account_auth_guard VALUES (?,?,?,?) ON CONFLICT(name) DO UPDATE SET failures=excluded.failures,strikes=excluded.strikes,blocked_until=excluded.blocked_until",(name,failures,strikes,str(until)))
+    return max(0,until-int(now))
