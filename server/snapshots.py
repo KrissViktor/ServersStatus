@@ -71,7 +71,8 @@ def snapshot(c,agent,identifier):
         services={'inventory':None,'received':None,'message':'Полный список служб для этого момента не сохранён. История служб начинается после обновления портала и первого сбора. Текущие службы в старый снимок не подставляются.'}
     from .task_manager import section
     content+=section(agent,{'processes':process_result,'services':services})
-    return {'report_id':identifier,'received':row['received'],'html':content,'processes_available':compact is not None and compact.get('status','available')=='available'}
+    from .folding import fold_sections
+    return {'report_id':identifier,'received':row['received'],'html':fold_sections(content),'processes_available':compact is not None and compact.get('status','available')=='available'}
 
 
 

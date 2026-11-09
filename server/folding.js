@@ -10,8 +10,9 @@
     const button=event.target.closest('.fold-size');if(!button)return;
     event.preventDefault();event.stopPropagation();const fold=button.closest('details');fold.open=true;size(fold,!fold.classList.contains('is-wide'));
   });
+  let informationSequence=0;
   function information(root=document){
-    for(const panel of root.querySelectorAll('.server-detail .server-information')){
+    for(const panel of root.querySelectorAll('.server-information')){
       const folds=[...panel.querySelectorAll('.section-fold')].filter(f=>f.closest('.server-information')===panel);
       if(!folds.length||panel.classList.contains('section-browser'))continue;
       panel.classList.add('section-browser');
@@ -27,7 +28,7 @@
         button.type='button';button.dataset.sectionKey=fold.dataset.foldKey;button.title=name;button.setAttribute('aria-label',name);
         button.append(title.querySelector('.section-icon').cloneNode(true));
         const caption=document.createElement('span');caption.className='sr-only';caption.textContent=name;button.append(caption);
-        body.id=`server-section-${fold.dataset.foldKey}`;button.setAttribute('aria-controls',body.id);
+        body.id=`server-section-${++informationSequence}-${fold.dataset.foldKey}`;button.setAttribute('aria-controls',body.id);
         button.addEventListener('click',()=>choose(fold));
         button.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...nav.querySelectorAll('button')];const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next].focus();buttons[next].click()});
         nav.append(button);

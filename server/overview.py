@@ -101,8 +101,7 @@ def detail_page(row, csrf,console_access=False):
     data=json.loads(row['data'] or '{}')
     from .console_ui import section as console_section
     if console_access:content+=console_section(row['id'],csrf,data)
-    if can_history() and data.get('windows_updates'):
-        content += '<section class="server"><h3>Управление Windows</h3><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
+
 
     from .folding import fold_sections
     content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>{if(!item.closest(".section-browser") || !item.classList.contains("section-fold"))item.open=false;});});</script>'
