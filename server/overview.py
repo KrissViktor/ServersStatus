@@ -105,7 +105,7 @@ def detail_page(row, csrf,console_access=False):
         content += '<section class="server"><h3>Управление Windows</h3><a href="/windows/'+esc(identifier)+'">Управление обновлениями и перезагрузкой Windows →</a></section>'
 
     from .folding import fold_sections
-    content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>item.open=false);});</script>'
+    content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>{if(!item.closest(".section-browser") || !item.classList.contains("section-fold"))item.open=false;});});</script>'
     from .drilldown import widget
     from .rdp_control import widget as rdp_widget
     return page(fold_sections(content)+(widget(row['id']) if can_history() else '')+(rdp_widget() if can_console() else ''), refresh=True)

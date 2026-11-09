@@ -21,7 +21,7 @@
           const expanded = new Map([...target.querySelectorAll('details')].map(detail=>[key(detail),{open:detail.open,wide:detail.classList.contains('is-wide')}]));
           for (const detail of source.querySelectorAll('details'))if(expanded.has(key(detail))){const state=expanded.get(key(detail));detail.open=state.open;window.setServerFoldSize?.(detail,state.wide)}
           const cpuCores=[...target.querySelectorAll('[data-cpu-cores]')];
-          target.innerHTML = source.innerHTML;window.keepCpuCores?.(cpuCores,target);
+          target.innerHTML = source.innerHTML;window.initServerInformation?.();window.keepCpuCores?.(cpuCores,target);
         }
       }
       window.scrollTo({left: x, top: y, behavior: 'instant'});

@@ -10,6 +10,34 @@
     const button=event.target.closest('.fold-size');if(!button)return;
     event.preventDefault();event.stopPropagation();const fold=button.closest('details');fold.open=true;size(fold,!fold.classList.contains('is-wide'));
   });
+  function information(root=document){
+    for(const panel of root.querySelectorAll('.server-detail .server-information')){
+      const folds=[...panel.querySelectorAll('.section-fold')].filter(f=>f.closest('.server-information')===panel);
+      if(!folds.length||panel.classList.contains('section-browser'))continue;
+      panel.classList.add('section-browser');
+      const nav=document.createElement('nav');nav.className='section-picker';nav.setAttribute('aria-label','Разделы информации о сервере');
+      const selected=folds.find(f=>f.open)||folds[0];
+      function choose(fold){
+        folds.forEach(item=>{const active=item===fold;item.open=active;item.querySelector(':scope>summary').setAttribute('aria-expanded',String(active));nav.querySelector(`[data-section-key="${item.dataset.foldKey}"]`).setAttribute('aria-pressed',String(active))});
+      }
+      folds.forEach((fold,index)=>{
+        const title=fold.querySelector(':scope>summary>.fold-title'),body=fold.querySelector(':scope>section');
+        const label=title.cloneNode(true);label.querySelectorAll('.count,.section-icon').forEach(item=>item.remove());
+        const name=label.textContent.trim(),button=document.createElement('button');
+        button.type='button';button.dataset.sectionKey=fold.dataset.foldKey;button.title=name;button.setAttribute('aria-label',name);
+        button.append(title.querySelector('.section-icon').cloneNode(true));
+        const caption=document.createElement('span');caption.className='sr-only';caption.textContent=name;button.append(caption);
+        body.id=`server-section-${fold.dataset.foldKey}`;button.setAttribute('aria-controls',body.id);
+        button.addEventListener('click',()=>choose(fold));
+        button.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...nav.querySelectorAll('button')];const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next].focus();buttons[next].click()});
+        nav.append(button);
+        const heading=document.createElement('h3');heading.className='section-browser-title';heading.innerHTML=title.innerHTML;body.prepend(heading);
+      });
+      panel.prepend(nav);choose(selected);
+    }
+  }
+  window.initServerInformation=information;
+  information();
   const heading=document.querySelector('.panel-name-heading'),trigger=heading?.querySelector('.panel-name-trigger'),form=heading?.querySelector('.panel-name-form');
   if(!trigger||!form)return;
   const input=form.elements.display_name,message=heading.querySelector('.panel-name-message');let saved=input.value,busy=false;
@@ -27,7 +55,7 @@
       const next=new DOMParser().parseFromString(await response.text(),'text/html'),name=next.querySelector('.panel-name-value');if(!name)throw Error('Не удалось подтвердить новое название');
       trigger.querySelector('.panel-name-value').textContent=name.textContent;saved=input.value.trim();input.value=saved;form.hidden=true;trigger.hidden=false;message.textContent='Название сохранено';
       const current=document.getElementById('server-live'),fresh=next.getElementById('server-live');
-      if(current&&fresh){const states=new Map([...current.querySelectorAll('details[data-fold-key]')].map(d=>[d.dataset.foldKey,{open:d.open,wide:d.classList.contains('is-wide')}]));for(const d of fresh.querySelectorAll('details[data-fold-key]')){const state=states.get(d.dataset.foldKey);if(state){d.open=state.open;size(d,state.wide)}}current.innerHTML=fresh.innerHTML}
+      if(current&&fresh){const states=new Map([...current.querySelectorAll('details[data-fold-key]')].map(d=>[d.dataset.foldKey,{open:d.open,wide:d.classList.contains('is-wide')}]));for(const d of fresh.querySelectorAll('details[data-fold-key]')){const state=states.get(d.dataset.foldKey);if(state){d.open=state.open;size(d,state.wide)}}current.innerHTML=fresh.innerHTML;information()}
     }catch(error){message.textContent=error.message}finally{if(live)delete live.dataset.fetchBusy;busy=false;buttons.forEach(b=>b.disabled=false)}
   });
 })();
