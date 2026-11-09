@@ -1,0 +1,20 @@
+ServersStatus hardware temperature helper
+
+LibreHardwareMonitorLib 0.9.6 — LibreHardwareMonitor contributors.
+Unmodified official NuGet package, MPL-2.0.
+Corresponding source:
+https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/tree/3d331e3370efb858411f19511373eff65a218701
+https://www.nuget.org/packages/LibreHardwareMonitorLib/0.9.6
+License: https://www.mozilla.org/MPL/2.0/
+
+PawnIO_setup.exe 2.1.0.0 — Copyright (C) 2026 namazso.
+The official installer is redistributed unmodified, as expressly permitted in
+its embedded notice. Driver source: https://github.com/namazso/PawnIO
+Official releases: https://github.com/namazso/PawnIO.Setup
+Setup acquired from the same pinned LibreHardwareMonitor source revision above.
+Driver license: GPL-2.0-or-later with the upstream IOCTL exception (see source).
+
+The self-contained Microsoft .NET runtime is distributed under MIT and its
+third-party license notices (see licenses and NuGet package metadata). Dependency package identities, versions,
+licenses and source references are included in NuGet-NOTICES.txt generated at build.
+This helper does not modify the library, its dependencies or their drivers.

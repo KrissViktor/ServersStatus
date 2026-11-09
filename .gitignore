@@ -14,3 +14,8 @@ agent/VERSION
 ai/api-key.txt
 ai/settings.xml
 ai/versions.json
+
+# Hardware helper build output
+agent/hardware-monitor/bin/
+agent/hardware-monitor/obj/
+build/

@@ -31,7 +31,7 @@ def section(data,historical=False):
     if not items:
         if temperatures.get('status')=='checking':message='Датчики опрашиваются. Дождитесь следующего отчёта.'
         elif not temperatures:message='В этом снимке температурные данные не сохранялись. Текущие значения не подставляются.' if historical else 'Температурных данных пока нет. Обновите агент.'
-        else:message='Доступные датчики не обнаружены или не удалось их прочитать. На Windows для CPU/GPU/памяти может потребоваться работающий LibreHardwareMonitor с WMI. ACPI-зона не означает температуру процессора.'
+        else:message='Доступные датчики не обнаружены или не удалось их прочитать. На Windows обновите агент со встроенным сборщиком температур; если датчики недоступны, проверьте agent.log и блокировку драйвера PawnIO. ACPI-зона не означает температуру процессора.'
         return content+'<p class="muted">'+message+'</p></section>'
     content+='<div class="temperature-scroll"><table class="temperature-table"><thead><tr><th>Датчик / устройство</th><th>Температура</th><th>Пределы</th></tr></thead><tbody>'
     for sensor in items:

@@ -37,3 +37,41 @@ class TemperatureSensorsTest(unittest.TestCase):
         stale={**result,'sampled_at':time.time()-121}
         with patch.object(t.os,'name','nt'),patch.object(t,'_busy',False),patch.object(t,'_next',float('inf')),patch.object(t,'_cached',stale):
             self.assertEqual(t.collect_temperatures()['items'],[])
+
+    def test_bundled_probe_preferred_and_no_powershell_after_success(self):
+        with patch.object(t.Path,'is_file',return_value=True),patch.object(t,'ensure_sensor_driver') as driver,patch.object(t.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout='[{"id":"lhm:/intelcpu/0/temperature/0","current":62,"device":"CPU"}]')) as process:
+            result=t.windows_probe()
+        self.assertEqual(result['items'][0]['current'],62)
+        self.assertEqual(process.call_count,1)
+        self.assertTrue(process.call_args.args[0][0].endswith('ServersStatusHardwareMonitor.exe'))
+        self.assertEqual(process.call_args.kwargs['timeout'],15)
+        driver.assert_called_once()
+
+    def test_native_failure_empty_and_unreadable_fall_back(self):
+        import subprocess
+        for failure in (None, RuntimeError('blocked'), subprocess.TimeoutExpired('probe',15)):
+            with self.subTest(failure=failure),patch.object(t,'native_probe',side_effect=failure if failure else None,return_value=None),patch.object(t.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout='[{"id":"acpi:0","current":45}]')) as process:
+                self.assertEqual(t.windows_probe()['items'][0]['id'],'acpi:0')
+                self.assertIn('-NonInteractive',process.call_args.args[0])
+        with patch.object(t.Path,'is_file',return_value=True),patch.object(t,'ensure_sensor_driver'),patch.object(t.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout='[{"id":"lhm:bad","current":999}]')):
+            self.assertIsNone(t.native_probe())
+
+    def test_native_disabled_never_installs_driver(self):
+        with patch.dict(t.os.environ,{'STATUS_AGENT_HARDWARE_TEMPERATURES':'0'}),patch.object(t,'ensure_sensor_driver') as driver,patch.object(t.subprocess,'run') as process:
+            self.assertIsNone(t.native_probe())
+        driver.assert_not_called();process.assert_not_called()
+
+    def test_driver_install_attempt_is_once_even_when_it_fails(self):
+        with patch.object(t,'_driver_attempted',False),patch.object(t.subprocess,'run',side_effect=OSError('not elevated')) as process:
+            t.ensure_sensor_driver();t.ensure_sensor_driver()
+        self.assertEqual(process.call_count,1)
+        self.assertEqual(process.call_args.kwargs['timeout'],80)
+        self.assertTrue(process.call_args.args[0][-1].endswith('install_sensor_driver.ps1'))
+
+    def test_frozen_bundle_self_test_never_installs_or_probes_hardware(self):
+        with patch.object(t.Path,'is_file',return_value=True),patch.object(t,'ensure_sensor_driver') as driver,patch.object(t.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=b'[]\r\n')) as process:
+            t.bundle_self_test()
+        self.assertEqual(process.call_args.args[0][-1],'--self-test');driver.assert_not_called()
+        with patch.object(t.Path,'is_file',return_value=False),patch.object(t.subprocess,'run') as process:
+            with self.assertRaises(RuntimeError):t.bundle_self_test()
+        process.assert_not_called()
