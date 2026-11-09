@@ -7,6 +7,30 @@ import time
 import psutil
 
 
+def processor_name():
+    """Read the CPU brand supplied by the OS, without drivers or subprocesses."""
+    if platform.system() == 'Windows':
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as key:
+                value, _ = winreg.QueryValueEx(key, 'ProcessorNameString')
+            if isinstance(value, str) and value.strip():
+                return ' '.join(value.replace('\x00', '').split())
+        except (ImportError, OSError):
+            pass
+    elif platform.system() == 'Linux':
+        try:
+            with open('/proc/cpuinfo', encoding='utf-8') as source:
+                for line in source:
+                    key, separator, value = line.partition(':')
+                    if separator and key.strip() == 'model name' and value.strip():
+                        return ' '.join(value.split())
+        except OSError:
+            pass
+    return platform.processor()
+
+
 def sample_cpu(interval=1):
     # Prime per-CPU counters, then measure both views over the same one-second
     # interval. No second blocking sample is added to the reporting loop.
@@ -56,7 +80,7 @@ def rates(before, after, group, fields):
 def extended_metrics(before, after):
     memory = psutil.virtual_memory()
     system = {'os': platform.system(), 'release': platform.release(), 'version': platform.version(),
-              'architecture': platform.machine(), 'processor': platform.processor(),
+              'architecture': platform.machine(), 'processor': processor_name(),
               'physical_cores': psutil.cpu_count(logical=False), 'logical_cores': psutil.cpu_count(),
               'memory_total_bytes': memory.total, 'memory_available_bytes': memory.available,
               'memory_used_bytes': max(0, memory.total-memory.available)}

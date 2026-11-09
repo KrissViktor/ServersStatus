@@ -32,3 +32,28 @@ class PerCoreCpuTest(unittest.TestCase):
         from unittest.mock import patch
         from agent.metrics import sample_cpu
         with patch('agent.metrics.psutil.cpu_percent',side_effect=[OSError('no per cpu'),25]):self.assertEqual(sample_cpu(),(25,[]))
+
+
+class ProcessorNameTest(unittest.TestCase):
+    def test_windows_brand_from_registry(self):
+        from unittest.mock import MagicMock, patch
+        from agent.metrics import processor_name
+        registry = MagicMock()
+        registry.QueryValueEx.return_value = ('  AMD Ryzen 5 5600  6-Core Processor  ', 1)
+        with patch('agent.metrics.platform.system', return_value='Windows'), patch.dict('sys.modules', winreg=registry):
+            self.assertEqual(processor_name(), 'AMD Ryzen 5 5600 6-Core Processor')
+        registry.QueryValueEx.assert_called_once_with(registry.OpenKey.return_value.__enter__.return_value, 'ProcessorNameString')
+
+    def test_windows_missing_brand_falls_back(self):
+        from unittest.mock import MagicMock, patch
+        from agent.metrics import processor_name
+        registry = MagicMock()
+        registry.OpenKey.side_effect = OSError('Unavailable')
+        with patch('agent.metrics.platform.system', return_value='Windows'), patch('agent.metrics.platform.processor', return_value='AMD64 fallback'), patch.dict('sys.modules', winreg=registry):
+            self.assertEqual(processor_name(), 'AMD64 fallback')
+
+    def test_linux_model_name(self):
+        from unittest.mock import mock_open, patch
+        from agent.metrics import processor_name
+        with patch('agent.metrics.platform.system', return_value='Linux'), patch('builtins.open', mock_open(read_data='processor : 0\nmodel name : Intel(R) Xeon(R) CPU\n')):
+            self.assertEqual(processor_name(), 'Intel(R) Xeon(R) CPU')
