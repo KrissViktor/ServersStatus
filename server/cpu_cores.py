@@ -48,14 +48,20 @@ def render(c,agent,identifier=None,offset=0,all_cores=False):
     if identifier:samples=[p for p in samples if int((p['timestamp']-start)//10)!=30]+[{'timestamp':center,'report_id':identifier,'cores':values}]
     system=data.get('system') or {};physical=system.get('physical_cores')
     description=str(len(values))+' логических процессоров'+(' · физических ядер: '+str(physical) if physical else '')
-    content='<p class="muted cpu-topology">'+esc(description)+'. Индексы логических процессоров из отчёта агента.</p><div class="cpu-core-grid">'
+    grid_class='cpu-core-grid cpu-core-grid-dense' if all_cores else 'cpu-core-grid'
+    content='<p class="muted cpu-topology">'+esc(description)+'</p><div class="'+grid_class+'">'
     for index in range(offset,len(values) if all_cores else min(offset+32,len(values))):
         value=values[index]
         points=[{'timestamp':p['timestamp'],'report_id':p['report_id'],'cpu':p['cores'][index] if p['cores'] else None} for p in samples]
         current=f'{value:.1f}%' if value is not None else 'Нет данных'
         attrs=' data-detail-metric="cpu_core" data-detail-name="'+str(index)+'" data-detail-first="'+str(row['received'])+'" data-detail-last="'+str(row['received'])+'" data-detail-count="30" data-detail-title="Логический процессор '+str(index)+'"'
         if identifier:attrs+=' data-detail-report="'+str(identifier)+'"'
-        content+='<section class="cpu-core"><div><button type="button" class="cpu-core-open"'+attrs+'>CPU '+str(index)+'</button><span>'+esc(current)+'</span></div><div class="task-plot">'+graph(points,'cpu',center,snapshot=identifier is not None,core=index,interactive=not all_cores)+'</div></section>'
+        drawing=graph(points,'cpu',center,snapshot=identifier is not None,core=index,interactive=not all_cores)
+        if all_cores:
+            tooltip=esc('CPU '+str(index)+' · '+current+' · Открыть историю')
+            content+='<section class="cpu-core"><button type="button" class="cpu-core-open cpu-core-chart" title="'+tooltip+'" aria-label="'+tooltip+'"'+attrs+'><span class="task-plot">'+drawing+'</span></button></section>'
+        else:
+            content+='<section class="cpu-core"><div><button type="button" class="cpu-core-open"'+attrs+'>CPU '+str(index)+'</button><span>'+esc(current)+'</span></div><div class="task-plot">'+drawing+'</div></section>'
     content+='</div>'
     if not all_cores and (offset or len(values)>32):
         content+='<div class="cpu-core-pages">'

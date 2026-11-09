@@ -194,3 +194,5 @@ body:has(#chart-detail[open]){overflow:hidden}
 .metrics:has(>.task-cpu>.cpu-breakdown[open]){align-items:start}
 
 .task-cpu:has(>.cpu-breakdown[open])>.task-description{min-height:0;margin:6px 0;font-size:11px}
+/* Dense logical-CPU view: graphs only; labels remain accessible as tooltips. */
+.cpu-breakdown .cpu-core-grid.cpu-core-grid-dense{grid-template-columns:repeat(auto-fit,minmax(40px,1fr));gap:2px}.cpu-core-grid-dense>.cpu-core{padding:0;border:0;border-radius:0;background:transparent}.cpu-breakdown .cpu-core-chart{display:block;width:100%;min-height:24px;height:24px;padding:0;border:0;border-radius:0;background:transparent;line-height:0}.cpu-breakdown .cpu-core-chart>.task-plot{display:block;height:24px}.cpu-core-chart:focus-visible{outline:2px solid #9bc4df;outline-offset:1px}.cpu-core-chart:hover .task-plot{border-color:#9bc4df}
