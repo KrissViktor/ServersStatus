@@ -39,11 +39,6 @@ class ServersStatusService(win32serviceutil.ServiceFramework):
 
 
 if __name__ == '__main__':
-    if sys.argv[1:]==['--sensor-self-test']:
-        from agent.temperatures import bundle_self_test
-        bundle_self_test()
-        print('Hardware bundle OK')
-        sys.exit(0)
     if getattr(sys, 'frozen', False):
         ServersStatusService._exe_name_ = sys.executable
     if len(sys.argv) == 1 and getattr(sys, 'frozen', False):

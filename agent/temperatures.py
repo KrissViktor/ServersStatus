@@ -1,7 +1,6 @@
-"""Available temperatures: Linux hwmon, bundled Windows helper and WMI fallback."""
+"""Read-only temperatures from existing Linux hwmon and Windows ACPI sensors."""
 import json
 import math
-import logging
 import os
 from pathlib import Path
 import subprocess
@@ -13,8 +12,6 @@ _lock=threading.Lock()
 _busy=False
 _next=0
 _cached={'status':'checking','items':[],'sampled_at':None}
-_native_state=None
-_driver_attempted=False
 
 
 def value(number):
@@ -52,61 +49,7 @@ def linux_sensors():
     except (OSError,RuntimeError,NotImplementedError,ValueError,TypeError,AttributeError,psutil.Error):return {'status':'unavailable','items':[],'sampled_at':time.time()}
 
 
-def bundle_self_test():
-    """Check the extracted helper/runtime without touching hardware or drivers."""
-    root=Path(__file__).with_name('hardware-monitor-bin')
-    for path in (root/'ServersStatusHardwareMonitor.exe',root/'LibreHardwareMonitorLib.dll',root/'PawnIO_setup.exe',Path(__file__).with_name('install_sensor_driver.ps1')):
-        if not path.is_file():raise RuntimeError('Hardware bundle is incomplete')
-    result=subprocess.run([str(root/'ServersStatusHardwareMonitor.exe'),'--self-test'],
-        cwd=str(root),capture_output=True,timeout=20,
-        creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    if result.returncode or result.stdout.strip()!=b'[]':raise RuntimeError('Hardware bundle runtime failed')
-
-
-def ensure_sensor_driver():
-    global _driver_attempted
-    if _driver_attempted:return
-    _driver_attempted=True
-    executable=Path(os.environ.get('SystemRoot',r'C:\Windows'))/'System32/WindowsPowerShell/v1.0/powershell.exe'
-    try:
-        result=subprocess.run([str(executable),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
-            '-File',str(Path(__file__).with_name('install_sensor_driver.ps1'))],capture_output=True,
-            timeout=80,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-        logging.info('Temperature driver setup: %s', 'ready' if result.returncode==0 else 'failed; see Windows driver policy or existing installation')
-        if result.returncode:logging.warning('Temperature driver setup details: %s',result.stderr.decode('utf-8',errors='replace')[-1500:])
-    except Exception:
-        logging.warning('Temperature driver setup unavailable; continuing without driver installation')
-
-
-def native_probe():
-    """Only execute the helper shipped with this agent, never search PATH or download."""
-    helper=Path(__file__).with_name('hardware-monitor-bin')/'ServersStatusHardwareMonitor.exe'
-    if os.environ.get('STATUS_AGENT_HARDWARE_TEMPERATURES','1')=='0' or not helper.is_file():return None
-    ensure_sensor_driver()
-    result=subprocess.run([str(helper)],cwd=str(helper.parent),capture_output=True,
-        encoding='utf-8-sig',errors='replace',timeout=15,
-        creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    if result.returncode:raise RuntimeError('Built-in hardware probe failed')
-    if len(result.stdout)>1024*1024:raise ValueError('Sensor response too large')
-    rows=json.loads(result.stdout)
-    if not isinstance(rows,list):raise ValueError('Invalid sensor response')
-    items=sanitize(rows)
-    return items if any(item['current'] is not None for item in items) else None
-
-
 def windows_probe():
-    global _native_state
-    try:
-        items=native_probe()
-        state='available' if items else 'unavailable'
-    except Exception:
-        items=None;state='failed'
-    if state!=_native_state:
-        logging.info('Built-in temperature sensors: %s%s',state,
-            '; using WMI fallback' if not items else '')
-        _native_state=state
-    if items:return {'status':'available','items':items,'sampled_at':time.time()}
-
     executable=Path(os.environ.get('SystemRoot',r'C:\Windows'))/'System32/WindowsPowerShell/v1.0/powershell.exe'
     result=subprocess.run([str(executable),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(Path(__file__).with_name('temperature_sensors.ps1'))],capture_output=True,encoding='utf-8-sig',errors='replace',timeout=9,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     if result.returncode:raise RuntimeError('Temperature probe failed')
