@@ -16,10 +16,10 @@ def controls(row,historical=False):
     if historical and not identifier:return ''
     url='/api/servers/'+quote(row['id'],safe='')+'/cpu-cores'
     if historical:url+='?report_id='+str(identifier)
-    return '<details class="cpu-breakdown" data-fold-key="'+esc('cpu-cores:'+row['id']+':'+str(identifier or 'live'))+'" data-cpu-cores data-cpu-url="'+esc(url)+'"'+(' data-cpu-historical' if historical else '')+'><summary>По ядрам · логические процессоры</summary><div class="cpu-cores-content"><p class="muted">Раскройте для загрузки.</p></div></details>'
+    return '<details class="cpu-breakdown" data-fold-key="'+esc('cpu-cores:'+row['id']+':'+str(identifier or 'live'))+'" data-cpu-cores data-cpu-url="'+esc(url)+'"'+(' data-cpu-historical' if historical else '')+'><summary><span class="cpu-label-cores">По ядрам · логические процессоры</span><span class="cpu-label-total">Общая загрузка</span></summary><div class="cpu-cores-content"><p class="muted">Раскройте для загрузки.</p></div></details>'
 
 
-def render(c,agent,identifier=None,offset=0):
+def render(c,agent,identifier=None,offset=0,all_cores=False):
     if identifier is not None:
         row=c.execute('SELECT received,data FROM reports WHERE rowid=? AND agent=?',(identifier,agent)).fetchone()
     else:
@@ -30,7 +30,7 @@ def render(c,agent,identifier=None,offset=0):
         message='В этом снимке нагрузка по логическим процессорам не сохранялась. Новые данные появятся после обновления агента.' if identifier else 'Агент ещё не прислал нагрузку по логическим процессорам. Обновите агент и дождитесь нового отчёта.'
         if 'cpu_per_core_v1' in data.get('features',[]):message='В этом отчёте агент не смог получить нагрузку логических процессоров. Проверьте журнал агента; текущие значения вместо исторических не подставляются.'
         return {'html':'<p class="muted">'+message+'</p>','count':0}
-    offset=min(offset,((len(values)-1)//32)*32)
+    offset=0 if all_cores else min(offset,((len(values)-1)//32)*32)
     center=row['received'] if identifier else time.time();start=center-300;end=center+300 if identifier else center
     # Bounded scans around the selected moment, only array metrics, no inventories.
     fields="rowid AS report_id,received,json_extract(data,'$.cpu_per_core') AS cores"
@@ -49,15 +49,15 @@ def render(c,agent,identifier=None,offset=0):
     system=data.get('system') or {};physical=system.get('physical_cores')
     description=str(len(values))+' логических процессоров'+(' · физических ядер: '+str(physical) if physical else '')
     content='<p class="muted cpu-topology">'+esc(description)+'. Индексы логических процессоров из отчёта агента.</p><div class="cpu-core-grid">'
-    for index in range(offset,min(offset+32,len(values))):
+    for index in range(offset,len(values) if all_cores else min(offset+32,len(values))):
         value=values[index]
         points=[{'timestamp':p['timestamp'],'report_id':p['report_id'],'cpu':p['cores'][index] if p['cores'] else None} for p in samples]
         current=f'{value:.1f}%' if value is not None else 'Нет данных'
         attrs=' data-detail-metric="cpu_core" data-detail-name="'+str(index)+'" data-detail-first="'+str(row['received'])+'" data-detail-last="'+str(row['received'])+'" data-detail-count="30" data-detail-title="Логический процессор '+str(index)+'"'
         if identifier:attrs+=' data-detail-report="'+str(identifier)+'"'
-        content+='<section class="cpu-core"><div><button type="button" class="cpu-core-open"'+attrs+'>CPU '+str(index)+'</button><span>'+esc(current)+'</span></div><div class="task-plot">'+graph(points,'cpu',center,snapshot=identifier is not None,core=index)+'</div></section>'
+        content+='<section class="cpu-core"><div><button type="button" class="cpu-core-open"'+attrs+'>CPU '+str(index)+'</button><span>'+esc(current)+'</span></div><div class="task-plot">'+graph(points,'cpu',center,snapshot=identifier is not None,core=index,interactive=not all_cores)+'</div></section>'
     content+='</div>'
-    if offset or len(values)>32:
+    if not all_cores and (offset or len(values)>32):
         content+='<div class="cpu-core-pages">'
         if offset:content+='<button type="button" data-core-page="'+str(max(0,offset-32))+'">← Предыдущие</button>'
         content+='<span>'+str(min(offset+1,len(values)))+'–'+str(min(offset+32,len(values)))+' из '+str(len(values))+'</span>'
@@ -69,8 +69,8 @@ def render(c,agent,identifier=None,offset=0):
 
 def register(app,db,authenticated):
     @app.get('/api/servers/{agent}/cpu-cores')
-    def view(agent:str,request:Request,report_id:int|None=Query(default=None,ge=1),offset:int=Query(default=0,ge=0,le=1023)):
+    def view(agent:str,request:Request,report_id:int|None=Query(default=None,ge=1),offset:int=Query(default=0,ge=0,le=1023),all_cores:bool=False):
         if not authenticated(request):raise HTTPException(401)
         if not can_history():raise HTTPException(403)
-        with db() as c:result=render(c,agent,report_id,offset)
+        with db() as c:result=render(c,agent,report_id,offset,all_cores)
         return JSONResponse(result,headers={'Cache-Control':'no-store'})

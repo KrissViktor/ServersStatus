@@ -6,7 +6,7 @@ import math
 WINDOW=300
 
 
-def graph(points,field,now,snapshot=False,core=None):
+def graph(points,field,now,snapshot=False,core=None,interactive=True):
     start=now-WINDOW
     end=now+WINDOW if snapshot else now
     width=end-start
@@ -46,7 +46,7 @@ def graph(points,field,now,snapshot=False,core=None):
     if snapshot:
         stamp=datetime.fromtimestamp(now,timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S МСК')
         content+='<line class="task-snapshot-marker" x1="160" x2="160" y1="0" y2="100"><title>Момент снимка: '+html.escape(stamp)+'</title></line>'
-    for timestamp,value in samples:
+    for timestamp,value in (samples if interactive else []):
         stamp=datetime.fromtimestamp(timestamp,timezone(timedelta(hours=3))).strftime('%H:%M:%S МСК')
         tooltip=f'{stamp} · {value:.1f}%'
         if field=='ram':

@@ -7,7 +7,7 @@
     const controller=new AbortController(),state={busy:true,loaded:false,controller,offset:offset??old?.offset??0};states.set(details,state);
     const content=details.querySelector('.cpu-cores-content');if(!old?.loaded)content.textContent='Загрузка логических процессоров…';content.setAttribute('aria-busy','true');
     try{
-      const url=new URL(details.dataset.cpuUrl,location.origin);url.searchParams.set('offset',state.offset);
+      const url=new URL(details.dataset.cpuUrl,location.origin);url.searchParams.set('offset',state.offset);url.searchParams.set('all_cores','1');
       const response=await fetch(url,{credentials:'same-origin',cache:'no-store',signal:controller.signal});
       if(!response.ok)throw Error(response.status===401||response.status===403?'Доступ к графикам закрыт. Войдите в портал снова.':'Не удалось получить графики ядер');
       const data=await response.json();if(!details.isConnected||!details.open)return;
@@ -15,7 +15,7 @@
     }catch(error){if(error.name!=='AbortError'&&details.isConnected){const text=document.createElement('p'),button=document.createElement('button');text.textContent=error.message;button.type='button';button.textContent='Повторить';button.addEventListener('click',()=>load(details,true));content.replaceChildren(text,button)}}
     finally{state.busy=false;content.removeAttribute('aria-busy')}
   }
-  document.addEventListener('toggle',event=>{const details=event.target;if(!details.matches?.('[data-cpu-cores]'))return;if(details.open)load(details);else{const state=states.get(details);if(state?.busy){state.controller.abort();state.busy=false;state.loaded=false}}},true);
+  document.addEventListener('toggle',event=>{const details=event.target;if(!details.matches?.('[data-cpu-cores]'))return;if(details.open)load(details,true);else{const state=states.get(details);if(state?.busy){state.controller.abort();state.busy=false;state.loaded=false}}},true);
   document.addEventListener('click',event=>{const button=event.target.closest('[data-core-page]');if(button){event.preventDefault();load(button.closest('[data-cpu-cores]'),true,Number(button.dataset.corePage))}});
   const scan=()=>document.querySelectorAll('[data-cpu-cores][open]').forEach(d=>load(d));
   new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});scan();

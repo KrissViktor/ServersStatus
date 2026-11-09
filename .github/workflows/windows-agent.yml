@@ -23,6 +23,8 @@ jobs:
         run: python -m pip install -r agent/requirements-windows.txt pyinstaller==6.16.0
       - name: Test backup schedules
         run: python -m unittest discover -s tests -p test_backups.py -v
+      - name: Test temperature sensor collection
+        run: python -m unittest discover -s tests -p test_temperature_sensors.py -v
       - name: Test extended metrics
         run: python -m unittest discover -s tests -p test_metrics.py -v
       - name: Test universal updater
@@ -82,7 +84,7 @@ jobs:
       - name: Test real Windows helper file replacement and rollback
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-WindowsUpdateHelper.ps1
       - name: Build standalone service
-        run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --add-data "agent/VERSION;agent" --add-data "agent/apply_update.ps1;agent" --add-data "agent/windows_management.ps1;agent" --hidden-import win32timezone --hidden-import win32ts --paths . agent/windows_service.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --name ServersStatusService --add-data "agent/VERSION;agent" --add-data "agent/apply_update.ps1;agent" --add-data "agent/windows_management.ps1;agent" --add-data "agent/temperature_sensors.ps1;agent" --hidden-import win32timezone --hidden-import win32ts --paths . agent/windows_service.py
       - name: Test frozen service registration and startup
         shell: pwsh
         run: |

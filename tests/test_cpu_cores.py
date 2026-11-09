@@ -38,6 +38,8 @@ class CpuCoresTest(unittest.TestCase):
         with a.db() as c:
             first=render(c,'pc',latest);second=render(c,'pc',latest,32)
         self.assertEqual(first['html'].count('class="cpu-core"'),32);self.assertEqual(second['html'].count('class="cpu-core"'),8)
+        with a.db() as c:all_graphs=render(c,'pc',latest,all_cores=True)
+        self.assertEqual(all_graphs['html'].count('class="cpu-core"'),40);self.assertNotIn('data-core-page',all_graphs['html']);self.assertNotIn('class="task-point"',all_graphs['html'])
         self.assertIn('CPU 39',second['html']);self.assertNotIn('>CPU 0</button>',second['html'])
         with a.db() as c:clamped=render(c,'pc',latest,100)
         self.assertEqual(clamped['offset'],32);self.assertEqual(clamped['html'].count('class="cpu-core"'),8)

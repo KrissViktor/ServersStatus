@@ -260,7 +260,10 @@ from .windows import WindowsInfo
 
 from .console import ConsoleInfo
 
+from .temperatures import TemperatureInfo
+
 class Report(BaseModel):
+    temperatures: TemperatureInfo | None = None
     console: ConsoleInfo | None = None
     windows_updates: WindowsInfo | None = None
     agent_version: str = Field(default="dev", max_length=80)

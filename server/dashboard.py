@@ -190,7 +190,8 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
             content+=disk_forecast_html(forecasts.get(disk.get('path'),{'status':'insufficient'}),disk,not online)
         content+='</div>'
     content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section>'
-    content+='<div class="secondary fold-grid"><section><h3>Службы</h3>'
+    from .temperatures import section as temperature_section
+    content+='<div class="secondary fold-grid">'+temperature_section(data,historical=historical)+'<section><h3>Службы</h3>'
     services = data.get('services', [])
     if not services:
         content += '<p class="empty small">Контроль служб не настроен</p>'
