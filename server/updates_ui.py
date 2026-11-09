@@ -6,7 +6,7 @@ import json
 import time
 
 SCRIPT=Path(__file__).with_name('updates.js').read_text()
-LABELS={'queued':('В очереди','neutral'),'running':('Установка','warning'),'applied':('Установлено','normal'),'failed':('Ошибка','danger')}
+LABELS={'queued':('В очереди','neutral'),'running':('Установка','warning'),'applied':('Установлено','normal'),'failed':('Ошибка','danger'),'cancelled':('Отменено','neutral')}
 
 
 def render(c,csrf,result=None):
@@ -20,6 +20,11 @@ def render(c,csrf,result=None):
             except (ValueError,TypeError):count=0
             if count or key=='queued':summary.append(f'<li>{esc(label)}: <b>{count}</b></li>')
         content+='<section class="server" role="status"><h2>Массовое обновление</h2><ul>'+''.join(summary)+'</ul><p class="muted">Результаты установки появятся в истории каждого агента.</p></section>'
+    content+=f'<section class="server"><h2>Отмена заданий</h2><p>Можно отменить задания, которые агент ещё не принял. Уже принятую установку нельзя безопасно остановить из панели.</p><form method="post" action="/updates/all/cancel"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Отменить все ожидающие обновления</button></form></section>'
+    if result and result.get('cancelled') is not None:
+        try:count=max(0,int(result['cancelled']))
+        except (ValueError,TypeError):count=0
+        content+=f'<p role="status">Отменено ожидающих заданий: {count}. Уже принятые агентами задания продолжаются.</p>'
     content+=f'<section class="server"><h2>Обновить все агенты</h2><p>Проверить GitHub и отправить каждому доступному агенту последнюю новую версию для его платформы. Raspberry Pi обновляется вместе с порталом. Агенты без связи и с незавершёнными задачами будут пропущены.</p><form data-bulk-update method="post" action="/updates/all/latest"><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="check"><input type="checkbox" name="confirm" value="yes" required> Разрешаю короткий перезапуск служб агентов</label><button>Обновить все агенты</button><p class="muted" data-bulk-progress hidden role="status">Проверяем GitHub и создаём задачи…</p></form></section>'
     content+=f'<section class="server"><h2>Доступные версии</h2><p>Нажмите, чтобы получить новые сборки из GitHub.</p><form method="post" action="/updates/github/check"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Проверить GitHub</button></form></section><div data-updates-root>'
     from .updates import pending
@@ -37,6 +42,13 @@ def render(c,csrf,result=None):
             rendered=''.join(f'<option value="{p["id"]}">{esc(p["version"])} ({p["label"]}) · {stamp(p["display_date"])} МСК</option>' for p in options)
             disabled='disabled' if active or not online or not options else ''
             content+=f'<form data-update-form method="post" action="/updates/{esc(quote(agent,safe=""))}"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>Перейти на версию<select name="package" required {"disabled" if not options else ""}>{rendered or "<option>Подходящих версий нет</option>"}</select></label><label class="check"><input type="checkbox" required> Разрешаю короткий перезапуск службы агента</label><button {disabled}>Установить выбранную версию</button></form>'
+        cancellation=''
+        if active:
+            state=c.execute('SELECT status FROM agent_update_jobs WHERE id=?',(active['id'],)).fetchone()['status']
+            if state=='queued':
+                cancellation=f'<form method="post" action="/updates/{esc(quote(agent,safe=""))}/{active["id"]}/cancel"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Отменить задание #{active["id"]}</button></form>'
+            else:cancellation='<p class="muted">Агент уже принял задание. Безопасная отмена установки недоступна.</p>'
+        content+='<div data-update-cancel>'+cancellation+'</div>'
         content+='<div data-update-history tabindex="0" aria-label="История обновлений: прокручиваемый список" style="max-height:300px;overflow:hidden;overscroll-behavior:auto;border:1px solid var(--line);border-radius:12px;padding:0 14px;margin-top:18px">'
         jobs=c.execute('SELECT j.*,p.version,x.from_version FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package LEFT JOIN update_job_context x ON x.job=j.id WHERE j.agent=? ORDER BY j.id DESC LIMIT 10',(agent,)).fetchall()
         if jobs:

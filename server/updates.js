@@ -40,6 +40,8 @@
           oldSelect.disabled=newSelect.disabled;
           card.querySelector('form[data-update-form] button').disabled=source.querySelector('form[data-update-form] button').disabled;
         }
+        const cancel=card.querySelector('[data-update-cancel]'),freshCancel=source.querySelector('[data-update-cancel]');
+        if(cancel && freshCancel && cancel.innerHTML!==freshCancel.innerHTML)cancel.innerHTML=freshCancel.innerHTML;
         const history=card.querySelector('[data-update-history]'),freshHistory=source.querySelector('[data-update-history]');
         const opened=new Map([...history.querySelectorAll('details')].map(n=>[n.dataset.updateJob,n.open]));
         for (const detail of freshHistory.querySelectorAll('details'))if(opened.has(detail.dataset.updateJob))detail.open=opened.get(detail.dataset.updateJob);

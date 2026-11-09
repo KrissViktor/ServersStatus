@@ -30,6 +30,21 @@ def pending(c,agent):
     return dict(row) if row else None
 
 
+def cancel_queued(c,agent=None,job_id=None):
+    """Serialize cancellation against the agent's running acknowledgement."""
+    c.execute('BEGIN IMMEDIATE')
+    where="status='queued'";args=[]
+    if agent is not None:where+=' AND agent=?';args.append(agent)
+    if job_id is not None:where+=' AND id=?';args.append(job_id)
+    jobs=c.execute('SELECT id FROM agent_update_jobs WHERE '+where,args).fetchall()
+    now=time.time();message='Отменено администратором до начала установки'
+    from .update_versions import event
+    for job in jobs:
+        c.execute("UPDATE agent_update_jobs SET status='cancelled',message=?,updated=? WHERE id=? AND status='queued'",(message,now,job['id']))
+        event(c,job['id'],'cancelled',message,now)
+    return len(jobs)
+
+
 def confirm(c,agent,data):
     job=pending(c,agent)
     if job and data.agent_version==job['version'] and data.agent_platform==job['platform']:
@@ -142,6 +157,31 @@ def register(app,db,authenticated,csrf_token,digest):
             event(c,job_id,'queued','Ожидание агента',now)
         return RedirectResponse('/updates',303)
 
+    async def cancellation_form(request):
+        if not authenticated(request):raise HTTPException(401)
+        raw=await request.body()
+        if len(raw)>4096:raise HTTPException(413)
+        form=parse_qs(raw.decode())
+        if not hmac.compare_digest(form.get('csrf',[''])[0].encode(),csrf_token(request).encode()):raise HTTPException(403)
+
+    @app.post('/updates/all/cancel')
+    async def cancel_all(request:Request):
+        await cancellation_form(request)
+        with db() as c:count=cancel_queued(c)
+        return RedirectResponse('/updates?cancelled='+str(count),303)
+
+    @app.post('/updates/{agent}/{job_id}/cancel')
+    async def cancel_one(agent:str,job_id:int,request:Request):
+        await cancellation_form(request)
+        with db() as c:
+            count=cancel_queued(c,agent,job_id)
+            if not count:
+                row=c.execute('SELECT status FROM agent_update_jobs WHERE id=? AND agent=?',(job_id,agent)).fetchone()
+                if not row:raise HTTPException(404,'Задание не найдено')
+                if row['status']!='cancelled':
+                    raise HTTPException(409,'Задание уже принято агентом или завершено. Принудительная остановка установки недоступна.')
+        return RedirectResponse('/updates?cancelled='+str(count),303)
+
     @app.get('/api/agent-update/{agent}')
     def job(agent:str,request:Request):
         with db() as c:
@@ -204,6 +244,10 @@ def register(app,db,authenticated,csrf_token,digest):
                 if data.get('rollback')=='restored':message+='; предыдущий EXE восстановлен'
                 elif data.get('rollback')=='failed':message+='; восстановление не завершено, проверьте службу локально'
                 elif data.get('message')=='Не удалось скачать или проверить пакет; служба не заменена':message='Не удалось скачать пакет или проверить SHA256; EXE службы не заменён'
+            c.execute('BEGIN IMMEDIATE')
+            existing=c.execute('SELECT status FROM agent_update_jobs WHERE id=? AND agent=?',(data['job_id'],agent)).fetchone()
+            if existing and existing['status']=='cancelled':
+                raise HTTPException(409,'Задание отменено; установка запрещена')
             now=time.time()
             changed=c.execute("UPDATE agent_update_jobs SET status=?,message=?,updated=? WHERE id=? AND agent=? AND status IN ('queued','running')",(data['status'],message,now,data['job_id'],agent))
             if changed.rowcount:
