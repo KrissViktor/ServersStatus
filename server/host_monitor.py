@@ -20,6 +20,21 @@ def database_size(path):
     return sum(p.stat().st_size for p in (Path(path),Path(str(path)+'-wal'),Path(str(path)+'-shm')) if p.is_file())
 
 
+def enrich_host(data, path):
+    """Keep common Linux sensors; provide the local SoC reading as a fallback."""
+    current=temperature()
+    data.update(agent_platform='portal',
+        features=list(dict.fromkeys(data.get('features',[])+['host_monitor_v1','service_inventory_v1','process_history_v1'])),
+        services=[],discovered_services=[],auto_services_enabled=False)
+    data['portal']={'temperature_c':current,'database_bytes':database_size(path)}
+    if current is not None and not (data.get('temperatures') or {}).get('items'):
+        data['temperatures']={'status':'available','sampled_at':time.time(),'items':[
+            {'id':'portal:thermal_zone0','label':'SoC','device':'Raspberry Pi',
+             'component':'SoC','source':'Linux thermal_zone0','current':current,
+             'high':None,'critical':None}]}
+    return data
+
+
 def register_host(db):
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
@@ -58,11 +73,10 @@ def main():
             from agent.processes import begin,finish
             before=begin()
             data=collect({'auto_monitor_services':False},{})
-            data.update(agent_platform='portal',features=['host_monitor_v1','service_inventory_v1','process_history_v1'],services=[],discovered_services=[],auto_services_enabled=False)
+            data=enrich_host(data,DB)
             units=['serversstatus.service','serversstatus-bot.service','serversstatus-notify.timer','serversstatus-host-monitor.service','serversstatus-events.timer','serversstatus-hysteria.service']
             units=[name for name in units if Path('/etc/systemd/system',name).exists()]
             data['services']=systemd_services(units)
-            data['portal']={'temperature_c':temperature(),'database_bytes':database_size(DB)}
             data=Report.model_validate(data).model_dump()
             processes=finish(before)
             if not store(db,agent,data,time.time(),processes):return

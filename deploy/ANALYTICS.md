@@ -210,3 +210,19 @@ root\LibreHardwareMonitor / root\OpenHardwareMonitor и ACPI root\wmi, timeout
 Номер CPU и текущий процент доступны в подсказке при наведении и accessible name;
 нажатие на любой мини-график открывает его подробную историю. Переключение обратно
 на общую загрузку и выбранный режим при автообновлении сохраняются.
+
+### Raspberry Pi — портал (raspi-portal)
+
+Локальная служба serversstatus-host-monitor использует общий Linux-сборщик
+температур, без LibreHardwareMonitor/PawnIO. Если он не вернул датчиков, доступное
+показание `/sys/class/thermal/thermal_zone0/temp` добавляется в общий раздел
+«Температуры» как SoC и сохраняется в отчётах/снимках. Старое значение в разделе
+администрирования Raspberry Pi также сохраняется. Недоступный датчик не становится
+нулём. После обновления исходников перезапустите **обе** службы:
+
+```bash
+sudo systemctl restart serversstatus serversstatus-host-monitor
+```
+
+Отдельно обновлять агент через Windows/Linux releases для raspi-portal не нужно:
+он запускается из того же репозитория /opt/ServersStatus.
