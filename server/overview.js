@@ -19,7 +19,7 @@
         let current=existing.get(id);
         if(!current)current=card;
         else if(current.outerHTML!==card.outerHTML && !current.contains(document.activeElement)){
-          current.replaceWith(card);if(cursor===current)cursor=card;current=card;
+          window.keepCpuCores?.(current,card);current.replaceWith(card);if(cursor===current)cursor=card;current=card;
         }
         if(current!==cursor)oldGrid.insertBefore(current,cursor);
         cursor=current.nextElementSibling;

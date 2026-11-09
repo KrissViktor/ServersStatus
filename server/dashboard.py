@@ -51,14 +51,14 @@ def level(percent):
     return 'danger' if percent >= 95 else 'warning' if percent >= 85 else 'normal'
 
 
-def meter(label,value,description,points=None,field='cpu',now=None,snapshot=False):
+def meter(label,value,description,points=None,field='cpu',now=None,snapshot=False,extra=''):
     from .task_graph import graph
     percent=min(100,number(value))
     now=time.time() if now is None else now
     if not can_history():return f'<div class="metric current-metric"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><p class="muted task-description">{esc(description)}</p></div>'
     axis_class='task-axis snapshot-axis' if snapshot else 'task-axis'
     axis='<span>−5 минут</span><span>Снимок</span><span>+5 минут</span>' if snapshot else '<span>5 минут</span><span>Сейчас</span>'
-    return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now,snapshot=snapshot) + '</div><div class="'+axis_class+'">'+axis+'</div><p class="muted task-description">' + esc(description) + '</p></div>'
+    return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}</span><strong>{percent:.1f}<small>%</small></strong></div><div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now,snapshot=snapshot) + '</div><div class="'+axis_class+'">'+axis+'</div><p class="muted task-description">' + esc(description) + '</p>'+extra+'</div>'
 
 
 def resource_points(row,data):
@@ -108,7 +108,7 @@ def page(content, refresh=False, protection_entry=False):
         widget=('<button type="button" id="ai-launcher" class="ai-launcher" aria-label="Открыть ИИ-помощника" aria-expanded="false" aria-controls="ai-widget">✦ <span>ИИ-помощник</span></button>'
                 '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside><script>'
                 +Path(__file__).with_name('ai_chat.js').read_text(encoding='utf-8')+'</script><script>'+Path(__file__).with_name('ai_widget.js').read_text(encoding='utf-8')+'</script>')
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main>'+widget+'</body></html>'
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script><script>'+Path(__file__).with_name('cpu_cores.js').read_text(encoding='utf-8')+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 
 def login_page():
@@ -180,7 +180,8 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
     if not online:
         content += '<p class="notice">Данные устарели: агент не присылал отчёт более 3 минут.</p>'
     points=resource_points(row,data)
-    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data),points,'cpu',now,snapshot=historical) + meter('Оперативная память', data.get('memory_percent'), memory_description(data),points,'ram',now,snapshot=historical) + '</div><div class="server-information"><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
+    from .cpu_cores import controls as cpu_controls
+    content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data),points,'cpu',now,snapshot=historical,extra=cpu_controls(row,historical)) + meter('Оперативная память', data.get('memory_percent'), memory_description(data),points,'ram',now,snapshot=historical) + '</div><div class="server-information"><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
     for disk in monitored_disks(data):
         percent = min(100, number(disk.get('used_percent')))
         content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p>'

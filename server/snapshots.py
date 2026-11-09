@@ -53,7 +53,7 @@ def snapshot(c,agent,identifier):
     data['features']=[feature for feature in data.get('features',[]) if not feature.startswith('console')]
     name=c.execute('SELECT display_name FROM agent_profiles WHERE agent=?',(agent,)).fetchone()
     stamp=datetime.fromtimestamp(row['received'],timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S МСК')
-    card={'id':agent,'received':row['received'],'data':json.dumps(data),'display_name':name[0] if name else '','sparkline':surrounding_points(c,agent,row['received'])}
+    card={'id':agent,'received':row['received'],'data':json.dumps(data),'display_name':name[0] if name else '','snapshot_report_id':identifier,'sparkline':surrounding_points(c,agent,row['received'])}
     center=resource_points({'received':row['received']},data)[0]
     center['report_id']=identifier
     card['sparkline']=sorted([point for point in card['sparkline'] if point['timestamp']!=row['received']]+[center],key=lambda point:point['timestamp'])

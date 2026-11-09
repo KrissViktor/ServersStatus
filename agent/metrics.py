@@ -7,6 +7,24 @@ import time
 import psutil
 
 
+def sample_cpu(interval=1):
+    # Prime per-CPU counters, then measure both views over the same one-second
+    # interval. No second blocking sample is added to the reporting loop.
+    ready=False
+    try:
+        psutil.cpu_percent(interval=None,percpu=True);ready=True
+    except (OSError,RuntimeError,NotImplementedError,psutil.Error):pass
+    total=psutil.cpu_percent(interval=interval)
+    values=[]
+    if ready:
+        try:
+            result=psutil.cpu_percent(interval=None,percpu=True)
+            if isinstance(result,list):
+                values=[float(v) if isinstance(v,(int,float)) and math.isfinite(v) and 0<=v<=100 else None for v in result[:1024]]
+        except (OSError,RuntimeError,NotImplementedError,psutil.Error):pass
+    return total,values
+
+
 def counters():
     snapshot = {'time': time.monotonic(), 'network': {}, 'disk_io': {}}
     for key, method in (('network', lambda: psutil.net_io_counters(pernic=True)),

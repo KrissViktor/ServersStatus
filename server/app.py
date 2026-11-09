@@ -8,6 +8,7 @@ import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -277,6 +278,7 @@ class Report(BaseModel):
     sample_seconds: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     hostname: str = Field(max_length=255)
     cpu_percent: float = Field(ge=0, le=100)
+    cpu_per_core: list[Annotated[float,Field(ge=0,le=100,allow_inf_nan=False)] | None] = Field(default_factory=list,max_length=1024)
     memory_percent: float = Field(ge=0, le=100)
     uptime_seconds: float = Field(ge=0)
     disks: list[dict] = Field(max_length=100)
@@ -711,3 +713,6 @@ register_services(app,db,authenticated,digest)
 
 from .ai_chat import register as register_ai_chat
 register_ai_chat(app,db,authenticated,csrf_token)
+
+from .cpu_cores import register as register_cpu_cores
+register_cpu_cores(app,db,authenticated)

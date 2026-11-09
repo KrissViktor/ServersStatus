@@ -27,3 +27,10 @@ class TaskGraphTest(unittest.TestCase):
             self.assertIn('8.0 Гб / 16.0 Гб',markup)
             self.assertIn('3.20 ГГц',markup)
             self.assertIn('5 минут',markup)
+
+    def test_missing_logical_cpu_sample_is_a_gap(self):
+        points=[{'timestamp':980,'cpu':10},{'timestamp':990,'cpu':None},{'timestamp':1000,'cpu':80}]
+        markup=graph(points,'cpu',1000,core=2)
+        self.assertEqual(markup.count('class="task-line"'),2)
+        self.assertIn('Логический процессор 2',markup)
+        self.assertIn('data-detail-name="2"',markup)

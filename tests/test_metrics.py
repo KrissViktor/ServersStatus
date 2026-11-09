@@ -20,3 +20,15 @@ class MetricsTest(unittest.TestCase):
         self.assertIn('version', data['system'])
         self.assertEqual(data['disk_io'], [])
         self.assertIsInstance(data['network'], list)
+
+class PerCoreCpuTest(unittest.TestCase):
+    def test_one_interval_and_separate_per_cpu_samples(self):
+        from unittest.mock import patch,call
+        from agent.metrics import sample_cpu
+        with patch('agent.metrics.psutil.cpu_percent',side_effect=[[0,0,0],50,[10,80,float('nan')]]) as read:
+            self.assertEqual(sample_cpu(),(50,[10.0,80.0,None]))
+            self.assertEqual(read.call_args_list,[call(interval=None,percpu=True),call(interval=1),call(interval=None,percpu=True)])
+    def test_optional_per_cpu_failure_does_not_break_total(self):
+        from unittest.mock import patch
+        from agent.metrics import sample_cpu
+        with patch('agent.metrics.psutil.cpu_percent',side_effect=[OSError('no per cpu'),25]):self.assertEqual(sample_cpu(),(25,[]))
