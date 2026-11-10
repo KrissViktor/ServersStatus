@@ -47,16 +47,20 @@ def matches(row, now, query, view):
         return False
     if view == 'problems':
         return bool(issues(row, now))
+    if view == 'online':
+        return row['received'] is not None and now-row['received']<180
+    if view == 'disks':
+        return any(number(disk.get('used_percent'))>=85 for disk in monitored_disks(data))
     if view == 'offline':
         return row['received'] is not None and now - row['received'] >= 180
     return True
 
 
 def search_form(query, view, shown, total, rows=None, group=''):
-    options = ''.join(f'<option value="{value}" {"selected" if value == view else ""}>{label}</option>' for value, label in [('all', 'Все серверы'), ('problems', 'Есть проблемы'), ('offline', 'Нет связи')])
+    options = ''.join(f'<option value="{value}" {"selected" if value == view else ""}>{label}</option>' for value, label in [('all', 'Все серверы'), ('online','Онлайн'), ('offline', 'Нет связи'), ('problems', 'Есть проблемы'), ('disks','Диски от 85%')])
     groups={item['id']:item['name'] for row in (rows or []) for item in dict(row).get('groups',[])}
     group_control='<label>Группа<select name="group"><option value="">Все группы</option>'+''.join('<option value="'+esc(key)+'" '+('selected' if key==group else '')+'>'+esc(name)+'</option>' for key,name in groups.items())+'</select></label>'
-    return f'<form class="searchbar" method="get" action="/"><label>Поиск по названию или имени<input name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><p class="muted result-count">Показано {shown} из {total}. Фильтр «Есть проблемы»: связь, CPU/RAM от 95%, диски от 85%, бэкапы и службы.</p>'
+    return f'<form class="searchbar" method="get" action="/"><label>Поиск<input aria-label="Поиск по названию или имени" name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><p class="muted result-count">Показано {shown} из {total}</p>'
 
 
 def compact_card(row, now):

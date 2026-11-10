@@ -84,6 +84,11 @@
     }
   }
 
+  document.addEventListener('click',event=>{
+    const filter=event.target.closest('[data-overview-view]');
+    if(!filter || event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)return;
+    event.preventDefault();view.value=filter.dataset.overviewView;search(false);
+  });
   input.addEventListener('input', () => {
     if (pending) pending.abort();
     pending = null;

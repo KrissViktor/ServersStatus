@@ -5,7 +5,7 @@ import html
 import json
 import math
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from pathlib import Path
 
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')
@@ -262,11 +262,18 @@ def dashboard(rows, q='', view='all', group=''):
         data = json.loads(row['data']) if row['data'] else {}
         if any(number(d.get('used_percent')) >= 85 for d in monitored_disks(data)):
             attention += 1
-    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/admin">Администрирование</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
+    header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/admin">Администрирование</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="overview-commandbar"><div class="heading"><h1>Обзор серверов</h1><span class="refresh" title="Автообновление каждые 10 секунд">↻ 10 с</span></div>'
     if not can_history():header=header.replace('<a class="nav-link" href="/admin">Администрирование</a>','')
     if can_history():header+=overview_shortcuts()
+    header+='</div>'
     if group:header=header.replace('href="/compare"','href="/compare?group='+esc(group)+'"').replace('href="/daily"','href="/daily?group='+esc(group)+'"')
-    stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
+    stats='<div class="stats">'
+    for label,value,color,selection in [('Всего',len(rows),'neutral','all'),('Онлайн',online,'normal','online'),('Нет связи',len(rows)-online-missing,'danger','offline'),('Диски от 85%',attention,'warning','disks')]:
+        query={**({'q':q} if q else {}),**({'group':group} if group else {}),**({'view':selection} if selection!='all' else {})}
+        url='/'+('?' + urlencode(query) if query else '')
+        current=' aria-current="true"' if view==selection else ''
+        stats+='<a class="stat stat-filter" data-overview-view="'+selection+'" href="'+esc(url)+'"'+current+'><span>'+label+'</span><strong class="text-'+color+'">'+str(value)+'</strong></a>'
+    stats+='</div>'
     from .overview import compact_card, matches, search_form
     selected = [row for row in rows if matches(row, now, q, view) and (not group or group in [item['id'] for item in dict(row).get('groups',[])])]
     active=[row for row in selected if dict(row).get('active',1)]
@@ -279,4 +286,4 @@ def dashboard(rows, q='', view='all', group=''):
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now)
     from .drilldown import widget
-    return page(header + '<div id="overview-alerts">' + backup_alerts([row for row in rows if dict(row).get('important',1)], now) + summary + '</div><div id="overview-stats">' + stats + '</div>' + cards + (widget('') if can_history() else '') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
+    return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+summary+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')

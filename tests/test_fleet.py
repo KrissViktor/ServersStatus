@@ -62,6 +62,21 @@ class FleetTest(unittest.TestCase):
         with a.db() as c:result='\n'.join(build_summary(c,now-3600,now,now))
         self.assertIn('Доступность:',result);self.assertIn('Завершилось инцидентов:',result)
 
+    def test_status_filters_exclude_unseen_and_keep_group_search(self):
+        self.fixture.report();now=time.time()
+        with a.db() as c:
+            c.execute('INSERT INTO reports VALUES (?,?,?)',('other',now-500,json.dumps({**self.fixture.data,'hostname':'Old SQL'})))
+            c.execute("INSERT INTO agents VALUES ('waiting','unused')")
+            c.execute("INSERT INTO server_groups VALUES (1,'SQL')")
+            c.execute("INSERT INTO server_group_members VALUES (1,'pc')")
+        online=self.client.get('/?view=online').text
+        self.assertIn('data-server-id="pc"',online);self.assertNotIn('data-server-id="other"',online);self.assertNotIn('data-server-id="waiting"',online)
+        offline=self.client.get('/?view=offline').text
+        self.assertIn('data-server-id="other"',offline);self.assertNotIn('data-server-id="pc"',offline);self.assertNotIn('data-server-id="waiting"',offline)
+        scoped=self.client.get('/?q=pc&group=1').text
+        self.assertIn('href="/?q=pc&amp;group=1&amp;view=online"',scoped)
+        self.assertEqual(self.client.get('/?view=online&group=1&q=other').status_code,200)
+
     def test_private_routes_require_login_and_viewer_cannot_write(self):
         self.client.cookies.clear()
         for url in ['/groups','/daily','/compare','/checks/pc']:

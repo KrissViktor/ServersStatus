@@ -138,7 +138,7 @@ def server_rows():
 def index(request: Request, q: str = '', view: str = 'all', group: str = ''):
     if not authenticated(request):
         return HTMLResponse(login_page())
-    if view not in ('all', 'problems', 'offline') or len(q) > 200 or len(group)>20:
+    if view not in ('all', 'online', 'problems', 'offline', 'disks') or len(q) > 200 or len(group)>20:
         raise HTTPException(400)
     return HTMLResponse(dashboard(server_rows(), q, view, group))
 
