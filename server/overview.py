@@ -107,7 +107,7 @@ def detail_page(row, csrf,console_access=False):
         content+=f'<button type="button" class="panel-name-trigger" title="Двойной щелчок — изменить название; Enter — редактировать" aria-label="Изменить название панели"><span class="panel-name-value">{esc(name)}</span></button><form class="panel-name-form" method="post" action="/servers/{esc(identifier)}/name" hidden><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="sr-only" for="panel-name-input">Название панели</label><input id="panel-name-input" name="display_name" maxlength="120" value="{esc(title)}" placeholder="{esc(fallback_name)}"><button type="submit">Сохранить</button><button type="button" data-name-cancel>Отмена</button></form><p class="panel-name-message" role="status"></p>'
     else:content+='<span class="panel-name-value">'+esc(name)+'</span>'
     content+='</div>'
-    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details">Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}))
+    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details" hidden>Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}))
     content+='</div>'
     from .task_manager import section as task_section,assets as task_assets
     content += task_section(row['id'])+task_assets()
@@ -117,7 +117,7 @@ def detail_page(row, csrf,console_access=False):
 
 
     from .folding import fold_sections
-    content += '</div><script>document.getElementById("collapse-details").addEventListener("click",()=>{document.querySelectorAll(".server-detail details[open]").forEach(item=>{if(!item.closest(".section-browser") || !item.classList.contains("section-fold"))item.open=false;});});</script>'
+    content += '</div>'
     from .drilldown import widget
     from .rdp_control import widget as rdp_widget
     return page(fold_sections(content)+(widget(row['id']) if can_history() else '')+(rdp_widget() if can_console() else ''), refresh=True)

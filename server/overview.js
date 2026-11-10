@@ -63,7 +63,7 @@
       // Removing filtered cards must not clamp the viewport to the page bottom.
       document.body.style.minHeight = Math.max(window.innerHeight, y + window.innerHeight) + 'px';
       updateResults(next,background);
-      for (const id of ['overview-alerts', 'overview-stats']) {
+      for (const id of ['overview-alerts', 'overview-stats', 'overview-tools']) {
         const target = document.getElementById(id), source = nextPage.getElementById(id);
         if (target && source && target.innerHTML !== source.innerHTML){const expanded=target.querySelector('.problem-more')?.open;target.innerHTML=source.innerHTML;if(expanded && target.querySelector('.problem-more'))target.querySelector('.problem-more').open=true;}
       }

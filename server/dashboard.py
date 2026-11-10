@@ -238,6 +238,19 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
     return fold_sections(content)
 
 
+def overview_shortcuts():
+    def icon(paths):
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>'
+    compare=icon('<path d="M4 19V9m5 10V5m6 14v-7m5 7V3M2 21h20"/>')
+    daily=icon('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M7 2v4m10-4v4M3 10h18m-14 5h3m4 0h3m-10 3h3"/>')
+    arrow=icon('<path d="m9 5 7 7-7 7"/>')
+    groups=icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>')
+    result='<div id="overview-tools" class="overview-tools"><nav class="overview-shortcuts" aria-label="Аналитика серверов">'
+    for url,title,description,svg in [('/compare','Сравнение','Нагрузки и доступность',compare),('/daily','Сводка за сутки','События и изменения',daily)]:
+        result+='<a class="overview-shortcut" href="'+url+'"><span class="shortcut-icon">'+svg+'</span><span class="shortcut-copy"><strong>'+title+'</strong><small>'+description+'</small></span><span class="shortcut-arrow">'+arrow+'</span></a>'
+    return result+'</nav><a class="overview-groups" href="/groups">'+groups+'<span>Группы</span></a></div>'
+
+
 def dashboard(rows, q='', view='all', group=''):
     all_rows=rows
     if group:rows=[row for row in rows if group in [item['id'] for item in dict(row).get('groups',[])]]
@@ -251,7 +264,7 @@ def dashboard(rows, q='', view='all', group=''):
             attention += 1
     header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/admin">Администрирование</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
     if not can_history():header=header.replace('<a class="nav-link" href="/admin">Администрирование</a>','')
-    if can_history():header+='<nav class="fleet-nav"><a href="/compare">⇄ Сравнить</a><a href="/groups">▦ Группы</a><a href="/daily">◷ За сутки</a></nav>'
+    if can_history():header+=overview_shortcuts()
     if group:header=header.replace('href="/compare"','href="/compare?group='+esc(group)+'"').replace('href="/daily"','href="/daily?group='+esc(group)+'"')
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     from .overview import compact_card, matches, search_form

@@ -40,6 +40,16 @@
   }
   window.initServerInformation=information;
   information();
+  const detailRoot=document.querySelector('.server-detail'),collapseButton=document.getElementById('collapse-details');
+  if(detailRoot && collapseButton){
+    // The selected icon pane is navigation, not an expanded detail.
+    const expandedDetails=()=>[...detailRoot.querySelectorAll('details[open]')].filter(detail=>!detail.matches('.section-browser .section-fold'));
+    const syncCollapse=()=>{collapseButton.hidden=expandedDetails().length===0};
+    collapseButton.addEventListener('click',()=>{expandedDetails().forEach(detail=>detail.open=false);syncCollapse()});
+    detailRoot.addEventListener('toggle',syncCollapse,true);
+    new MutationObserver(syncCollapse).observe(detailRoot,{subtree:true,childList:true,attributes:true,attributeFilter:['open']});
+    syncCollapse();
+  }
   const heading=document.querySelector('.panel-name-heading'),trigger=heading?.querySelector('.panel-name-trigger'),form=heading?.querySelector('.panel-name-form');
   if(!trigger||!form)return;
   const input=form.elements.display_name,message=heading.querySelector('.panel-name-message');let saved=input.value,busy=false;
