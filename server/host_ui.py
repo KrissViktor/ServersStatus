@@ -9,7 +9,7 @@ def register(app,db,authenticated):
     @app.get('/host',response_class=HTMLResponse)
     def host(request:Request):
         if not authenticated(request):return RedirectResponse('/',303)
-        content='<header class="topbar"><a href="/">← Все серверы</a></header><h1>Raspberry Pi — портал</h1>'
+        content='<header class="topbar"><a href="/">← Все серверы</a><a class="nav-link" href="/portal-health">Контроль портала →</a></header><h1>Raspberry Pi — портал</h1>'
         with db() as c:
             row=c.execute('SELECT r.data,r.received,l.agent FROM local_host l LEFT JOIN current_reports r ON r.agent=l.agent WHERE l.id=1').fetchone()
         if not row or not row['data']:

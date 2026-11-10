@@ -36,4 +36,6 @@ def cleanup(connection,now):
     removed=cursor.rowcount
     delay=60 if removed==CLEANUP_BATCH else 3600
     connection.execute("INSERT INTO report_maintenance VALUES ('retention',?) ON CONFLICT(name) DO UPDATE SET next_run=excluded.next_run",(now+delay,))
+    from .portal_backup import note
+    note(connection,'retention',detail='Удалено отчётов: '+str(removed),now=now)
     return removed

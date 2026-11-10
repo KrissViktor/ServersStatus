@@ -33,6 +33,8 @@ def process_events(db, now=None):
                 record(c,state['agent'],key.split(':')[0],'Восстановлено: '+state['body'],'info',now)
                 c.execute('UPDATE event_state SET active=0 WHERE key=?',(key,))
         c.execute('DELETE FROM events WHERE received<?',(now-90*86400,))
+        from .portal_backup import note
+        note(c,'events',now=now)
 
 
 def event_page(rows, agent='', level='', before=None):

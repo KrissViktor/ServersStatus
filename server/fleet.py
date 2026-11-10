@@ -73,6 +73,8 @@ def register(app,db,authenticated,csrf_token):
             content=header('Сравнение серверов')+'<form id="compare-filter" class="fleet-filter">'+group_select(c,group)+'<label>Период<select name="period">'+''.join('<option value="'+p+'" '+('selected' if p==period else '')+'>'+label+'</option>' for p,(label,_,_) in PERIODS.items())+'</select></label><fieldset class="fleet-selection"><legend>Серверы · до 6</legend>'
             content+=''.join('<label class="check"><input type="checkbox" name="agents" value="'+esc(r['id'])+'" '+('checked' if r['id'] in chosen else '')+'>'+esc(r['name'])+'</label>' for r in all_rows)+'</fieldset><button>Сравнить</button></form>'
             content+='''<script>document.querySelector('#compare-filter select[name=group]').addEventListener('change',event=>{const form=event.target.form;for(const input of form.querySelectorAll('input[name=agents]'))input.disabled=true;form.submit()});</script>'''
+            from .report_exports import export_links
+            content+=export_links('compare',{'agents':chosen,'period':period,'group':group})
             names={r['id']:r['name'] for r in all_rows};results=[];series=[]
             for agent in chosen:
                 summary=stats(c,agent,start,end);up=availability(c,agent,start,end,details=False)
@@ -155,6 +157,8 @@ def register(app,db,authenticated,csrf_token):
         with db() as c:
             rows=members(c,group)
             content=header('Сводка за '+date.strftime('%d.%m.%Y'))+'<form class="fleet-filter"><label>Дата (МСК)<input type="date" name="day" value="'+date.isoformat()+'" max="'+today.isoformat()+'"></label>'+group_select(c,group)+'<button>Показать</button></form><p class="muted">'+esc(stamp(start))+' — '+esc(stamp(end))+'. Для сегодняшнего дня сводка неполная. Показатели относятся к выбранным суткам.</p>'
+            from .report_exports import export_links
+            content+=export_links('daily',{'day':date.isoformat(),'group':group})
             content+='<section class="server"><div class="table-scroll"><table class="metric-table"><tr><th>Сервер</th><th>Доступность</th><th>Без данных</th><th>CPU ср. / пик</th><th>RAM ср. / пик</th><th>Изменение CPU / RAM³</th><th>Перезагрузки¹</th><th>Началось / завершилось инцидентов</th><th>Изменения комплектации²</th></tr>'
             for row in rows:
                 agent=row['id'];summary=stats(c,agent,start,end);up=availability(c,agent,start,end)

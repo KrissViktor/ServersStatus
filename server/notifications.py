@@ -177,6 +177,8 @@ def main():
             daily_sent, daily_failed = deliver_daily(db, sender)
             delivered += daily_sent
             failed += daily_failed
+        from .portal_backup import note
+        with db() as c:note(c,'notifications','warning' if failed else 'ok',f'Отправок: {delivered}; ошибок: {failed}')
         print(f'Отправлено: {delivered}; ошибок доставки: {failed}.')
         if failed:
             raise SystemExit(1)

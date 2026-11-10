@@ -61,6 +61,8 @@ def db():
         CREATE TABLE IF NOT EXISTS account_auth_guard (name TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
+        from .portal_backup import SCHEMA as PORTAL_SCHEMA
+        connection.executescript(PORTAL_SCHEMA)
         from .fleet import SCHEMA as FLEET_SCHEMA
         from .equipment_history import SCHEMA as EQUIPMENT_SCHEMA
         from .application_checks import SCHEMA as CHECK_SCHEMA
@@ -361,7 +363,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/compare', '/groups', '/daily', '/checks', '/login', '/logout')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/compare', '/groups', '/daily', '/checks', '/export', '/portal-health', '/login', '/logout')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -768,3 +770,8 @@ from .fleet import register as register_fleet
 register_fleet(app,db,authenticated,csrf_token)
 from .application_checks import register as register_checks
 register_checks(app,db,authenticated,csrf_token)
+
+from .report_exports import register as register_exports
+register_exports(app,db,authenticated)
+from .portal_health import register as register_portal_health
+register_portal_health(app,db,authenticated,csrf_token)
