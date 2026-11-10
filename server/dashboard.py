@@ -223,6 +223,9 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
         content += '</div>'
     if backups:
         content += '<p class="muted legend">Свежесть файла не подтверждает возможность восстановления SQL.</p>'
+    if not historical or data.get('reboot_history'):
+        from .stability import agent_panel,reboot_panel
+        content+='</section><section><h3>Доступность и агент</h3>'+dict(row).get('stability_html','')+agent_panel(data,row['received'],now)+reboot_panel(data)
     from .metrics_ui import extended_sections
     content += '</section></div>' + extended_sections(data,rdp_access) + '</div><details class="raw-report"><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
     from .folding import fold_sections
@@ -250,5 +253,7 @@ def dashboard(rows, q='', view='all'):
     cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'
     from .overview import LIVE_SCRIPT
     cards = search_form(q, view, len(selected), len(rows)) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
+    from .incident_history import summary_html
+    summary=summary_html([row for row in selected if dict(row).get('active',1)],now)
     from .drilldown import widget
-    return page(header + '<div id="overview-alerts">' + backup_alerts([row for row in rows if dict(row).get('important',1)], now) + '</div><div id="overview-stats">' + stats + '</div>' + cards + (widget('') if can_history() else '') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
+    return page(header + '<div id="overview-alerts">' + backup_alerts([row for row in rows if dict(row).get('important',1)], now) + summary + '</div><div id="overview-stats">' + stats + '</div>' + cards + (widget('') if can_history() else '') + '<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')

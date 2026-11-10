@@ -28,6 +28,8 @@ def cleanup(connection,now):
             SELECT h.id FROM service_history h WHERE h.received<? AND h.id<>(
                 SELECT s.id FROM service_history s WHERE s.agent=h.agent AND s.received<?
                 ORDER BY s.received DESC,s.id DESC LIMIT 1) LIMIT ?)''',(now-RETENTION_DAYS*86400,now-RETENTION_DAYS*86400,CLEANUP_BATCH))
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='incident_history'").fetchone():
+        connection.execute('DELETE FROM incident_history WHERE closed IS NOT NULL AND closed<?',(now-RETENTION_DAYS*86400,))
     cursor=connection.execute('''DELETE FROM reports WHERE rowid IN (
         SELECT rowid FROM reports WHERE received<? ORDER BY received LIMIT ?
     )''',(now-RETENTION_DAYS*86400,CLEANUP_BATCH))

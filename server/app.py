@@ -61,6 +61,8 @@ def db():
         CREATE TABLE IF NOT EXISTS account_auth_guard (name TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
+        from .incident_history import SCHEMA as INCIDENT_SCHEMA
+        connection.executescript(INCIDENT_SCHEMA)
         from .updates import SCHEMA
         connection.executescript(SCHEMA)
         from .ai_chat import initialize as initialize_ai
@@ -112,6 +114,8 @@ def server_rows():
             from .access import can_history
             if not can_history():row['sparkline']=[];continue
             from .memory import RAM_USED_SQL, RAM_TOTAL_SQL
+            from .stability import load as load_stability
+            row['availability']=load_stability(c,row['id'],now-86400,now,details=False)['percent']
             row['sparkline']=[dict(point) for point in c.execute(f"""SELECT AVG(received) AS timestamp,
                 AVG(json_extract(data,'$.cpu_percent')) AS cpu,
                 AVG(json_extract(data,'$.memory_percent')) AS ram,
@@ -263,8 +267,10 @@ from .console import ConsoleInfo
 from .temperatures import TemperatureInfo
 
 from .hardware import HardwareInfo
+from .reboots import RebootHistory
 
 class Report(BaseModel):
+    reboot_history: RebootHistory | None = None
     hardware: HardwareInfo | None = None
     temperatures: TemperatureInfo | None = None
     console: ConsoleInfo | None = None
@@ -315,6 +321,9 @@ async def report(agent_id: str, request: Request):
             raise HTTPException(401)
         received = time.time()
         encoded = data.model_dump_json()
+        previous_report = c.execute('SELECT received FROM current_reports WHERE agent=?',(agent_id,)).fetchone()
+        from .incident_history import on_report
+        on_report(c,agent_id,previous_report,received,encoded)
         c.execute('INSERT INTO latest_reports VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data', (agent_id,received,encoded))
         report_id=c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded)).lastrowid
         cleanup(c,received)
@@ -444,6 +453,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM console_controls WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
+                c.execute('DELETE FROM incident_history WHERE agent=?',(name,))
                 record(c,name,'configuration','Агент удалён')
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
@@ -470,6 +480,11 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
         io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk)
         from .snapshots import extrema
         extremes=extrema(c,agent_id,start,end)
+        from .stability import load as load_stability, render as stability_render
+        from .incident_history import sync,history_html
+        latest=c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id WHERE a.id=?',(agent_id,)).fetchone()
+        sync(c,[latest],end)
+        io=stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
     return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes))
 
 
@@ -579,10 +594,11 @@ async def monitoring_save(agent_id: str, request: Request):
 
 
 @app.get('/servers/{agent_id}', response_class=HTMLResponse)
-def server_detail(agent_id: str, request: Request):
+def server_detail(agent_id: str, request: Request, stability: str = '24h'):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
     from .overview import detail_page
+    from .access import can_history
     row = next((row for row in server_rows() if row['id'] == agent_id), None)
     if row is None:
         raise HTTPException(404)
@@ -590,6 +606,14 @@ def server_detail(agent_id: str, request: Request):
     with db() as c:
         current_disks = {d.get('path') for d in monitored_disks(json.loads(row['data'] or '{}'))}
         row['forecasts'] = {path: value for path,value in load_forecasts(c, agent_id, time.time()).items() if path in current_disks}
+        if can_history():
+            from .stability import load as load_stability,render as stability_render
+            from .incident_history import sync,history_html
+            chosen = stability
+            if chosen not in PERIODS:raise HTTPException(400,'Неизвестный период доступности')
+            end=time.time();start=end-PERIODS[chosen][1]
+            sync(c,[row],end)
+            row['stability_html']=stability_render(load_stability(c,agent_id,start,end),agent_id,chosen)+history_html(c,agent_id,start,end)
     from .console_access import unlocked
     access=unlocked(request,db)
     if not access:

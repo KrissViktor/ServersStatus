@@ -38,7 +38,7 @@ class HardwareTest(unittest.TestCase):
         self.assertLess(len(json.dumps(info)), 11000)
 
     def test_failure_does_not_break_report_and_clears_busy(self):
-        with patch.object(hardware, 'probe', side_effect=subprocess.TimeoutExpired('powershell',30)), patch.object(hardware,'_cached',{}), patch.object(hardware,'_busy',True):
+        with patch.object(hardware, 'probe', side_effect=RuntimeError('CIM query returned nonzero')), patch.object(hardware,'_cached',{}), patch.object(hardware,'_busy',True):
             hardware._refresh()
             self.assertFalse(hardware._busy)
             self.assertEqual(hardware._cached['status'], 'unavailable')

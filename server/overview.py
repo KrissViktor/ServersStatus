@@ -29,6 +29,11 @@ def issues(row, now):
     for service in data.get('services', []):
         if service.get('status') != 'running':
             problems.append('Служба не работает: ' + str(service.get('name', '')))
+    from .stability import agent_health
+    age,errors=agent_health(data,row['received'],now)
+    if age is not None and age<180:
+        if age>30:problems.append('Задержка отчётов агента')
+        if errors:problems.append('Недоступен сбор: '+', '.join(errors))
     return problems
 
 
@@ -76,6 +81,9 @@ def compact_card(row, now):
             content += f'<p class="muted">Ещё проблем: {len(problems)-3}</p>'
     else:
         content += '<p class="text-normal compact-ok">Проблем по полученным данным нет</p>'
+    if can_history() and 'availability' in dict(row):
+        from .stability import percentage
+        content+='<p class="availability-brief">Доступность за 24 ч: <b>'+esc(percentage(row['availability']))+'</b></p>'
     content += '<p class="muted">Отчёт: ' + duration(age) + ' назад · В работе: ' + duration(data.get('uptime_seconds')) + '</p>'
     if not can_history():return content+f'<p class="history-link"><a class="nav-link" href="{esc(url)}">Открыть сервер →</a></p></article>'
     return content + f'<p class="history-link"><a class="nav-link" href="{esc(url)}">Открыть сервер →</a> <a class="nav-link" href="/history/{esc(quote(row["id"], safe=""))}">Графики нагрузки</a></p></article>'

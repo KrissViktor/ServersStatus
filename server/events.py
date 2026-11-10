@@ -17,6 +17,8 @@ def process_events(db, now=None):
         c.execute('BEGIN IMMEDIATE')
         rows = c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id').fetchall()
         existing = c.execute('SELECT * FROM event_state').fetchall()
+        from .incident_history import sync
+        sync(c,rows,now)
         current, valid, checked = evaluate(rows, existing, now)
         states = {s['key']:s for s in existing}
         for key,(agent,text) in current.items():

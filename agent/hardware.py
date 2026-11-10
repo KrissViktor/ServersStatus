@@ -78,7 +78,7 @@ def _refresh():
     global _cached, _busy
     try:
         data = probe()
-    except (OSError, subprocess.SubprocessError, ValueError, TypeError):
+    except (OSError, RuntimeError, subprocess.SubprocessError, ValueError, TypeError):
         data = {'status': 'unavailable', 'items': [], 'checked_at': time.time(),
                 'unavailable': list(QUERIES), 'truncated': False}
     with _lock:

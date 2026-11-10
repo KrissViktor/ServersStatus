@@ -17,7 +17,8 @@
       if(!folds.length||panel.classList.contains('section-browser'))continue;
       panel.classList.add('section-browser');
       const nav=document.createElement('nav');nav.className='section-picker';nav.setAttribute('aria-label','Разделы информации о сервере');
-      const selected=folds.find(f=>f.open)||folds[0];
+      const requested=panel.closest('.server-detail') && new URLSearchParams(location.search).has('stability') ? folds.find(f=>f.querySelector(':scope>summary>.fold-title')?.textContent.trim()==='Доступность и агент') : null;
+      const selected=folds.find(f=>f.open)||requested||folds[0];
       function choose(fold){
         folds.forEach(item=>{const active=item===fold;item.open=active;item.querySelector(':scope>summary').setAttribute('aria-expanded',String(active));nav.querySelector(`[data-section-key="${item.dataset.foldKey}"]`).setAttribute('aria-pressed',String(active))});
       }

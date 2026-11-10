@@ -7,6 +7,7 @@ import re
 # Small inline illustrations inherit the portal palette and need no external assets.
 def section_icon(title):
     drawings = {
+        'Доступность и агент': '<path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6Z"/><path d="M6 12h3l2-4 3 8 2-4h2"/>',
         'Диски': '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="11" cy="10" r="4"/><path d="m11 10 6 5M6 18h1m3 0h1"/>',
         'Температуры': '<path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0Z"/><path d="M12 7v10m6-10h3m-3 4h2"/>',
         'Службы': '<path d="m12 3 2 3 4-1 1 4 3 3-3 2 1 4-4 1-4 3-2-3-4 1-1-4-3-2 3-3-1-4 4 1Z"/><circle cx="12" cy="12" r="3"/>',

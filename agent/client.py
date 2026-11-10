@@ -59,6 +59,8 @@ def collect(config, previous):
     extra['windows_updates']=inventory(config)
     from agent.hardware import inventory as hardware_inventory
     extra['hardware']=hardware_inventory()
+    from agent.reboots import inventory as reboot_inventory
+    extra['reboot_history']=reboot_inventory()
     from agent.console import info as console_info
     extra['console']=console_info(config)
     return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1','github_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1', 'windows_management_v1','console_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1','console_v1']) + ['service_inventory_v1','process_history_v1','cpu_per_core_v1','temperature_sensors_v1'], 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'cpu_per_core': per_core, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
