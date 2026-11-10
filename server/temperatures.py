@@ -21,18 +21,14 @@ class TemperatureInfo(BaseModel):
 
 
 def section(data,historical=False):
-    temperatures=data.get('temperatures') or {};items=temperatures.get('items') or []
+    temperatures=data.get('temperatures') or {};items=[item for item in (temperatures.get('items') or []) if item.get('current') is not None]
+    if not items:return ''
     content='<section><h3>Температуры <span class="count">'+str(len(items))+'</span></h3>'
     sampled=temperatures.get('sampled_at')
     if sampled is not None:
         stamp=datetime.fromtimestamp(sampled,timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M:%S МСК')
         label='Измерено' if temperatures.get('status')=='available' else 'Последняя проверка'
         content+='<p class="muted">'+label+': '+esc(stamp)+'</p>'
-    if not items:
-        if temperatures.get('status')=='checking':message='Датчики опрашиваются. Дождитесь следующего отчёта.'
-        elif not temperatures:message='В этом снимке температурные данные не сохранялись. Текущие значения не подставляются.' if historical else 'Температурных данных пока нет. Обновите агент.'
-        else:message='Доступные датчики не обнаружены или не удалось их прочитать. На Windows доступны только датчики, предоставленные штатным ACPI-провайдером. Если их нет, температура не отображается. ACPI-зона не означает температуру процессора.'
-        return content+'<p class="muted">'+message+'</p></section>'
     content+='<div class="temperature-scroll"><table class="temperature-table"><thead><tr><th>Датчик / устройство</th><th>Температура</th><th>Пределы</th></tr></thead><tbody>'
     for sensor in items:
         current=sensor.get('current');high=sensor.get('high');critical=sensor.get('critical')

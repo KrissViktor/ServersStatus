@@ -85,11 +85,20 @@ def summary_html(rows,now):
             if age>30:items.append((1,row['id'],'Задержка отчётов агента: '+str(int(age))+' с'))
             if errors:items.append((2,row['id'],'Недоступен сбор: '+', '.join(errors)))
     items.sort()
-    content='<section class="problem-summary"><h2>Сводка проблем <span class="count">'+str(len(items))+'</span></h2>'
-    if not items:return content+'<p class="text-normal">Активных проблем по полученным данным нет.</p></section>'
     counts=[sum(rank==i for rank,_,_ in items) for i in range(3)]
-    content+='<p class="muted">'+esc(' · '.join(labels[i]+': '+str(n) for i,n in enumerate(counts)))+'</p>'
-    for rank,agent,message in items[:20]:
-        content+='<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(agent)+'</b><span>'+esc(message)+'</span></a>'
-    if len(items)>20:content+='<p class="muted">Показаны первые 20 проблем. Остальные — в карточках серверов.</p>'
+    content='<section class="problem-summary"><header><h2>Проблемы <span class="count">'+str(len(items))+'</span></h2>'
+    if not items:return content+'<span class="text-normal">Всё в порядке</span></header></section>'
+    content+='<span class="problem-counts">'+esc(' · '.join(labels[i]+': '+str(n) for i,n in enumerate(counts) if n))+'</span></header>'
+    names={row['id']:(json.loads(row['data'] or '{}').get('hostname') or row['id']) for row in rows}
+    def line(item):
+        rank,agent,message=item
+        short=message.removeprefix(names.get(agent,agent)+' ('+agent+')').lstrip(' :·')
+        short=' '.join(short.split())
+        if len(short)>140:short=short[:137]+'…'
+        return '<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'" title="'+esc(message)+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(agent)+'</b><span>'+esc(short)+'</span></a>'
+    content+=''.join(line(item) for item in items[:3])
+    if len(items)>3:
+        content+='<details class="problem-more"><summary>Ещё '+str(len(items)-3)+'</summary>'+''.join(line(item) for item in items[3:20])
+        if len(items)>20:content+='<p class="muted">Остальные — в карточках серверов.</p>'
+        content+='</details>'
     return content+'</section>'

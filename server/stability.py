@@ -92,7 +92,7 @@ def render(info, agent, period='24h', base='servers'):
 def agent_health(data, received, now):
     age = max(0, now-received) if received is not None else None
     checks = []
-    for key,label in [('hardware','Комплектация'),('temperatures','Температуры'),('reboot_history','Журнал перезагрузок'),('windows_updates','Windows Update')]:
+    for key,label in [('hardware','Комплектация'),('reboot_history','Журнал перезагрузок'),('windows_updates','Windows Update')]:
         value=data.get(key)
         if isinstance(value,dict) and value.get('status')=='unavailable':
             checks.append(label)

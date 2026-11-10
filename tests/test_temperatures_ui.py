@@ -18,5 +18,6 @@ class TemperaturesUiTest(unittest.TestCase):
             payload['temperatures']['items'][0]['current']=current
             with self.assertRaises(ValidationError):a.Report.model_validate(payload)
     def test_legacy_and_unavailable_do_not_invent_readings(self):
-        self.assertIn('Обновите агент',section({}));self.assertIn('не обнаружены',section({'temperatures':{'status':'unavailable','items':[]}}))
+        self.assertEqual('',section({}));self.assertEqual('',section({'temperatures':{'status':'unavailable','items':[]}}))
+        self.assertEqual('',section({'temperatures':{'items':[{'id':'cpu','current':None}]}}))
         self.assertNotIn('0.0 °C',section({'temperatures':{'status':'unavailable','items':[]}}))
