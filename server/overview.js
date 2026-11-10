@@ -43,6 +43,7 @@
     pending = controller;
     const url = new URL('/', window.location.origin);
     if (input.value) url.searchParams.set('q', input.value);
+    if (form.elements.group?.value) url.searchParams.set('group',form.elements.group.value);
     if (view.value !== 'all') url.searchParams.set('view', view.value);
     if (!background) status.textContent = 'Обновляем список…';
     results.setAttribute('aria-busy', 'true');
@@ -64,7 +65,7 @@
       updateResults(next,background);
       for (const id of ['overview-alerts', 'overview-stats']) {
         const target = document.getElementById(id), source = nextPage.getElementById(id);
-        if (target && source && target.innerHTML !== source.innerHTML) target.innerHTML = source.innerHTML;
+        if (target && source && target.innerHTML !== source.innerHTML){const expanded=target.querySelector('.problem-more')?.open;target.innerHTML=source.innerHTML;if(expanded && target.querySelector('.problem-more'))target.querySelector('.problem-more').open=true;}
       }
       document.querySelector('.result-count').textContent =
         nextPage.querySelector('.result-count').textContent;
@@ -91,6 +92,7 @@
     timer = setTimeout(() => search(false), 180);
   });
   view.addEventListener('change', () => search(false));
+  form.elements.group?.addEventListener('change',()=>search(false));
   form.addEventListener('submit', event => { event.preventDefault(); search(false); });
   setInterval(() => search(true), 10000);
 })();

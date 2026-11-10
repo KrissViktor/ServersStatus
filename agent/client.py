@@ -45,6 +45,8 @@ def collect(config, previous):
                 services.append({'name': name, 'status': 'unavailable'})
     elif sys.platform.startswith('linux'):
         services.extend(entry for entry in systemd_services(config.get('services', [])) if entry['name'].casefold() not in names)
+    from agent.service_names import enrich
+    services=enrich(services)
     before = counters()
     cpu, per_core = sample_cpu(interval=1)
     after = counters()
@@ -61,9 +63,11 @@ def collect(config, previous):
     extra['hardware']=hardware_inventory()
     from agent.reboots import inventory as reboot_inventory
     extra['reboot_history']=reboot_inventory()
+    from agent.application_checks import inventory as check_inventory
+    extra['application_checks']=check_inventory(config)
     from agent.console import info as console_info
     extra['console']=console_info(config)
-    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1','github_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1', 'windows_management_v1','console_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1','console_v1']) + ['service_inventory_v1','process_history_v1','cpu_per_core_v1','temperature_sensors_v1'], 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'cpu_per_core': per_core, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
+    return {'agent_version': version(), 'agent_platform': agent_platform(), **extra, 'features': (['remote_update_v1','github_update_v1'] if enabled() else []) + (['auto_services_v1', 'rdp_v1', 'rdp_details_v1', 'processes_v1', 'windows_management_v1','console_v1'] if os.name == 'nt' else ['auto_services_v1','systemd_v1','processes_v1','console_v1']) + ['service_inventory_v1','process_history_v1','cpu_per_core_v1','temperature_sensors_v1','app_checks_v1'], 'auto_services_enabled': bool(config.get('auto_monitor_services', True)), 'manual_services': config.get('services', []), 'discovered_services': discovered, 'rdp': rdp_sessions(), 'hostname': socket.gethostname(), 'cpu_percent': cpu, 'cpu_per_core': per_core, 'memory_percent': memory_percent, 'uptime_seconds': max(0, time.time() - psutil.boot_time()), 'disks': disks, 'backups': backups, 'services': services}
 
 
 def run(config_path, stop=None):
@@ -74,12 +78,17 @@ def run(config_path, stop=None):
     previous = {}
     cache_path = Path(str(config_path) + '.remote.json')
     cached = load_cache(cache_path)
+    from agent.application_checks import load_cache as load_checks,save_cache as save_checks
+    checks_path=Path(str(config_path)+'.checks.remote.json')
+    checks=load_checks(checks_path)
     while stop is None or not stop.is_set():
         cycle_started = time.monotonic()
         try:
             from agent.processes import begin, finish
             process_before = begin()
-            report = collect(effective_config(config, cached), previous)
+            effective=effective_config(config,cached)
+            if checks is not None:effective={**effective,'application_checks':checks['checks'],'_checks_revision':checks['revision']}
+            report = collect(effective, previous)
             process_snapshot = finish(process_before)
             report['monitoring_revision'] = cached['revision']
             from urllib.parse import quote
@@ -96,6 +105,9 @@ def run(config_path, stop=None):
                             job = json.loads(update_response.read(65536)).get('job')
                         if job:
                             launch_windows(config, config_path, job)
+                if 'application_checks' in reply:
+                    try:checks=save_checks(checks_path,reply['application_checks'])
+                    except (OSError,ValueError,TypeError):logging.warning('Не удалось сохранить настройки проверок приложений; остальные настройки продолжают применяться')
                 requested_interval = reply.get('report_interval_seconds')
                 if isinstance(requested_interval, int) and 5 <= requested_interval <= 3600:
                     interval = requested_interval

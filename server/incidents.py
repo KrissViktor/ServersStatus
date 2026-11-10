@@ -29,6 +29,15 @@ def evaluate(rows, existing, now, disk_threshold=85):
             # Do not claim recovery of backup problems using stale reports.
             valid.update(s['key'] for s in existing if s['agent'] == agent and not s['key'].startswith('connection:') and (not is_linux(report) or not s['key'].startswith('disk:') or s['key']==disk_key(agent,'/')))
             continue
+        probes=report.get('application_checks') or {}
+        if probes.get('enabled') and probes.get('checked_at') is not None and now-probes['checked_at']<180:
+            for item in probes.get('items',[]):
+                key='application:'+agent+':'+item['id'];valid.add(key)
+                if item.get('status') not in ('ok','failed'):continue
+                checked.add(key)
+                if item['status']=='failed':incidents[key]=(agent,f'{name} ({agent}): не отвечает приложение '+item['name'])
+        elif probes.get('enabled'):
+            valid.update(s['key'] for s in existing if s['agent']==agent and s['key'].startswith('application:'))
         for backup in report.get('backups', []):
             key = incident_key(agent, backup.get('path', backup.get('name', '')))
             valid.add(key)

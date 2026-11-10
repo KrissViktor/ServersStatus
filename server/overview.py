@@ -34,6 +34,9 @@ def issues(row, now):
     if age is not None and age<180:
         if age>30:problems.append('Задержка отчётов агента')
         if errors:problems.append('Недоступен сбор: '+', '.join(errors))
+    checks=data.get('application_checks') or {}
+    if elapsed<180 and checks.get('checked_at') is not None and now-checks['checked_at']<180:
+        problems.extend('Не отвечает приложение: '+item['name'] for item in checks.get('items',[]) if item.get('status')=='failed')
     return problems
 
 
@@ -49,9 +52,11 @@ def matches(row, now, query, view):
     return True
 
 
-def search_form(query, view, shown, total):
+def search_form(query, view, shown, total, rows=None, group=''):
     options = ''.join(f'<option value="{value}" {"selected" if value == view else ""}>{label}</option>' for value, label in [('all', 'Все серверы'), ('problems', 'Есть проблемы'), ('offline', 'Нет связи')])
-    return f'<form class="searchbar" method="get" action="/"><label>Поиск по названию или имени<input name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label><noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><p class="muted result-count">Показано {shown} из {total}. Фильтр «Есть проблемы»: связь, CPU/RAM от 95%, диски от 85%, бэкапы и службы.</p>'
+    groups={item['id']:item['name'] for row in (rows or []) for item in dict(row).get('groups',[])}
+    group_control='<label>Группа<select name="group"><option value="">Все группы</option>'+''.join('<option value="'+esc(key)+'" '+('selected' if key==group else '')+'>'+esc(name)+'</option>' for key,name in groups.items())+'</select></label>'
+    return f'<form class="searchbar" method="get" action="/"><label>Поиск по названию или имени<input name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><p class="muted result-count">Показано {shown} из {total}. Фильтр «Есть проблемы»: связь, CPU/RAM от 95%, диски от 85%, бэкапы и службы.</p>'
 
 
 def compact_card(row, now):

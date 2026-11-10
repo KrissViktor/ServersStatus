@@ -37,6 +37,8 @@ jobs:
           python -m unittest discover -s tests -p test_hardware.py -v
       - name: Test reboot event inventory
         run: python -m unittest discover -s tests -p test_reboots.py -v
+      - name: Test application checks and service executable names
+        run: python -m unittest discover -s tests -p test_application_checks.py -v
       - name: Test universal updater
         run: python -m unittest discover -s tests -p test_updater.py -v
       - name: Test remote monitoring settings

@@ -30,6 +30,14 @@ def build_summary(connection,start,end,now):
             lines.append('За сутки нет измерений.')
         count=connection.execute("SELECT COUNT(*) FROM events WHERE agent=? AND level='warning' AND received>=? AND received<?",(agent,start,end)).fetchone()[0]
         lines.append(f'Проблем за сутки: {count}.')
+        from .stability import load as load_availability,percentage
+        from .dashboard import duration
+        availability=load_availability(connection,agent,start,end)
+        lines.append('Доступность: '+percentage(availability['percent'])+'; без данных '+duration(availability['missing'])+'; перезагрузок по аптайму '+str(len(availability['reboots']))+'.')
+        recovered=connection.execute("SELECT COUNT(*) FROM incident_history WHERE agent=? AND resolution='recovered' AND closed>=? AND closed<?",(agent,start,end)).fetchone()[0]
+        lines.append('Завершилось инцидентов: '+str(recovered)+'.')
+        changed=connection.execute('SELECT COUNT(*) FROM equipment_history h WHERE agent=? AND received>=? AND received<? AND EXISTS(SELECT 1 FROM equipment_history p WHERE p.agent=h.agent AND p.id<h.id)',(agent,start,end)).fetchone()[0]
+        if changed:lines.append('Изменений комплектации: '+str(changed)+'.')
         if latest:
             data=json.loads(latest['data']);elapsed=max(0,now-latest['received'])
             lines.append('Сейчас: '+('🟢 онлайн' if elapsed<180 else '🔴 нет связи'))

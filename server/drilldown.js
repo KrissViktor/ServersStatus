@@ -78,7 +78,7 @@
   document.addEventListener('click',event=>{
     let point=event.target.closest('[data-detail-metric]');
     if(!point){
-      const svg=event.target.closest('.history-chart,.task-graph');let nearest=19;
+      const svg=event.target.closest('.history-chart,.task-graph,.comparison-chart');let nearest=19;
       if(svg)for(const candidate of svg.querySelectorAll('[data-detail-metric]')){
         const box=candidate.getBoundingClientRect(),distance=Math.hypot(event.clientX-box.x-box.width/2,event.clientY-box.y-box.height/2);
         if(distance<nearest){nearest=distance;point=candidate}

@@ -96,6 +96,8 @@ def agent_health(data, received, now):
         value=data.get(key)
         if isinstance(value,dict) and value.get('status')=='unavailable':
             checks.append(label)
+    probe=data.get('application_checks') or {}
+    if probe.get('enabled') and (probe.get('checked_at') is None or now-probe['checked_at']>=180):checks.append('Проверки приложений: нет свежего результата')
     return age,checks
 
 

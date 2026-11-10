@@ -3,6 +3,7 @@
   "agent_id": "linux-btrx24",
   "token": "REPLACE_WITH_INDIVIDUAL_AGENT_KEY",
   "interval_seconds": 10,
+  "allow_application_checks": false,
   "auto_monitor_services": true,
   "services": [],
   "backups": [],

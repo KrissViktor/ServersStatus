@@ -61,6 +61,10 @@ def db():
         CREATE TABLE IF NOT EXISTS account_auth_guard (name TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
+        from .fleet import SCHEMA as FLEET_SCHEMA
+        from .equipment_history import SCHEMA as EQUIPMENT_SCHEMA
+        from .application_checks import SCHEMA as CHECK_SCHEMA
+        connection.executescript(FLEET_SCHEMA+EQUIPMENT_SCHEMA+CHECK_SCHEMA)
         from .incident_history import SCHEMA as INCIDENT_SCHEMA
         connection.executescript(INCIDENT_SCHEMA)
         from .updates import SCHEMA
@@ -110,7 +114,11 @@ def server_rows():
     now=time.time()
     with db() as c:
         rows=[dict(row) for row in c.execute("SELECT a.id, p.display_name, r.received, r.data,COALESCE(f.important,1) AS important,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id ORDER BY a.id").fetchall()]
+        memberships={}
+        for item in c.execute('SELECT m.agent,g.id,g.name FROM server_group_members m JOIN server_groups g ON g.id=m.group_id ORDER BY g.name'):
+            memberships.setdefault(item['agent'],[]).append({'id':str(item['id']),'name':item['name']})
         for row in rows:
+            row['groups']=memberships.get(row['id'],[])
             from .access import can_history
             if not can_history():row['sparkline']=[];continue
             from .memory import RAM_USED_SQL, RAM_TOTAL_SQL
@@ -127,12 +135,12 @@ def server_rows():
 
 
 @app.get('/', response_class=HTMLResponse)
-def index(request: Request, q: str = '', view: str = 'all'):
+def index(request: Request, q: str = '', view: str = 'all', group: str = ''):
     if not authenticated(request):
         return HTMLResponse(login_page())
-    if view not in ('all', 'problems', 'offline') or len(q) > 200:
+    if view not in ('all', 'problems', 'offline') or len(q) > 200 or len(group)>20:
         raise HTTPException(400)
-    return HTMLResponse(dashboard(server_rows(), q, view))
+    return HTMLResponse(dashboard(server_rows(), q, view, group))
 
 
 @app.post('/login')
@@ -268,8 +276,10 @@ from .temperatures import TemperatureInfo
 
 from .hardware import HardwareInfo
 from .reboots import RebootHistory
+from .application_checks import CheckInfo
 
 class Report(BaseModel):
+    application_checks: CheckInfo | None = None
     reboot_history: RebootHistory | None = None
     hardware: HardwareInfo | None = None
     temperatures: TemperatureInfo | None = None
@@ -324,6 +334,10 @@ async def report(agent_id: str, request: Request):
         previous_report = c.execute('SELECT received FROM current_reports WHERE agent=?',(agent_id,)).fetchone()
         from .incident_history import on_report
         on_report(c,agent_id,previous_report,received,encoded)
+        from .equipment_history import record as record_equipment
+        record_equipment(c,agent_id,received,data.model_dump())
+        from .application_checks import configuration as check_configuration
+        check_config=check_configuration(c,agent_id)
         c.execute('INSERT INTO latest_reports VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data', (agent_id,received,encoded))
         report_id=c.execute('INSERT INTO reports VALUES (?,?,?)',(agent_id,received,encoded)).lastrowid
         cleanup(c,received)
@@ -334,7 +348,7 @@ async def report(agent_id: str, request: Request):
         monitoring = {'revision': remote['revision'], 'settings': json.loads(remote['data'])} if remote else {'revision': 0, 'settings': None}
     if monitoring['settings'] is not None and 'auto_services_v1' not in data.features:
         monitoring['settings'].pop('auto_monitor_services', None)
-    return {'ok': True, 'monitoring': monitoring, 'report_interval_seconds': 10,'report_id':report_id,'report_received':received}
+    return {'ok': True, **({'application_checks':check_config} if check_config is not None and 'app_checks_v1' in data.features else {}), 'monitoring': monitoring, 'report_interval_seconds': 10,'report_id':report_id,'report_received':received}
 
 
 @app.get('/health')
@@ -347,7 +361,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/login', '/logout')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/compare', '/groups', '/daily', '/checks', '/login', '/logout')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -454,6 +468,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
                 c.execute('DELETE FROM incident_history WHERE agent=?',(name,))
+                for table in ('equipment_history','application_check_config','server_group_members'):c.execute('DELETE FROM '+table+' WHERE agent=?',(name,))
                 record(c,name,'configuration','Агент удалён')
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
@@ -614,6 +629,8 @@ def server_detail(agent_id: str, request: Request, stability: str = '24h'):
             end=time.time();start=end-PERIODS[chosen][1]
             sync(c,[row],end)
             row['stability_html']=stability_render(load_stability(c,agent_id,start,end),agent_id,chosen)+history_html(c,agent_id,start,end)
+            from .equipment_history import render as equipment_render
+            row['equipment_history_html']=equipment_render(c,agent_id)
     from .console_access import unlocked
     access=unlocked(request,db)
     if not access:
@@ -746,3 +763,8 @@ register_ai_chat(app,db,authenticated,csrf_token)
 
 from .cpu_cores import register as register_cpu_cores
 register_cpu_cores(app,db,authenticated)
+
+from .fleet import register as register_fleet
+register_fleet(app,db,authenticated,csrf_token)
+from .application_checks import register as register_checks
+register_checks(app,db,authenticated,csrf_token)

@@ -72,7 +72,7 @@ def summary_html(rows,now):
     from .dashboard import esc
     from urllib.parse import quote
     incidents,_,_=current(rows,[],now)
-    priority={'connection':0,'backup':0,'service':1,'cpu_percent':1,'memory_percent':1,'disk':2}
+    priority={'connection':0,'backup':0,'application':0,'service':1,'cpu_percent':1,'memory_percent':1,'disk':2}
     labels=['Критично','Высокий','Внимание']
     items=[]
     for key,(agent,message) in incidents.items():
@@ -96,9 +96,7 @@ def summary_html(rows,now):
         short=' '.join(short.split())
         if len(short)>140:short=short[:137]+'…'
         return '<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'" title="'+esc(message)+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(agent)+'</b><span>'+esc(short)+'</span></a>'
-    content+=''.join(line(item) for item in items[:3])
-    if len(items)>3:
-        content+='<details class="problem-more"><summary>Ещё '+str(len(items)-3)+'</summary>'+''.join(line(item) for item in items[3:20])
-        if len(items)>20:content+='<p class="muted">Остальные — в карточках серверов.</p>'
-        content+='</details>'
+    content+='<details class="problem-more"><summary>Посмотреть проблемы <span aria-hidden="true">⌄</span></summary>'+''.join(line(item) for item in items[:20])
+    if len(items)>20:content+='<p class="muted">Остальные — в карточках серверов.</p>'
+    content+='</details>'
     return content+'</section>'

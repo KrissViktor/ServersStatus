@@ -198,7 +198,8 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
     for service in services:
         state = service.get('status', 'unavailable')
         labels = {'running': '🟢 Работает', 'stopped': '🔴 Остановлена', 'paused': '🟡 На паузе', 'failed':'🔴 Ошибка','start_pending':'🟠 Запускается','stop_pending':'🟠 Останавливается','continue_pending':'🟠 Возобновляется','pause_pending':'🟠 Переход на паузу','unavailable': '⚪ Недоступна'}
-        content += f'<div class="list-row"><b>{esc(service.get("display_name") or service.get("name", "—"))}</b><span class="badge {"normal" if state == "running" else "warning"}">{esc(labels.get(state, state))}</span></div>'
+        service_file = ('<small class="service-executable" title="'+('Процесс' if service.get('executable_source')=='process' else 'Из конфигурации службы')+'">'+esc(service['executable'])+'</small>') if service.get('executable') else ''
+        content += f'<div class="list-row"><b>{esc(service.get("display_name") or service.get("name", "—"))}{service_file}</b><span class="badge {"normal" if state == "running" else "warning"}">{esc(labels.get(state, state))}</span></div>'
     content += '</section><section><h3>Резервные копии</h3>'
     backups = data.get('backups', [])
     if not backups:
@@ -226,13 +227,20 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
     if not historical or data.get('reboot_history'):
         from .stability import agent_panel,reboot_panel
         content+='</section><section><h3>Доступность и агент</h3>'+dict(row).get('stability_html','')+agent_panel(data,row['received'],now)+reboot_panel(data)
+    from .application_checks import panel as check_panel
+    if data.get('application_checks') or (not historical and can_history()):
+        content+='</section><section><h3>Отклик приложений</h3>'+check_panel(data,row['id'] if can_history() else None,historical)
+    if dict(row).get('equipment_history_html'):
+        content+='</section><section><h3>Изменения комплектации</h3>'+row['equipment_history_html']
     from .metrics_ui import extended_sections
     content += '</section></div>' + extended_sections(data,rdp_access) + '</div><details class="raw-report"><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
     from .folding import fold_sections
     return fold_sections(content)
 
 
-def dashboard(rows, q='', view='all'):
+def dashboard(rows, q='', view='all', group=''):
+    all_rows=rows
+    if group:rows=[row for row in rows if group in [item['id'] for item in dict(row).get('groups',[])]]
     now = time.time()
     online = sum(row['received'] is not None and now - row['received'] < 180 for row in rows)
     missing = sum(row['received'] is None for row in rows)
@@ -243,16 +251,18 @@ def dashboard(rows, q='', view='all'):
             attention += 1
     header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/admin">Администрирование</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Обзор серверов</h1><p class="muted">Состояние оборудования и резервных копий в одном месте</p></div><span class="refresh">↻ Обновление каждые 10 с</span></div>'
     if not can_history():header=header.replace('<a class="nav-link" href="/admin">Администрирование</a>','')
+    if can_history():header+='<nav class="fleet-nav"><a href="/compare">⇄ Сравнить</a><a href="/groups">▦ Группы</a><a href="/daily">◷ За сутки</a></nav>'
+    if group:header=header.replace('href="/compare"','href="/compare?group='+esc(group)+'"').replace('href="/daily"','href="/daily?group='+esc(group)+'"')
     stats = '<div class="stats">' + ''.join(f'<div class="stat"><span>{label}</span><strong class="text-{color}">{value}</strong></div>' for label, value, color in [('Всего серверов', len(rows), 'neutral'), ('Онлайн', online, 'normal'), ('Нет связи', len(rows) - online - missing, 'danger'), ('Диски от 85%', attention, 'warning')]) + '</div>'
     from .overview import compact_card, matches, search_form
-    selected = [row for row in rows if matches(row, now, q, view)]
+    selected = [row for row in rows if matches(row, now, q, view) and (not group or group in [item['id'] for item in dict(row).get('groups',[])])]
     active=[row for row in selected if dict(row).get('active',1)]
     inactive=[row for row in selected if not dict(row).get('active',1)]
     cards='<div class="server-grid" data-server-group="active">'+''.join(compact_card(row,now) for row in active)+'</div>'
     cards+='<details id="inactive-servers" class="inactive-servers" '+('hidden' if not inactive else '')+' '+('open' if inactive and (q or view!='all') else '')+'><summary>Не активные <span class="count">'+str(len(inactive))+'</span></summary><div class="server-grid" data-server-group="inactive">'+''.join(compact_card(row,now) for row in inactive)+'</div></details>'
     cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'
     from .overview import LIVE_SCRIPT
-    cards = search_form(q, view, len(selected), len(rows)) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
+    cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now)
     from .drilldown import widget
