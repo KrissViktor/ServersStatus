@@ -78,7 +78,10 @@ def tick(db, sender, now=None):
         c.execute('''CREATE TABLE IF NOT EXISTS telegram_state (
             key TEXT PRIMARY KEY, agent TEXT, body TEXT, active INTEGER,
             sent INTEGER, next_attempt REAL DEFAULT 0)''')
+        c.execute('BEGIN IMMEDIATE')
         rows = c.execute('SELECT a.id,p.display_name,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id WHERE COALESCE(f.important,1)=1').fetchall()
+        from .incident_history import sync
+        sync(c,rows,now)
         existing = c.execute('SELECT * FROM telegram_state').fetchall()
         incidents, valid, checked = evaluate(rows, existing, now, disk_threshold=98)
         c.execute('CREATE TABLE IF NOT EXISTS telegram_policy (name TEXT PRIMARY KEY, value TEXT)')
@@ -97,7 +100,7 @@ def tick(db, sender, now=None):
         for key, (agent, text) in incidents.items():
             c.execute('''INSERT INTO telegram_state(key,agent,body,active,sent) VALUES (?,?,?,1,0)
                          ON CONFLICT(key) DO UPDATE SET body=excluded.body, active=1''', (key, agent, text))
-        pending = c.execute('SELECT * FROM telegram_state WHERE active!=sent AND next_attempt<=? ORDER BY active DESC, key LIMIT 20', (now,)).fetchall()
+        pending = c.execute('''SELECT * FROM telegram_state t WHERE active!=sent AND next_attempt<=? AND NOT (active=1 AND EXISTS (SELECT 1 FROM incident_acknowledgements a JOIN incident_history h ON h.id=a.incident AND h.key=a.problem_key AND h.opened=a.episode_opened WHERE h.key=t.key AND h.closed IS NULL)) ORDER BY active DESC,key LIMIT 20''', (now,)).fetchall()
     if not delivery_window(now):
         return 0, 0
     delivered, failed = 0, 0
@@ -106,6 +109,8 @@ def tick(db, sender, now=None):
             break
         with db() as c:
             enabled=c.execute('SELECT COALESCE(f.important,1) FROM agents a LEFT JOIN agent_flags f ON f.agent=a.id WHERE a.id=?',(state['agent'],)).fetchone()
+            if state['active'] and c.execute('''SELECT 1 FROM incident_acknowledgements a JOIN incident_history h ON h.id=a.incident AND h.key=a.problem_key AND h.opened=a.episode_opened WHERE h.key=? AND h.closed IS NULL''',(state['key'],)).fetchone():
+                continue
             if not enabled or not enabled[0]:
                 c.execute('DELETE FROM telegram_state WHERE agent=?',(state['agent'],))
                 continue

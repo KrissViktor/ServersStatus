@@ -7,7 +7,8 @@ SCHEMA='''CREATE TABLE IF NOT EXISTS incident_history (
     id INTEGER PRIMARY KEY, key TEXT NOT NULL, agent TEXT NOT NULL, category TEXT NOT NULL,
     opened REAL NOT NULL, last_seen REAL NOT NULL, closed REAL, resolution TEXT, message TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS incident_history_agent_time ON incident_history(agent,opened);
-CREATE UNIQUE INDEX IF NOT EXISTS incident_history_open ON incident_history(key) WHERE closed IS NULL;'''
+CREATE UNIQUE INDEX IF NOT EXISTS incident_history_open ON incident_history(key) WHERE closed IS NULL;
+CREATE TABLE IF NOT EXISTS incident_acknowledgements(incident INTEGER PRIMARY KEY,problem_key TEXT NOT NULL,episode_opened REAL NOT NULL,acknowledged REAL NOT NULL,owner TEXT NOT NULL);'''
 
 
 def current(rows, existing, now):
@@ -20,6 +21,15 @@ def current(rows, existing, now):
             key=field+':'+row['id'];valid.add(key);checked.add(key)
             if (data.get(field) or 0)>=95:
                 incidents[key]=(row['id'],label+' '+f'{data[field]:.1f}%')
+        from .stability import agent_health
+        age,errors=agent_health(data,row['received'],now)
+        key='report_delay:'+row['id'];valid.add(key);checked.add(key)
+        if age>30:incidents[key]=(row['id'],'Задержка отчётов агента: '+str(int(age))+' с')
+        import hashlib
+        for error in ['Комплектация','Журнал перезагрузок','Windows Update','Проверки приложений: нет свежего результата']:
+            key='collector:'+row['id']+':'+hashlib.sha256(error.encode()).hexdigest()
+            valid.add(key);checked.add(key)
+            if error in errors:incidents[key]=(row['id'],'Недоступен сбор: '+error)
     return incidents,valid,checked
 
 
@@ -69,35 +79,39 @@ def history_html(c,agent,start,end):
     return result
 
 
-def summary_html(rows,now):
+def summary_html(rows,now,csrf=''):
     from .dashboard import esc
+    from .access import can_history
     from urllib.parse import quote
     incidents,_,_=current(rows,[],now)
-    priority={'connection':0,'backup':0,'application':0,'service':1,'cpu_percent':1,'memory_percent':1,'disk':2}
+    priority={'connection':0,'backup':0,'application':0,'service':1,'cpu_percent':1,'memory_percent':1,'report_delay':1}
     labels=['Критично','Высокий','Внимание']
-    items=[]
+    states={key:value for row in rows for key,value in dict(row).get('problem_states',{}).items()}
+    items=[];ignored=0
     for key,(agent,message) in incidents.items():
+        if states.get(key,{}).get('acknowledged'):
+            ignored+=1
+            continue
         rank=priority.get(key.split(':')[0],2)
-        items.append((rank,agent,message))
-    from .stability import agent_health
-    for row in rows:
-        data=json.loads(row['data'] or '{}');age,errors=agent_health(data,row['received'],now)
-        if age is not None and age<180:
-            if age>30:items.append((1,row['id'],'Задержка отчётов агента: '+str(int(age))+' с'))
-            if errors:items.append((2,row['id'],'Недоступен сбор: '+', '.join(errors)))
+        items.append((rank,agent,message,key))
     items.sort()
-    counts=[sum(rank==i for rank,_,_ in items) for i in range(3)]
+    counts=[sum(rank==i for rank,_,_,_ in items) for i in range(3)]
     content='<section class="problem-summary"><header><h2>Проблемы <span class="count">'+str(len(items))+'</span></h2>'
-    if not items:return content+'<span class="text-normal">Всё в порядке</span></header></section>'
-    content+='<span class="problem-counts">'+esc(' · '.join(labels[i]+': '+str(n) for i,n in enumerate(counts) if n))+'</span></header>'
+    if not items:content+='<span class="text-normal">Всё в порядке</span>'
+    else:content+='<span class="problem-counts">'+esc(' · '.join(labels[i]+': '+str(n) for i,n in enumerate(counts) if n))+'</span>'
+    if ignored:content+='<span class="problem-counts">Отмечено «Всё окей»: '+str(ignored)+'</span>'
+    content+='</header>'
+    if not items:return content+'</section>'
     names={row['id']:display_name(row) for row in rows}
     def line(item):
-        rank,agent,message=item
+        rank,agent,message,key=item
         short=message.removeprefix(names.get(agent,agent)+' ('+agent+')').lstrip(' :·')
         short=' '.join(short.split())
         if len(short)>140:short=short[:137]+'…'
-        return '<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'" title="'+esc(message)+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(names.get(agent,agent))+'</b><span>'+esc(short)+'</span></a>'
-    content+='<details class="problem-more"><summary>Посмотреть проблемы <span aria-hidden="true">⌄</span></summary>'+''.join(line(item) for item in items[:20])
-    if len(items)>20:content+='<p class="muted">Остальные — в карточках серверов.</p>'
-    content+='</details>'
+        link='<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'" title="'+esc(message)+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(names.get(agent,agent))+'</b><span>'+esc(short)+'</span></a>'
+        state=states.get(key,{})
+        if not (csrf and can_history() and state.get('id')):return link
+        return '<div class="problem-action-row">'+link+'<form method="post" action="/problems/acknowledge"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="incident" value="'+str(state['id'])+'"><button class="problem-ack-button" title="Игнорировать эту проблему до исчезновения и повторного появления">Всё окей</button></form></div>'
+    content+='<details class="problem-more" data-fold-key="overview-problems"><summary>Посмотреть проблемы <span aria-hidden="true">⌄</span></summary>'+''.join(line(item) for item in items)
+    content+='<p class="muted problem-ack-hint">«Всё окей» скрывает только текущий случай для всех пользователей. После исчезновения проблема снова появится при повторении.</p></details>'
     return content+'</section>'

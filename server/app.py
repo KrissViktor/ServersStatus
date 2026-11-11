@@ -124,7 +124,11 @@ def authenticated(request):
 def server_rows():
     now=time.time()
     with db() as c:
+        c.execute('BEGIN IMMEDIATE')
         rows=[dict(row) for row in c.execute("SELECT a.id, p.display_name, r.received, r.data,COALESCE(f.important,1) AS important,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id ORDER BY a.id").fetchall()]
+        from .problem_acknowledgements import attach
+        attach(c,rows,now)
+        c.commit()
         memberships={}
         for item in c.execute('SELECT m.agent,g.id,g.name FROM server_group_members m JOIN server_groups g ON g.id=m.group_id ORDER BY g.name'):
             memberships.setdefault(item['agent'],[]).append({'id':str(item['id']),'name':item['name']})
@@ -154,7 +158,7 @@ def index(request: Request, q: str = '', view: str = 'all', group: str = ''):
     from .news import banner
     from .access import current_user
     with db() as c:news_html=banner(c,current_user().get('name') or '')
-    return HTMLResponse(dashboard(server_rows(), q, view, group,news_html=news_html))
+    return HTMLResponse(dashboard(server_rows(), q, view, group,news_html=news_html,csrf=csrf_token(request)))
 
 
 @app.post('/login')
@@ -811,3 +815,6 @@ from .dependencies import register as register_dependencies
 register_dependencies(app,db,authenticated,csrf_token)
 from .wallboard import register as register_wallboard
 register_wallboard(app,db,authenticated)
+
+from .problem_acknowledgements import register as register_problem_acknowledgements
+register_problem_acknowledgements(app,db,authenticated,csrf_token)

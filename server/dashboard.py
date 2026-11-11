@@ -145,6 +145,9 @@ def backup_alerts(rows, now):
         data = json.loads(row['data']) if row['data'] else {}
         elapsed = max(0, now - row['received']) if row['received'] is not None else 0
         for backup in data.get('backups', []):
+            from .incidents import incident_key
+            key=incident_key(row['id'],backup.get('path',backup.get('name','')))
+            if dict(row).get('problem_states',{}).get(key,{}).get('acknowledged'):continue
             problems = backup_problems(backup, elapsed)
             if not problems:
                 continue
@@ -252,7 +255,7 @@ def overview_shortcuts():
     return result+'</nav><a class="overview-groups" href="/groups">'+groups+'<span>Группы</span></a></div>'
 
 
-def dashboard(rows, q='', view='all', group='', news_html=''):
+def dashboard(rows, q='', view='all', group='', news_html='', csrf=''):
     all_rows=rows
     if group:rows=[row for row in rows if group in [item['id'] for item in dict(row).get('groups',[])]]
     now = time.time()
@@ -288,6 +291,6 @@ def dashboard(rows, q='', view='all', group='', news_html=''):
     from .overview import LIVE_SCRIPT
     cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
     from .incident_history import summary_html
-    summary=summary_html([row for row in selected if dict(row).get('active',1)],now)
+    summary=summary_html([row for row in selected if dict(row).get('active',1)],now,csrf)
     from .drilldown import widget
     return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+summary+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
