@@ -53,15 +53,13 @@ def initialize_sequence(c):
         c.execute('INSERT OR IGNORE INTO console_job_sequence SELECT 1,COALESCE(MAX(id),0) FROM console_jobs')
 
 
-def history_cutoff(now):
-    current=datetime.fromtimestamp(now,timezone.utc)
-    index=current.year*12+current.month-1-6
-    year,month=divmod(index,12);month+=1
-    return current.replace(year=year,month=month,day=min(current.day,calendar.monthrange(year,month)[1])).timestamp()
+def history_cutoff(now,days=186):
+    return now-days*86400
 
 
 def cleanup_history(c,now):
-    cutoff=history_cutoff(now)
+    from .portal_settings import retention_days
+    cutoff=history_cutoff(now,retention_days(c))
     c.execute('DELETE FROM console_controls WHERE job IN (SELECT id FROM console_jobs WHERE created<?)',(cutoff,))
     c.execute('DELETE FROM rdp_operations WHERE job IN (SELECT id FROM console_jobs WHERE created<?)',(cutoff,))
     c.execute('DELETE FROM console_jobs WHERE created<?',(cutoff,))

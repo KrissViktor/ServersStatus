@@ -12,7 +12,8 @@ def load(c, agent, start, end, details=True):
     known = [row[0] for row in (first, latest) if row is not None and row[0] is not None]
     if not known or min(known) > end:
         return {'start': start, 'end': end, 'percent': None, 'gaps': [], 'segments': [], 'reboots': [], 'covered': 0, 'missing': 0, 'longest': 0}
-    start = max(start, min(known), end - 186*86400)
+    from .portal_settings import retention_days
+    start = max(start, min(known), end - retention_days(c)*86400)
     previous = c.execute('SELECT received FROM reports WHERE agent=? AND received<? ORDER BY received DESC LIMIT 1', (agent, start)).fetchone()
     timestamps = ([previous[0]] if previous else []) + [r[0] for r in c.execute('SELECT received FROM reports WHERE agent=? AND received>=? AND received<=? ORDER BY received', (agent, start, end))]
     if latest and latest[0] <= end and latest[0] not in timestamps:

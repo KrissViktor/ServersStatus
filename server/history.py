@@ -74,7 +74,7 @@ def chart(points, metric, title, start, end, color):
     return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
 
 
-def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None):
+def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None,retention_days=186):
     _, _, bucket = PERIODS[period]
     url = '/history/' + quote(agent_id, safe='')
     links = ''.join(f'<a class="period {"selected" if key == period else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{label}</a>' for key, (label, _, _) in PERIODS.items())
@@ -112,4 +112,4 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
     content += extra_html
     from .drilldown import widget
-    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится 186 дней (не менее 6 месяцев). Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
+    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится '+str(retention_days)+' дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)

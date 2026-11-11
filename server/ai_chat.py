@@ -64,8 +64,10 @@ def key():
 def clean(c,now):
     c.execute("UPDATE ai_turns SET status='failed',error='Запрос прерван после перезапуска или потери связи',updated=? WHERE status='running' AND updated<?",(now,now-30))
     c.execute("UPDATE ai_turns SET status='failed',error='Время ожидания в очереди истекло',updated=? WHERE status='queued' AND created<?",(now,now-MAX_QUEUE_WAIT))
-    c.execute('DELETE FROM ai_tool_runs WHERE turn IN (SELECT id FROM ai_turns WHERE created<?)',(now-186*86400,))
-    c.execute('DELETE FROM ai_turns WHERE created<?',(now-186*86400,))
+    from .portal_settings import retention_days
+    days=retention_days(c)
+    c.execute('DELETE FROM ai_tool_runs WHERE turn IN (SELECT id FROM ai_turns WHERE created<?)',(now-days*86400,))
+    c.execute('DELETE FROM ai_turns WHERE created<?',(now-days*86400,))
 
 
 def context(c,job):
@@ -255,7 +257,10 @@ def register(app,db,authenticated,csrf_token):
         if not authenticated(request):return RedirectResponse('/',303)
         user(request)
         from .ai_ui import render
-        return HTMLResponse(render(csrf_token(request)),headers={'Cache-Control':'no-store'})
+        with db() as c:
+            from .portal_settings import retention_days
+            days=retention_days(c)
+        return HTMLResponse(render(csrf_token(request),days),headers={'Cache-Control':'no-store'})
 
     @app.get('/api/ai/chats')
     def chats(request:Request):

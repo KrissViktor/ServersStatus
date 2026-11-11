@@ -37,7 +37,8 @@ def dataset(c,kind,now,agents=None,period='24h',day='',group=''):
         today=datetime.fromtimestamp(now,MSK).date()
         try:date=datetime.strptime(day,'%Y-%m-%d').date() if day else today-timedelta(days=1)
         except ValueError:raise HTTPException(400,'Некорректная дата') from None
-        if not today-timedelta(days=185)<=date<=today:raise HTTPException(400,'Дата вне сохранённой истории')
+        from .portal_settings import retention_days
+        if not today-timedelta(days=retention_days(c)-1)<=date<=today:raise HTTPException(400,'Дата вне сохранённой истории')
         start=datetime.combine(date,datetime.min.time(),MSK).timestamp();end=min(start+86400,now)
         title='Сводка за '+date.strftime('%d.%m.%Y');bucket=300
     else:raise HTTPException(404)

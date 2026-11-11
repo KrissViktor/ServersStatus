@@ -251,7 +251,7 @@ def overview_shortcuts():
     return result+'</nav><a class="overview-groups" href="/groups">'+groups+'<span>Группы</span></a></div>'
 
 
-def dashboard(rows, q='', view='all', group=''):
+def dashboard(rows, q='', view='all', group='', news_html=''):
     all_rows=rows
     if group:rows=[row for row in rows if group in [item['id'] for item in dict(row).get('groups',[])]]
     now = time.time()
@@ -263,6 +263,7 @@ def dashboard(rows, q='', view='all', group=''):
         if any(number(d.get('used_percent')) >= 85 for d in monitored_disks(data)):
             attention += 1
     header = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/admin">Администрирование</a><form method="post" action="/logout"><button>Выйти</button></form></header><div class="overview-commandbar"><div class="heading"><h1>Обзор серверов</h1><span class="refresh" title="Автообновление каждые 10 секунд">↻ 10 с</span></div>'
+    header=header.replace('<form method="post" action="/logout">',news_html+'<form method="post" action="/logout">')
     if not can_history():header=header.replace('<a class="nav-link" href="/admin">Администрирование</a>','')
     if can_history():header+=overview_shortcuts()
     header+='</div>'
@@ -280,6 +281,8 @@ def dashboard(rows, q='', view='all', group=''):
     inactive=[row for row in selected if not dict(row).get('active',1)]
     cards='<div class="server-grid" data-server-group="active">'+''.join(compact_card(row,now) for row in active)+'</div>'
     cards+='<details id="inactive-servers" class="inactive-servers" '+('hidden' if not inactive else '')+' '+('open' if inactive and (q or view!='all') else '')+'><summary>Не активные <span class="count">'+str(len(inactive))+'</span></summary><div class="server-grid" data-server-group="inactive">'+''.join(compact_card(row,now) for row in inactive)+'</div></details>'
+    from .overview_table import render as table_render
+    cards+=table_render(selected,now)
     cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'
     from .overview import LIVE_SCRIPT
     cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'

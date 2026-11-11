@@ -32,12 +32,13 @@ def process_events(db, now=None):
             elif key in checked and key not in current and state['active']:
                 record(c,state['agent'],key.split(':')[0],'Восстановлено: '+state['body'],'info',now)
                 c.execute('UPDATE event_state SET active=0 WHERE key=?',(key,))
-        c.execute('DELETE FROM events WHERE received<?',(now-90*86400,))
+        from .portal_settings import retention_days
+        c.execute('DELETE FROM events WHERE received<?',(now-retention_days(c)*86400,))
         from .portal_backup import note
         note(c,'events',now=now)
 
 
-def event_page(rows, agent='', level='', before=None):
+def event_page(rows, agent='', level='', before=None,days=186):
     from urllib.parse import urlencode
     content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Обзор</a></header><div class="heading"><h1>Журнал событий</h1></div>'
     content+='<form class="searchbar" method="get"><label>ID агента<input name="agent" value="'+esc(agent)+'"></label><label>Уровень<select name="level"><option value="">Все</option><option value="warning" '+('selected' if level=='warning' else '')+'>Проблемы</option><option value="info" '+('selected' if level=='info' else '')+'>Информация</option></select></label><button>Показать</button><a class="nav-link" href="/events">Сбросить</a></form><section class="server">'
@@ -49,7 +50,7 @@ def event_page(rows, agent='', level='', before=None):
     content+='</section>'
     if len(rows)>50:
         content+='<a class="nav-link" href="/events?'+esc(urlencode({'agent':agent,'level':level,'before':rows[49]['id']}))+'">Более ранние события →</a>'
-    return page(content+'<footer>Хранение — 90 дней. История начинается с установки этой версии.</footer>')
+    return page(content+'<footer>Хранение — '+str(days)+' дней. История начинается с установки этой версии.</footer>')
 
 
 def main():

@@ -45,6 +45,9 @@ def can_users():
     value=_context.get();return value is None or value.get('role')=='superadmin' or value.get('name')=='admin'
 
 
+def current_user():
+    return dict(_context.get() or {})
+
 def revoke(c,name):
     if c.execute("SELECT 1 FROM sqlite_master WHERE name='ai_turns'").fetchone():
         c.execute("UPDATE ai_turns SET status='cancelled',updated=? WHERE owner=? AND status IN ('queued','running')",(time.time(),name))
@@ -64,7 +67,7 @@ def middleware(db):
             if user:
                 if hidden and ((path.startswith('/users') and not can_users()) or (not path.startswith('/users') and not can_console())):
                     return JSONResponse({'detail':'Not Found'},status_code=404,headers={'Cache-Control':'no-store'})
-                current=(path=='/' and request.method=='GET') or path=='/logout' or (path.startswith('/servers/') and len(path.split('/'))==3 and request.method=='GET') or (path.startswith('/api/servers/') and path.endswith(('/processes','/services')) and request.method=='GET')
+                current=(path in ('/','/news','/wallboard','/api/wallboard') and request.method=='GET') or path=='/logout' or (path.startswith('/servers/') and len(path.split('/'))==3 and request.method=='GET') or (path.startswith('/api/servers/') and path.endswith(('/processes','/services')) and request.method=='GET')
                 infrastructure=path in ('/health','/login') or path.startswith(('/api/report/','/api/processes/','/api/agent-update/','/api/windows/','/api/console/'))
                 if not current and not infrastructure and not can_history():return JSONResponse({'detail':'Доступ закрыт'},status_code=403,headers={'Cache-Control':'no-store'})
             elif path.startswith('/users'):

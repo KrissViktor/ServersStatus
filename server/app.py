@@ -61,6 +61,12 @@ def db():
         CREATE TABLE IF NOT EXISTS account_auth_guard (name TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
         ''')
+        from .news import SCHEMA as NEWS_SCHEMA
+        from .observability import SCHEMA as OBSERVABILITY_SCHEMA
+        from .dependencies import SCHEMA as DEPENDENCY_SCHEMA
+        connection.executescript(NEWS_SCHEMA+OBSERVABILITY_SCHEMA+DEPENDENCY_SCHEMA)
+        from .portal_settings import SCHEMA as SETTINGS_SCHEMA
+        connection.executescript(SETTINGS_SCHEMA)
         from .portal_backup import SCHEMA as PORTAL_SCHEMA
         connection.executescript(PORTAL_SCHEMA)
         from .fleet import SCHEMA as FLEET_SCHEMA
@@ -93,6 +99,8 @@ def db():
         connection.executescript(ACCESS_SCHEMA)
         from .access import initialize
         initialize(connection)
+        from .news import sync as sync_news
+        sync_news(connection)
         yield connection
         connection.commit()
     finally:
@@ -142,7 +150,10 @@ def index(request: Request, q: str = '', view: str = 'all', group: str = ''):
         return HTMLResponse(login_page())
     if view not in ('all', 'online', 'problems', 'offline', 'disks') or len(q) > 200 or len(group)>20:
         raise HTTPException(400)
-    return HTMLResponse(dashboard(server_rows(), q, view, group))
+    from .news import banner
+    from .access import current_user
+    with db() as c:news_html=banner(c,current_user().get('name') or '')
+    return HTMLResponse(dashboard(server_rows(), q, view, group,news_html=news_html))
 
 
 @app.post('/login')
@@ -338,6 +349,8 @@ async def report(agent_id: str, request: Request):
         on_report(c,agent_id,previous_report,received,encoded)
         from .equipment_history import record as record_equipment
         record_equipment(c,agent_id,received,data.model_dump())
+        from .observability import store_boots
+        store_boots(c,agent_id,data.model_dump())
         from .application_checks import configuration as check_configuration
         check_config=check_configuration(c,agent_id)
         c.execute('INSERT INTO latest_reports VALUES (?,?,?) ON CONFLICT(agent) DO UPDATE SET received=excluded.received,data=excluded.data', (agent_id,received,encoded))
@@ -363,7 +376,7 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/compare', '/groups', '/daily', '/checks', '/export', '/portal-health', '/login', '/logout')):
+    if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/compare', '/groups', '/daily', '/checks', '/export', '/portal-health', '/portal-settings', '/news', '/heatmap', '/timeline', '/wallboard', '/api/wallboard', '/dependencies', '/login', '/logout')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
@@ -470,7 +483,8 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
                 c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
                 c.execute('DELETE FROM incident_history WHERE agent=?',(name,))
-                for table in ('equipment_history','application_check_config','server_group_members'):c.execute('DELETE FROM '+table+' WHERE agent=?',(name,))
+                for table in ('equipment_history','application_check_config','server_group_members','server_boot_events'):c.execute('DELETE FROM '+table+' WHERE agent=?',(name,))
+                c.execute('DELETE FROM server_dependencies WHERE dependent=? OR provider=?',(name,name))
                 record(c,name,'configuration','Агент удалён')
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
@@ -497,12 +511,14 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
         io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk)
         from .snapshots import extrema
         extremes=extrema(c,agent_id,start,end)
+        from .portal_settings import retention_days
+        days=retention_days(c)
         from .stability import load as load_stability, render as stability_render
         from .incident_history import sync,history_html
         latest=c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id WHERE a.id=?',(agent_id,)).fetchone()
         sync(c,[latest],end)
         io=stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
-    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes))
+    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes,retention_days=days))
 
 
 def settings_state(agent_id):
@@ -718,7 +734,9 @@ def journal(request: Request, agent: str = '', level: str = '', before: int = 0)
     from .access import can_users
     with db() as c:
         rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) AND (? OR category!='console') AND (? OR category!='users') ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before,access,can_users())).fetchall()
-    return HTMLResponse(event_page(rows,agent,level,before))
+        from .portal_settings import retention_days
+        days=retention_days(c)
+    return HTMLResponse(event_page(rows,agent,level,before,days=days))
 
 @app.get('/bot', response_class=HTMLResponse)
 def bot_status(request: Request):
@@ -775,3 +793,15 @@ from .report_exports import register as register_exports
 register_exports(app,db,authenticated)
 from .portal_health import register as register_portal_health
 register_portal_health(app,db,authenticated,csrf_token)
+
+from .portal_settings import register as register_portal_settings
+register_portal_settings(app,db,authenticated,csrf_token)
+
+from .news import register as register_news
+register_news(app,db,authenticated)
+from .observability import register as register_observability
+register_observability(app,db,authenticated)
+from .dependencies import register as register_dependencies
+register_dependencies(app,db,authenticated,csrf_token)
+from .wallboard import register as register_wallboard
+register_wallboard(app,db,authenticated)

@@ -152,7 +152,10 @@ def register(app,db,authenticated,csrf_token):
         today=datetime.now(MSK).date()
         try:date=datetime.strptime(day,'%Y-%m-%d').date() if day else today-timedelta(days=1)
         except ValueError:raise HTTPException(400,'Некорректная дата')
-        if not today-timedelta(days=185)<=date<=today:raise HTTPException(400,'Дата вне сохранённой истории')
+        with db() as c:
+            from .portal_settings import retention_days
+            days=retention_days(c)
+        if not today-timedelta(days=days-1)<=date<=today:raise HTTPException(400,'Дата вне сохранённой истории')
         start=datetime.combine(date,datetime.min.time(),MSK).timestamp();end=min(start+86400,time.time())
         with db() as c:
             rows=members(c,group)

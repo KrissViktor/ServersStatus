@@ -60,7 +60,9 @@ def search_form(query, view, shown, total, rows=None, group=''):
     options = ''.join(f'<option value="{value}" {"selected" if value == view else ""}>{label}</option>' for value, label in [('all', 'Все серверы'), ('online','Онлайн'), ('offline', 'Нет связи'), ('problems', 'Есть проблемы'), ('disks','Диски от 85%')])
     groups={item['id']:item['name'] for row in (rows or []) for item in dict(row).get('groups',[])}
     group_control='<label>Группа<select name="group"><option value="">Все группы</option>'+''.join('<option value="'+esc(key)+'" '+('selected' if key==group else '')+'>'+esc(name)+'</option>' for key,name in groups.items())+'</select></label>'
-    return f'<form class="searchbar" method="get" action="/"><label>Поиск<input aria-label="Поиск по названию или имени" name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><p class="muted result-count">Показано {shown} из {total}</p>'
+    from .overview_table import controls
+    tools=controls()
+    return f'<form class="searchbar" method="get" action="/"><label>Поиск<input aria-label="Поиск по названию или имени" name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><div class="overview-resultbar"><p class="muted result-count">Показано {shown} из {total}</p>{tools}</div>'
 
 
 def compact_card(row, now):
@@ -111,6 +113,7 @@ def detail_page(row, csrf,console_access=False):
         content+=f'<button type="button" class="panel-name-trigger" title="Двойной щелчок — изменить название; Enter — редактировать" aria-label="Изменить название панели"><span class="panel-name-value">{esc(name)}</span></button><form class="panel-name-form" method="post" action="/servers/{esc(identifier)}/name" hidden><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="sr-only" for="panel-name-input">Название панели</label><input id="panel-name-input" name="display_name" maxlength="120" value="{esc(title)}" placeholder="{esc(fallback_name)}"><button type="submit">Сохранить</button><button type="button" data-name-cancel>Отмена</button></form><p class="panel-name-message" role="status"></p>'
     else:content+='<span class="panel-name-value">'+esc(name)+'</span>'
     content+='</div>'
+    if can_history():content+='<nav class="detail-analysis-links"><a class="nav-link" href="/timeline/'+esc(identifier)+'">◷ Лента событий</a><a class="nav-link" href="/dependencies">Связи серверов</a></nav>'
     content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details" hidden>Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}))
     content+='</div>'
     from .task_manager import section as task_section,assets as task_assets

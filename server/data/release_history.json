@@ -1,0 +1,1125 @@
+[
+  {
+    "sha": "e9fcbde6639b7d0a22eee5745bccb960bfda327d",
+    "published": 1793915313,
+    "title": "Первая версия сервера мониторинга и Windows-агента",
+    "original": "Build initial monitoring server and Windows agent",
+    "category": "agents",
+    "tags": []
+  },
+  {
+    "sha": "a176f97af879b65f3d426478abbc3abfa078f51c",
+    "published": 1793969668,
+    "title": "Установщик службы Windows и автоматическая сборка агента",
+    "original": "Add standalone Windows service installer and Windows build workflow",
+    "category": "agents",
+    "tags": []
+  },
+  {
+    "sha": "a29c19ab7f8a8ee518bc1586aea1b495b036acfc",
+    "published": 1793972212,
+    "title": "Адаптивная панель мониторинга вместо исходных отчётов",
+    "original": "Replace raw reports with responsive server monitoring dashboard",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "82e5401519e07456870016f538971e4a9464bcbd",
+    "published": 1793973566,
+    "title": "Русские обозначения объёма данных в гигабайтах",
+    "original": "Display gigabyte sizes with requested Russian label",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "dbb4726fe14373baa71df5f3e3fc247f0ad4f504",
+    "published": 1793974470,
+    "title": "Регистрация агентов, перевыпуск ключей и удаление через портал",
+    "original": "Add authenticated agent registration key rotation and deletion UI",
+    "category": "agents",
+    "tags": []
+  },
+  {
+    "sha": "f5aeda3626f094e22aacc0ccaa03b78a23b93c13",
+    "published": 1793975543,
+    "title": "История CPU и RAM с выбором периода и отображением пропусков",
+    "original": "Add CPU and RAM history charts with period selection and gap handling",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "ba04a92dd45846ff87d185c7a3bd3bf8e8d9861d",
+    "published": 1793978269,
+    "title": "Контроль ежедневных и месячных резервных копий SQL",
+    "original": "Monitor daily and monthly SQL backups with named calendar rules",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "87be459036ee8d4616d244387d028667a8c04399",
+    "published": 1793978805,
+    "title": "Заметные предупреждения о просроченных и слишком маленьких бэкапах",
+    "original": "Alert prominently for overdue and undersized SQL backups",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "41be26cfe9ce91bae3e1919941cf97746fa79750",
+    "published": 1793979042,
+    "title": "Сведения Windows, скорость сети и дисковые операции",
+    "original": "Add Windows inventory network rates and disk IO metrics",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "e7b5b665f42bf49fdd61389a2ae336e867b95819",
+    "published": 1793984187,
+    "title": "Обновление установленного Windows-агента с сохранением настроек",
+    "original": "Support universal in-place updates from graphical Windows installer",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "aacd49f9cf6ccf6e53540a2823f47c65f7187dad",
+    "published": 1793986137,
+    "title": "Настройка бэкапов и отслеживаемых служб через портал",
+    "original": "Configure backup rules and monitored services through web panel",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "c3c8c3a0facbfc2f888c8a5ca69289a293b18fbc",
+    "published": 1793995079,
+    "title": "Уведомления Telegram о проблемах и восстановлении",
+    "original": "Add persistent Telegram incident and recovery notifications with systemd timer",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "e814e3fedae265dc3f68cef4706ff6f0f89152ed",
+    "published": 1794003502,
+    "title": "Поддержка SOCKS-прокси для Telegram и настройка Hysteria2",
+    "original": "Route Telegram requests through optional SOCKS proxy with Hysteria2 setup",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "2ea5c09921fa40b4d9da54347331d7e04088d987",
+    "published": 1794004108,
+    "title": "Компактные карточки, поиск серверов и страницы подробностей",
+    "original": "Add compact overview server search filters display names and detail pages",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "4007e0d303cd9d1931329fbc4c550fb5b508933e",
+    "published": 1794004562,
+    "title": "Мгновенный поиск и фильтры с выделением проблем",
+    "original": "Add instant server search and filters with updated branding and problem styling",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "bbf08a216c8034af8d06910a6b5d20c20ea8b85e",
+    "published": 1794004922,
+    "title": "Фоновое обновление без скачков страницы",
+    "original": "Refresh dashboard data in background without viewport jumps and simplify byte labels",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "7089c3ea26a96bf9b7be6cbbe995866e139f88ee",
+    "published": 1794005296,
+    "title": "Защита входа от перебора и ограничение HTTP-запросов",
+    "original": "Add persistent escalating login bans and bounded HTTP flood protection",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "0815f2afb86034e2b76dbf527d8abe021767658a",
+    "published": 1794006579,
+    "title": "Прогноз дисков, графики ввода-вывода, журнал и суточные сводки",
+    "original": "Add disk forecasts IO charts event journal daily summaries and Windows RDP monitoring",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "1ee9a3c6f02d517cbd978bda3ff5ec1a84b52b1a",
+    "published": 1794007106,
+    "title": "Дневное окно доставки Telegram и порог заполнения диска 98%",
+    "original": "Limit Telegram delivery to daytime windows and disk alerts to 98 percent",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "2cfbdeb3101e263d794dc51dc67415549b054e4a",
+    "published": 1794008455,
+    "title": "Агент CentOS/Linux, объём RAM и частота CPU",
+    "original": "Add CentOS Linux agent RAM capacity CPU frequency and ten-second live updates",
+    "category": "agents",
+    "tags": []
+  },
+  {
+    "sha": "9075dcf20893865ecd513cd31a69dfb0f26d1f98",
+    "published": 1794009685,
+    "title": "Кнопки команд Telegram и отдельная служба бота",
+    "original": "Add authorized Telegram command keyboard and supervised bot service",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "f178532f7913dba679a0558ea87d044c7a1fb9d5",
+    "published": 1794010006,
+    "title": "Мониторинг корневого раздела Linux без лишних точек монтирования",
+    "original": "Monitor only root filesystem on Linux and suppress obsolete mount alerts",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "1e6d5015fc00a789ca459e224e936b0f58ae093d",
+    "published": 1794010798,
+    "title": "Подробности бэкапов через Telegram и единые индикаторы состояния",
+    "original": "Add backup details command and consistent Telegram status circles",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "d442d7d6fef910f8063f43acf83e1c91d7959328",
+    "published": 1794055815,
+    "title": "Хранение каждого полученного отчёта не менее шести месяцев",
+    "original": "Retain every received report for at least six months",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "fb23b01382aa45f407d351446faaadff7d754383",
+    "published": 1794059013,
+    "title": "Живые графики CPU и RAM в стиле диспетчера задач",
+    "original": "Replace CPU and RAM bars with Task Manager style live graphs",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "99362c92f3eeb9675afdea2c7697eec1e8065bce",
+    "published": 1794062714,
+    "title": "Нейтральная графитовая тема портала",
+    "original": "Restyle dashboard with neutral graphite chat-inspired theme",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "5f01a3b54fc42492029d38c365f39ffa73fb9c10",
+    "published": 1794062797,
+    "title": "Более тёмный фон графитовой темы",
+    "original": "Darken graphite backgrounds by approximately 35 percent",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "d76c4ca0199da97c6b8f3fa049c0253571a3a4b6",
+    "published": 1794063452,
+    "title": "Дополнительная настройка тёмной палитры",
+    "original": "Darken dashboard backgrounds by another 20 percent",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "27f76eb5db6ce6f3ec6bd0b29c892989d341de78",
+    "published": 1794075829,
+    "title": "Мониторинг Raspberry Pi и управляемые обновления агентов",
+    "original": "Add Raspberry Pi monitoring and controlled agent updates from panel",
+    "category": "agents",
+    "tags": []
+  },
+  {
+    "sha": "8c7e9fc43eca68b2b6c6d669f0236a7a4f5ea633",
+    "published": 1794080357,
+    "title": "Сортируемый список процессов и подробности RDP-сеансов",
+    "original": "Add sortable live process lists and detailed RDP sessions",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "0cd3866143eee95bbb5c6daa3356d95b8960bb3c",
+    "published": 1794080969,
+    "title": "Публикация и скачивание обновлений агентов через GitHub",
+    "original": "Publish agent releases and download assigned updates from GitHub",
+    "category": "agents",
+    "tags": [
+      "agent-linux-0cd3866143ee",
+      "agent-windows-0cd3866143ee",
+      "agents-stable"
+    ]
+  },
+  {
+    "sha": "f97833d933595d1ff0c04ca14e00c9035391d178",
+    "published": 1794084622,
+    "title": "Состояние обновлений Windows и управление перезагрузкой",
+    "original": "Add Windows update monitoring and controlled restart management",
+    "category": "portal",
+    "tags": [
+      "agent-linux-f97833d93359",
+      "agent-windows-f97833d93359"
+    ]
+  },
+  {
+    "sha": "82e9d51af33deeb3b62de11cdea42dcaf17012f5",
+    "published": 1794086062,
+    "title": "Исправление замены EXE агента и диагностика восстановления",
+    "original": "Fix Windows agent EXE replacement and add repair diagnostics",
+    "category": "agents",
+    "tags": [
+      "agent-linux-82e9d51af33d",
+      "agent-windows-82e9d51af33d"
+    ]
+  },
+  {
+    "sha": "dbe8f147c2c2ffd918ec4148177bd51c8aee2a25",
+    "published": 1794090797,
+    "title": "Ограниченная удалённая мини-консоль Windows и Linux",
+    "original": "Add opt-in remote mini console for Windows and Linux agents",
+    "category": "agents",
+    "tags": [
+      "agent-linux-dbe8f147c2c2"
+    ]
+  },
+  {
+    "sha": "cd6a6b57604aa4e87cb7547ba00e1d498714fda9",
+    "published": 1794092171,
+    "title": "Исправление запуска Windows-консоли через pywin32",
+    "original": "Fix pywin32 Job Object name argument in Windows console",
+    "category": "agents",
+    "tags": [
+      "agent-linux-cd6a6b57604a",
+      "agent-windows-cd6a6b57604a"
+    ]
+  },
+  {
+    "sha": "a95644c4c4e6a6b86a9273b6ad63f326ebccdaad",
+    "published": 1794092317,
+    "title": "Подтверждена успешная сборка Windows-консоли",
+    "original": "Document successful Windows console build verification",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "de09d60bd00609f33e4df11e4f622037e7a8733a",
+    "published": 1794094020,
+    "title": "Диагностика ранних ошибок запуска обновления Windows",
+    "original": "Capture Windows updater startup failures before helper logging",
+    "category": "portal",
+    "tags": [
+      "agent-linux-de09d60bd006"
+    ]
+  },
+  {
+    "sha": "ff8f4fe1a0853fc6b651ec551a2ed218c63a10be",
+    "published": 1794095678,
+    "title": "Упрощённый выбор версии агента и хронология обновлений",
+    "original": "Simplify agent version choices and add dated update timelines",
+    "category": "agents",
+    "tags": [
+      "agent-linux-ff8f4fe1a085",
+      "agent-windows-ff8f4fe1a085"
+    ]
+  },
+  {
+    "sha": "a810919cddadfd292d160cbaefd8ba26583f0a83",
+    "published": 1794098014,
+    "title": "Вывод консоли в реальном времени и компактная история обновлений",
+    "original": "Stream live console output and compact update history",
+    "category": "portal",
+    "tags": [
+      "agent-linux-a810919cddad",
+      "agent-windows-a810919cddad"
+    ]
+  },
+  {
+    "sha": "779da04dd1f822740d4077ee85ce06ef07599a7d",
+    "published": 1794098481,
+    "title": "Ввод строк, завершение ввода и отмена команд консоли",
+    "original": "Support line input EOF and cancellation in live server console",
+    "category": "portal",
+    "tags": [
+      "agent-linux-779da04dd1f8",
+      "agent-windows-779da04dd1f8"
+    ]
+  },
+  {
+    "sha": "aa136df0b2009968b126c91cc47ace62c1172e13",
+    "published": 1794098614,
+    "title": "Приоритет отмены консоли перед очередью ввода",
+    "original": "Prioritize console cancellation over queued stdin replies",
+    "category": "portal",
+    "tags": [
+      "agent-linux-aa136df0b200"
+    ]
+  },
+  {
+    "sha": "0e6d328180b9bfe04b8690eab72953d06986731e",
+    "published": 1794098677,
+    "title": "Подтверждена сборка Windows-консоли с интерактивным вводом",
+    "original": "Record successful Windows stdin console release",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "7cdbf114b3310f8309a0b35cac44c4999603ca78",
+    "published": 1794099192,
+    "title": "Сворачиваемые разделы серверов и удобная прокрутка обновлений",
+    "original": "Add focus-based update scrolling and collapsible server sections",
+    "category": "portal",
+    "tags": [
+      "agent-linux-7cdbf114b331"
+    ]
+  },
+  {
+    "sha": "64e12fb6e296c9756dd658ca8f8acd84e471ad9a",
+    "published": 1794100549,
+    "title": "Защита консоли PIN-кодом и подтверждениями Telegram",
+    "original": "Protect console with PIN and Telegram challenges and retain six-month history",
+    "category": "portal",
+    "tags": [
+      "agent-linux-64e12fb6e296"
+    ]
+  },
+  {
+    "sha": "cbd5cdd079f58c05f2ca77035b233e1ae706b7d0",
+    "published": 1794101316,
+    "title": "Разблокировка консоли через окно замка на 30 минут",
+    "original": "Show protection flow in a padlock modal with thirty-minute access",
+    "category": "portal",
+    "tags": [
+      "agent-linux-cbd5cdd079f5"
+    ]
+  },
+  {
+    "sha": "c5fbec43f718426ee0026022daace94c5d11cdff",
+    "published": 1794101435,
+    "title": "Буквы и цифры в третьем коде защиты",
+    "original": "Use letters and digits for the third protection code",
+    "category": "portal",
+    "tags": [
+      "agent-linux-c5fbec43f718"
+    ]
+  },
+  {
+    "sha": "08eea1e8bf7831481f984ba38a3084190a9ed3d7",
+    "published": 1794101793,
+    "title": "Компактные адаптивные карточки и подробности сервера",
+    "original": "Compact dashboard and server details with responsive folded sections",
+    "category": "portal",
+    "tags": [
+      "agent-linux-08eea1e8bf78"
+    ]
+  },
+  {
+    "sha": "ada24818833d0971210673266360af0571c71efa",
+    "published": 1794102085,
+    "title": "Раздел администрирования и защищённый вход в консоль",
+    "original": "Group portal tools under administration and move locked console entry to agents",
+    "category": "agents",
+    "tags": [
+      "agent-linux-ada24818833d"
+    ]
+  },
+  {
+    "sha": "ba178330649cfb85bdb74677814edc870b3a1fd2",
+    "published": 1794102445,
+    "title": "Исправление прогнозов дисков и объёмы RAM в подсказках графиков",
+    "original": "Fix per-disk forecasts and show historical RAM sizes in graph tooltips",
+    "category": "portal",
+    "tags": [
+      "agent-linux-ba178330649c"
+    ]
+  },
+  {
+    "sha": "eb5eae1b1a1d8cfef869ffe8bc7e77f8fd430438",
+    "published": 1794102640,
+    "title": "Переключение устройств на графиках ввода-вывода",
+    "original": "Update IO charts on device selection and add expandable paired layouts",
+    "category": "portal",
+    "tags": [
+      "agent-linux-eb5eae1b1a1d"
+    ]
+  },
+  {
+    "sha": "65f70f88cccd5888c04a04590594aaa583a82b77",
+    "published": 1794103515,
+    "title": "Полноэкранные графики исходных отчётов и очистка вывода PowerShell",
+    "original": "Add fullscreen raw-report chart zoom and RAM sizes; hide PowerShell progress XML",
+    "category": "portal",
+    "tags": [
+      "agent-linux-65f70f88cccd"
+    ]
+  },
+  {
+    "sha": "30326d4bc42bd613fb9ef31d3edd798eb3dc4656",
+    "published": 1794103636,
+    "title": "Удобное перетаскивание графика без выделения текста",
+    "original": "Prevent text selection while dragging the fullscreen chart",
+    "category": "portal",
+    "tags": [
+      "agent-linux-30326d4bc42b"
+    ]
+  },
+  {
+    "sha": "2008f40988fba03c53db0bb2711e19c6ef9d9bed",
+    "published": 1794130490,
+    "title": "Защищённые действия с RDP-сеансами и запуск Shadow RDP",
+    "original": "Add protected RDP session actions and Shadow RDP launch download",
+    "category": "portal",
+    "tags": [
+      "agent-linux-2008f40988fb"
+    ]
+  },
+  {
+    "sha": "2cb7dc7aa9ef613e06bae1c7ae04aee1cc9b4ef8",
+    "published": 1794130603,
+    "title": "Подтверждены проверки защиты RDP на Windows",
+    "original": "Record successful Windows RDP guard validation",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "47cfca78613cbcc5f1d5f36f9645d0783928f602",
+    "published": 1794131969,
+    "title": "Флажки «Важный» и «Активный» для агентов",
+    "original": "Add important and active agent flags with compact administration cards",
+    "category": "agents",
+    "tags": [
+      "agent-linux-47cfca78613c"
+    ]
+  },
+  {
+    "sha": "207c731f7828c32f0102cf98fc53ed3f7a55f9f6",
+    "published": 1794133252,
+    "title": "Переход к экстремумам и снимки состояния с процессами",
+    "original": "Add exact-extrema chart links and historical state and process snapshots",
+    "category": "portal",
+    "tags": [
+      "agent-linux-207c731f7828"
+    ]
+  },
+  {
+    "sha": "d6293f6948be29b0be4998131389729815ebf5ed",
+    "published": 1794133502,
+    "title": "Подробные сообщения об ошибках тестов Windows в сборках",
+    "original": "Expose Windows console test failures in workflow annotations",
+    "category": "portal",
+    "tags": [
+      "agent-windows-d6293f6948be"
+    ]
+  },
+  {
+    "sha": "36c0eaac276b18cb2e45900d97481a1473f65aa0",
+    "published": 1794133661,
+    "title": "Подтверждены сборки агентов со снимками и проверки графиков",
+    "original": "Record successful snapshot agent builds and chart regression checks",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "c5accfda2abf581acd50e808d0ae17d06df45ab6",
+    "published": 1794137384,
+    "title": "Пользователи портала и разграничение доступа по ролям",
+    "original": "Add private user management and enforce identity-bound access roles",
+    "category": "portal",
+    "tags": [
+      "agent-linux-c5accfda2abf"
+    ]
+  },
+  {
+    "sha": "d207eda7d5064a7b505ca634a8479099ef56337f",
+    "published": 1794141119,
+    "title": "Полный список служб и исправление истории локальных процессов",
+    "original": "Add full service inventories and fix local historical process snapshots",
+    "category": "portal",
+    "tags": [
+      "agent-linux-d207eda7d506",
+      "agent-windows-d207eda7d506"
+    ]
+  },
+  {
+    "sha": "6ecde6974528c4f14c705743222a41afb3c38639",
+    "published": 1794141273,
+    "title": "Подтверждены сборки агентов с инвентаризацией служб",
+    "original": "Document successful service inventory agent builds",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "41fd6624c54db5b253d6d144fffc2ca2d3f6f63e",
+    "published": 1794146889,
+    "title": "Массовое обновление агентов на последнюю версию",
+    "original": "Add one-click bulk updates with automatic latest version selection",
+    "category": "portal",
+    "tags": [
+      "agent-linux-41fd6624c54d"
+    ]
+  },
+  {
+    "sha": "1739f261c2892dd0fce72c35a97f6b71222c55f2",
+    "published": 1794147650,
+    "title": "Единый диспетчер задач для текущих и исторических данных",
+    "original": "Unify live and historical task managers with full process and service history",
+    "category": "portal",
+    "tags": [
+      "agent-linux-1739f261c289"
+    ]
+  },
+  {
+    "sha": "f74aa28735965b3fef08774c0df55425caff0fa5",
+    "published": 1794149011,
+    "title": "Подсказки команд и многострочные сочетания клавиш консоли",
+    "original": "Add protected shell command completion and multiline console shortcuts",
+    "category": "portal",
+    "tags": [
+      "agent-linux-f74aa2873596"
+    ]
+  },
+  {
+    "sha": "a7efd33785933517130b59dd6f89ec56f160665c",
+    "published": 1794150171,
+    "title": "Расширенный каталог подсказок команд с поиском по описанию",
+    "original": "Expand shell completion catalog and search by command descriptions",
+    "category": "portal",
+    "tags": [
+      "agent-linux-a7efd3378593"
+    ]
+  },
+  {
+    "sha": "a3dbe5943dd36032e887ec06c3d8a1524da52bb3",
+    "published": 1794151020,
+    "title": "Мини-консоль в виде компактного терминала",
+    "original": "Restyle protected console as a compact terminal workspace",
+    "category": "portal",
+    "tags": [
+      "agent-linux-a3dbe5943dd3"
+    ]
+  },
+  {
+    "sha": "8fa3b0e0c84aa1d30830fc7a4ca17c0d4da421a2",
+    "published": 1794151878,
+    "title": "Изменение имени сервера на месте и ширины разделов",
+    "original": "Simplify console framing and add in-place server detail sizing and rename",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "067e975a4ad32af774c660c75aca3a6bd51396a8",
+    "published": 1794152109,
+    "title": "Совместимость редактора названия сервера с Python 3.11",
+    "original": "Fix Python 3.11 syntax compatibility in server title editor",
+    "category": "portal",
+    "tags": [
+      "agent-linux-067e975a4ad3"
+    ]
+  },
+  {
+    "sha": "88e07562bf4ce617fc899b02ebe3833d6e38d795",
+    "published": 1794152409,
+    "title": "Компактные прогнозы заполнения внутри каждого диска",
+    "original": "Nest per-disk fill forecasts in compact disclosure hints",
+    "category": "portal",
+    "tags": [
+      "agent-linux-88e07562bf4c"
+    ]
+  },
+  {
+    "sha": "819aa1ba714eb029672b1873ba792b3f6af6ad13",
+    "published": 1794159722,
+    "title": "Подготовка Windows-службы локальной ИИ-модели",
+    "original": "Prepare resource-limited native Windows AI service for windows-04",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "2808398f27bee9608c3320375f9a723d6bc9795e",
+    "published": 1794159812,
+    "title": "Проверка частей модели и диагностика нативного движка",
+    "original": "Handle verified model shards and native help output during AI setup",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "0de1a53556403bd9cc7607875047cd71bc9c7aa7",
+    "published": 1794159895,
+    "title": "Проверки установки локальной Windows ИИ-службы",
+    "original": "Finalize AI setup checks and document native Windows service validation",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "f8a82b280a11b951b3e675eb6d9c6b003c22770f",
+    "published": 1794160015,
+    "title": "Подтверждён запуск локальной Windows ИИ-службы",
+    "original": "Record successful final Windows AI service smoke test",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "020ce4e0a5cd30f61f8f2ea73e0ee0c8c5c50492",
+    "published": 1794161402,
+    "title": "Настройка порога свободной памяти для запуска модели",
+    "original": "Lower AI startup free memory threshold to 26 GB",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "7483663677b868f311d009a13a4e702cae00fa80",
+    "published": 1794161692,
+    "title": "Уточнение целевого сервера локальной модели Backup",
+    "original": "Correct local AI target to Backup windows-02",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "4a6750c3097cf369ea02233d2105cbb531e08e15",
+    "published": 1794162050,
+    "title": "Выбор официальных CPU-сборок llama.cpp",
+    "original": "Resolve llama.cpp stable release pointers to official CPU binaries",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "96e6b881267983048b5752f0f33d4057f6150002",
+    "published": 1794162073,
+    "title": "Исправление чтения HTTP-ответов при определении версии движка",
+    "original": "Decode binary HTTP responses when reading release pointer",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "26ebe52794f7a06b16e8be81793b45a27e298ba5",
+    "published": 1794162153,
+    "title": "Подтверждены проверки определения Windows-релизов",
+    "original": "Record successful Windows release resolver regression checks",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "9af1d350b4921d28917801e03866353d6c4d40cf",
+    "published": 1794163421,
+    "title": "Диагностика запуска ИИ и повторное использование проверенных загрузок",
+    "original": "Diagnose native AI startup errors and reuse verified model downloads",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "323429ab83af16faa939a42f69c1fe37a074f5a3",
+    "published": 1794163514,
+    "title": "Подтверждены тесты диагностики запуска Windows ИИ",
+    "original": "Record passing Windows AI startup diagnostics tests",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "2f80d812fa86de16ca4645ca812b3a512f82bce2",
+    "published": 1794164051,
+    "title": "Подготовка приватного подключения Raspberry Pi к ИИ через Tailscale",
+    "original": "Prepare private Tailscale connection from Raspberry Pi to Backup AI",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "843e2496191646236dc30b386574345522b1d690",
+    "published": 1794164144,
+    "title": "Подтверждены тесты конфигурации приватного подключения ИИ",
+    "original": "Record passing private AI connection configuration tests",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "b90207323208984cba66aab560abf743a8c86424",
+    "published": 1794165149,
+    "title": "Ограниченный обратный SSH-туннель для локальной модели",
+    "original": "Prepare restricted reverse SSH connection for Backup AI without Tailscale",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "ed1f57c6b8e38953377434559ad7957b37911c07",
+    "published": 1794165253,
+    "title": "Подтверждены проверки SSH-туннеля и подготовки Windows-ключей",
+    "original": "Record passing reverse SSH and Windows key preparation checks",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "96b67b000916b21bbab1e751645f9c987fb8331f",
+    "published": 1794166014,
+    "title": "Исправление владельца и прав SSH-ключа задачи SYSTEM",
+    "original": "Repair private SSH key owner and ACL for SYSTEM tunnel task",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "1cba049afc0bdbce8f48733dd070cc5d8629dffa",
+    "published": 1794166133,
+    "title": "Подтверждено исправление прав SSH-ключа SYSTEM",
+    "original": "Document verified repair of SYSTEM SSH key permissions",
+    "category": "portal",
+    "tags": []
+  },
+  {
+    "sha": "fff459c9340598a6cfcd3b8e43ee66215cd19155",
+    "published": 1794167132,
+    "title": "Чат с локальным ИИ через приватный обратный SSH-туннель",
+    "original": "Add private local AI chat through the verified reverse SSH tunnel",
+    "category": "ai",
+    "tags": [
+      "agent-linux-fff459c93405"
+    ]
+  },
+  {
+    "sha": "505e5f9536f0e8f0b04d2dc17b7d2bded740e701",
+    "published": 1794167280,
+    "title": "Подтверждена работа ИИ-чата на Python 3.11",
+    "original": "Record successful Python 3.11 AI chat verification",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "37c74d04e58247663eaaefc3453169991f2adca8",
+    "published": 1794167298,
+    "title": "Привязка результатов проверок к точному коммиту",
+    "original": "Keep CI verification reference tied to exact commit",
+    "category": "verification",
+    "tags": []
+  },
+  {
+    "sha": "4d7bd5e136d42d9a8646d29864aeb4ee2be0996e",
+    "published": 1794167329,
+    "title": "Уточнение порядка настройки ключа локального ИИ",
+    "original": "Clarify clipboard-safe order for local AI key setup",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "19e3e8509f37acfc156a7958dcbfc5de861eefb9",
+    "published": 1794168402,
+    "title": "Чтение метрик портала и веб-инструменты для ИИ-помощника",
+    "original": "Add read-only portal and public web tools to local AI assistant",
+    "category": "ai",
+    "tags": [
+      "agent-linux-19e3e8509f37"
+    ]
+  },
+  {
+    "sha": "014de94b1526a325cb7e66bbe39ff0279d2f647b",
+    "published": 1794170282,
+    "title": "Интернет-поиск перед генерацией ответа ИИ",
+    "original": "Enable AI internet by default and fetch public context before generation",
+    "category": "ai",
+    "tags": [
+      "agent-linux-014de94b1526"
+    ]
+  },
+  {
+    "sha": "18abdb71244a3f1dc32334bf16d0fb33c1aa0c57",
+    "published": 1794170763,
+    "title": "Поиск Google и чтение страниц перед ответом помощника",
+    "original": "Use Google search and read result pages before AI answers",
+    "category": "ai",
+    "tags": [
+      "agent-linux-18abdb71244a"
+    ]
+  },
+  {
+    "sha": "1fd398eb7a6e1d05a783eb639887675e3fe4e98d",
+    "published": 1794171961,
+    "title": "Плавающий ИИ-помощник на страницах портала",
+    "original": "Add floating AI assistant chat across portal pages",
+    "category": "ai",
+    "tags": [
+      "agent-linux-1fd398eb7a6e"
+    ]
+  },
+  {
+    "sha": "e804709a125974a28aea9e52dbeba534fc327b24",
+    "published": 1794172555,
+    "title": "Прогноз погоды с датами и состоянием источника",
+    "original": "Provide structured weather forecasts with dates and explicit source failures",
+    "category": "ai",
+    "tags": [
+      "agent-linux-e804709a1259"
+    ]
+  },
+  {
+    "sha": "45c3a6d5d3b3e44651ef7fde0ff29fa777989347",
+    "published": 1794172777,
+    "title": "Настройка прокси и понятные сетевые ошибки ИИ",
+    "original": "Add explicit local proxy and actionable network errors for AI web tools",
+    "category": "ai",
+    "tags": [
+      "agent-linux-45c3a6d5d3b3"
+    ]
+  },
+  {
+    "sha": "d19f86ba01dfa93971a52feb5bf46c010c905d6d",
+    "published": 1794173681,
+    "title": "Веб-навигация помощника и официальные курсы валют",
+    "original": "Add isolated autonomous web navigation and official currency rates",
+    "category": "ai",
+    "tags": [
+      "agent-linux-d19f86ba01df"
+    ]
+  },
+  {
+    "sha": "01e65ac9e4ebb70e85dda093ce21f41de6af3f7e",
+    "published": 1794173853,
+    "title": "Повтор запросов к ЦБ при ошибках прокси",
+    "original": "Retry official CBR rates directly after proxy connection failures",
+    "category": "ai",
+    "tags": [
+      "agent-linux-01e65ac9e4eb"
+    ]
+  },
+  {
+    "sha": "b6b66bc4ba2a9ec40dcc490f66435a73036f933d",
+    "published": 1794175094,
+    "title": "Поиск и извлечение страниц через Tavily",
+    "original": "Use Tavily search and extraction API for local AI web answers",
+    "category": "ai",
+    "tags": [
+      "agent-linux-b6b66bc4ba2a"
+    ]
+  },
+  {
+    "sha": "08771141fe0f30853f8967dbfafde2928bb7d499",
+    "published": 1794176566,
+    "title": "Распознавание русских названий городов в разных падежах",
+    "original": "Normalize inflected Russian city names for weather requests",
+    "category": "ai",
+    "tags": [
+      "agent-linux-08771141fe0f"
+    ]
+  },
+  {
+    "sha": "63e83fa68c142d6e4f2ce1ea17cd52048b9601ae",
+    "published": 1794177282,
+    "title": "Отображение этапов работы ИИ и настройка времени ожидания",
+    "original": "Show live AI work stages and triple model response timeouts",
+    "category": "ai",
+    "tags": [
+      "agent-linux-63e83fa68c14"
+    ]
+  },
+  {
+    "sha": "d5491095657a05775ce5c73a44e849e11ff90589",
+    "published": 1794178955,
+    "title": "Потоки ИИ и обновление лимитов ресурсов",
+    "original": "Raise local AI worker threads and add safe 80 percent resource update",
+    "category": "ai",
+    "tags": []
+  },
+  {
+    "sha": "5713e99658056f35a949a0436f27ed1a17d1e383",
+    "published": 1794179265,
+    "title": "Графики снимка с окном пять минут до и после измерения",
+    "original": "Center snapshot CPU and RAM charts on a five-minute window each side",
+    "category": "portal",
+    "tags": [
+      "agent-linux-5713e9965805"
+    ]
+  },
+  {
+    "sha": "8268b47a12edc695fd12d2abdbd4684d589ba3ab",
+    "published": 1794184155,
+    "title": "Исправление создания пользователей и управления блокировками",
+    "original": "Fix user creation errors and add account controls with visible lock deadlines",
+    "category": "portal",
+    "tags": [
+      "agent-linux-8268b47a12ed"
+    ]
+  },
+  {
+    "sha": "2955353764ba20ad4c1a0d8c24ef035dbf62c1ac",
+    "published": 1794185173,
+    "title": "Загрузка логических процессоров и отдельные графики ядер",
+    "original": "Collect logical CPU usage and add lazy per-core charts with historical drilldown",
+    "category": "portal",
+    "tags": [
+      "agent-linux-2955353764ba",
+      "agent-windows-2955353764ba"
+    ]
+  },
+  {
+    "sha": "664e0eef69b67d094b3c876262ca2af4cd8f43ee",
+    "published": 1794186518,
+    "title": "Переключение на графики всех ядер и доступные температуры",
+    "original": "Switch aggregate CPU chart to all-core grid and collect available temperatures",
+    "category": "portal",
+    "tags": [
+      "agent-linux-664e0eef69b6",
+      "agent-windows-664e0eef69b6"
+    ]
+  },
+  {
+    "sha": "f4378cf6515c6a8f1a77c0ff5d2c29e9adb4eef3",
+    "published": 1794186858,
+    "title": "Компактные графики логических ядер",
+    "original": "Compact logical CPU grid to graph-only tiles",
+    "category": "portal",
+    "tags": [
+      "agent-linux-f4378cf6515c"
+    ]
+  },
+  {
+    "sha": "89dda17d46aa062b2bb89d278f6d3cbcaf8a5c9b",
+    "published": 1794187817,
+    "title": "Историческое добавление аппаратного мониторинга Windows",
+    "original": "Bundle autonomous Windows hardware temperature collection and driver setup",
+    "category": "portal",
+    "tags": [
+      "agent-linux-89dda17d46aa"
+    ]
+  },
+  {
+    "sha": "32b533763235ddc54749a1bc25ea158afa72b2ec",
+    "published": 1794205380,
+    "title": "Исправление тестов датчиков для разных версий PowerShell",
+    "original": "Fix sensor driver test process mock across PowerShell runtimes",
+    "category": "agents",
+    "tags": [
+      "agent-linux-32b533763235",
+      "agent-windows-32b533763235"
+    ]
+  },
+  {
+    "sha": "692f18a7ed2c3209c56b800c52fb0d56dc709e09",
+    "published": 1794207904,
+    "title": "Резервный источник температуры SoC Raspberry Pi",
+    "original": "Include Raspberry Pi SoC fallback in shared temperature telemetry",
+    "category": "portal",
+    "tags": [
+      "agent-linux-692f18a7ed2c"
+    ]
+  },
+  {
+    "sha": "7849c6c3e5b9efa8fbc125d7ed7540137109a094",
+    "published": 1794217317,
+    "title": "Удаление PawnIO и стороннего монитора: только штатные температуры",
+    "original": "Remove PawnIO and bundled hardware monitor; collect native temperatures only",
+    "category": "portal",
+    "tags": [
+      "agent-linux-7849c6c3e5b9",
+      "agent-windows-7849c6c3e5b9"
+    ]
+  },
+  {
+    "sha": "5ff17b23c1fbbdd986d8bcf9836abd563d15c853",
+    "published": 1794227175,
+    "title": "Надёжная отмена очереди обновлений агентов",
+    "original": "Add race-safe cancellation of queued agent updates",
+    "category": "agents",
+    "tags": [
+      "agent-linux-5ff17b23c1fb"
+    ]
+  },
+  {
+    "sha": "0a98cd3f30637baf208af43ab8226cea03d9bc9d",
+    "published": 1794231137,
+    "title": "Навигация значками в информации о сервере",
+    "original": "Add icon navigation to server information sections",
+    "category": "portal",
+    "tags": [
+      "agent-linux-0a98cd3f3063"
+    ]
+  },
+  {
+    "sha": "5520f888252746c5fbc82b79ead7ea3841fce648",
+    "published": 1794231717,
+    "title": "Полное название процессора из Windows и Linux",
+    "original": "Read full CPU model from Windows registry and Linux cpuinfo",
+    "category": "agents",
+    "tags": [
+      "agent-linux-5520f8882527",
+      "agent-windows-5520f8882527"
+    ]
+  },
+  {
+    "sha": "9a8f1099ff86ef9979e63ca76dbee8c3f313dfcf",
+    "published": 1794232107,
+    "title": "Сводка комплектации Windows: плата, BIOS, память и накопители",
+    "original": "Add cached Windows hardware component summary to server details",
+    "category": "portal",
+    "tags": [
+      "agent-linux-9a8f1099ff86",
+      "agent-windows-9a8f1099ff86"
+    ]
+  },
+  {
+    "sha": "666b4f47d1b3e28bbaba38de96650b72670ad6ca",
+    "published": 1794237750,
+    "title": "Единая навигация снимков и удаление повторного блока Windows",
+    "original": "Unify historical snapshot navigation and remove duplicate Windows section",
+    "category": "portal",
+    "tags": [
+      "agent-linux-666b4f47d1b3"
+    ]
+  },
+  {
+    "sha": "3e3b9a10c978d2c5ec28f64e05a0518797072d23",
+    "published": 1794348712,
+    "title": "Доступность, интервалы инцидентов и причины перезагрузок Windows",
+    "original": "Add report availability, incident intervals and Windows reboot evidence",
+    "category": "portal",
+    "tags": [
+      "agent-linux-3e3b9a10c978",
+      "agent-windows-3e3b9a10c978"
+    ]
+  },
+  {
+    "sha": "67889786b1f5c9a7859fcc55fb93616bd1101354",
+    "published": 1794349457,
+    "title": "Компактные проблемы без предупреждений об отсутствии температур",
+    "original": "Compact problem summary and hide unavailable temperature readings",
+    "category": "portal",
+    "tags": [
+      "agent-linux-67889786b1f5"
+    ]
+  },
+  {
+    "sha": "c9d997b625233a43411196cf9bb932457e789617",
+    "published": 1794351088,
+    "title": "Сравнение серверов, группы, история оборудования и проверки приложений",
+    "original": "Add fleet comparison, groups, equipment revisions and application response checks",
+    "category": "portal",
+    "tags": [
+      "agent-linux-c9d997b62523",
+      "agent-windows-c9d997b62523"
+    ]
+  },
+  {
+    "sha": "6424265514706320e9f8776480d18cca4df888f8",
+    "published": 1794351668,
+    "title": "Аналитика на главной и условная кнопка сворачивания подробностей",
+    "original": "Move analytics shortcuts to overview and conditionally show collapse control",
+    "category": "portal",
+    "tags": [
+      "agent-linux-642426551470"
+    ]
+  },
+  {
+    "sha": "45a6eb645426852b2549eee7ce7c987a829347c1",
+    "published": 1794352185,
+    "title": "Горизонтальная шапка и фильтры «Онлайн» / «Нет связи»",
+    "original": "Compact overview header and add clickable server status filters",
+    "category": "portal",
+    "tags": [
+      "agent-linux-45a6eb645426"
+    ]
+  },
+  {
+    "sha": "e8d8fa8e3e573811c5fec7458ae605db54ce6c91",
+    "published": 1794353473,
+    "title": "Отчёты CSV/PDF/XML/JSON и контроль портала с копиями SQLite",
+    "original": "Add CSV PDF XML JSON reports and portal health with verified SQLite backups",
+    "category": "portal",
+    "tags": [
+      "agent-linux-e8d8fa8e3e57"
+    ]
+  }
+]
