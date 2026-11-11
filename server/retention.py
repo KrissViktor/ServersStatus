@@ -34,6 +34,8 @@ def cleanup(connection,now):
         connection.execute('DELETE FROM incident_history WHERE closed IS NOT NULL AND closed<?',(now-days*86400,))
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='incident_acknowledgements'").fetchone():
             connection.execute('DELETE FROM incident_acknowledgements WHERE incident NOT IN (SELECT id FROM incident_history)')
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name='incident_acknowledgement_comments'").fetchone():
+            connection.execute('DELETE FROM incident_acknowledgement_comments WHERE incident NOT IN (SELECT id FROM incident_history)')
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='equipment_history'").fetchone():
         connection.execute('DELETE FROM equipment_history WHERE id IN (SELECT h.id FROM equipment_history h WHERE h.received<? AND h.id<>(SELECT p.id FROM equipment_history p WHERE p.agent=h.agent AND p.received<? ORDER BY p.received DESC,p.id DESC LIMIT 1) LIMIT ?)',(now-days*86400,now-days*86400,CLEANUP_BATCH))
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='server_boot_events'").fetchone():connection.execute('DELETE FROM server_boot_events WHERE at<?',(now-days*86400,))

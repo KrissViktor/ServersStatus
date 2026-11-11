@@ -175,6 +175,9 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None, csr
     online = age is not None and age < 180
     state = 'Нет данных' if age is None else 'Онлайн' if online else 'Нет связи'
     badge = 'normal' if online else 'danger' if age is not None else 'neutral'
+    from .freshness import status as freshness_status,line as freshness_line,sections as freshness_sections
+    if not historical:
+        _,badge,state=freshness_status(row['received'],now)
     if historical:state,badge='Снимок','neutral'
     hostname = data.get('hostname') or row['id']
     title = dict(row).get('display_name') or hostname
@@ -199,6 +202,7 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None, csr
     from .problem_acknowledgements import control
     from .incidents import service_key,disk_key,incident_key
     return_to='/servers/'+quote(row['id'],safe='')
+    content+=freshness_line(row['received'],now,historical=historical)
     points=resource_points(row,data)
     from .cpu_cores import controls as cpu_controls
     content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data),points,'cpu',now,snapshot=historical,extra=cpu_controls(row,historical)) + meter('Оперативная память', data.get('memory_percent'), memory_description(data),points,'ram',now,snapshot=historical) + '</div><div class="server-information"><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
@@ -261,6 +265,12 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None, csr
         content+='</section><section><h3>Изменения комплектации</h3>'+row['equipment_history_html']
     from .metrics_ui import extended_sections
     content += '</section></div>' + extended_sections(data,rdp_access) + '</div><details class="raw-report"><summary>Исходный отчёт</summary><pre>' + esc(json.dumps(data, ensure_ascii=False, indent=2)) + '</pre></details></article>'
+    content=freshness_sections(content,row['received'],now,{
+        'Температуры':{'info':data.get('temperatures',{}),'max_age':120},
+        'Доступность и агент':{'info':{}},
+        'Отклик приложений':{'info':data.get('application_checks',{})},
+        'Обновления и перезагрузка Windows':{'info':data.get('windows_updates',{}),'max_age':1800},
+    },historical)
     from .folding import fold_sections
     return fold_sections(content)
 

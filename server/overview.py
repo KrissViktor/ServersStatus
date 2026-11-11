@@ -73,7 +73,12 @@ def search_form(query, view, shown, total, rows=None, group=''):
     group_control='<label>Группа<select name="group"><option value="">Все группы</option>'+''.join('<option value="'+esc(key)+'" '+('selected' if key==group else '')+'>'+esc(name)+'</option>' for key,name in groups.items())+'</select></label>'
     from .overview_table import controls
     tools=controls()
-    return f'<form class="searchbar" method="get" action="/"><label>Поиск<input aria-label="Поиск по названию или имени" name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><div class="overview-resultbar"><p class="muted result-count">Показано {shown} из {total}</p>{tools}</div>'
+    from .access import current_user
+    import hashlib
+    scope=hashlib.sha256((current_user().get('name') or 'local').encode()).hexdigest()[:16]
+    problem_url='/?view=problems'+('&group='+quote(group,safe='') if group else '')
+    ordering='<div class="overview-order"><a class="nav-link overview-problem-shortcut" data-overview-view="problems" href="'+esc(problem_url)+'">Показать проблемы</a><label>Порядок<select data-overview-sort aria-label="Сортировка серверов">'+''.join('<option value="'+key+'">'+label+'</option>' for key,label in [('name','По названию'),('problems','По числу проблем'),('status','По состоянию связи'),('cpu','По загрузке CPU'),('ram','По занятости RAM'),('disk','По заполнению дисков'),('availability','По доступности'),('age','По возрасту отчёта')])+'</select></label><button type="button" data-overview-direction aria-label="Изменить направление сортировки">По возрастанию ↑</button><span class="muted">★ Закреплённые — первыми. Настройки сохраняются в этом браузере.</span></div>'
+    return f'<form class="searchbar" data-preference-scope="{scope}" method="get" action="/"><label>Поиск<input aria-label="Поиск по названию или имени" name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/" data-overview-reset>Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><div class="overview-resultbar"><p class="muted result-count">Показано {shown} из {total}</p>{tools}</div>{ordering}'
 
 
 def compact_card(row, now, csrf=""):
@@ -82,11 +87,15 @@ def compact_card(row, now, csrf=""):
     title = dict(row).get('display_name') or hostname
     url = '/servers/' + quote(row['id'], safe='')
     age = max(0, now-row['received']) if row['received'] is not None else None
-    state, color = ('Ожидает данных', 'neutral') if age is None else ('Онлайн', 'normal') if age < 180 else ('Нет связи', 'danger')
+    from .freshness import status as freshness_status,line as freshness_line
+    _,color,state=freshness_status(row['received'],now)
     problem_class = ' problem-server' if issues(row, now) else ''
-    content = f'<article class="server compact{problem_class}" data-server-id="{esc(row["id"])}"><header class="server-head"><div><h2><a href="{esc(url)}">{esc(title)}</a></h2><p class="muted">{esc(hostname)} · {esc(row["id"])}</p></div><span class="badge {color}">● {state}</span></header>'
+    from .overview_table import sort_values,pin_button
+    sort_attrs=' '.join('data-sort-'+key+'="'+esc(value if value is not None else '')+'"' for key,value in sort_values(row,now).items())
+    content = f'<article class="server compact{problem_class}" data-server-id="{esc(row["id"])}" {sort_attrs}><header class="server-head"><div><h2><a href="{esc(url)}">{esc(title)}</a></h2><p class="muted">{esc(hostname)} · {esc(row["id"])}</p></div><div class="server-overview-status">{pin_button(row["id"])}<span class="badge {color}">● {state}</span></div></header>'
     if age is None:
         return content + '<p class="empty">Ожидаем первый отчёт агента</p><a class="nav-link" href="' + esc(url) + '">Открыть сервер →</a></article>'
+    content+=freshness_line(row['received'],now)
     if age >= 180:
         content += '<p class="notice">Данные устарели — нет связи с агентом</p>'
     points=resource_points(row,data)

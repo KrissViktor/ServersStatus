@@ -48,7 +48,34 @@ try {
     $global:SSUpdateTest_stopCalls=0
     try {& $helper -Package $package -Sha256 ('0'*64)} catch {}
     if ($global:SSUpdateTest_stopCalls -ne 0) {throw 'Checksum rejection stopped a healthy service'}
-    Write-Host 'Windows helper: locked file wait, replacement, rollback and checksum rejection passed.'
+    # Assigned updates report only real stages; network telemetry must be nonfatal.
+    function Invoke-RestMethod {
+        param($Uri,$Method,$ContentType,$Headers,[byte[]]$Body,$MaximumRedirection,$TimeoutSec)
+        $entry=[Text.Encoding]::UTF8.GetString($Body) | ConvertFrom-Json
+        $global:SSUpdateTest_progress.Add($entry)
+        if ($global:SSUpdateTest_progressFail -and -not $entry.error_code) {throw 'Simulated telemetry outage'}
+    }
+    $global:SSUpdateTest_failStart=$false
+    $configPath=Join-Path $temporary 'config.json'
+    [IO.File]::WriteAllText($configPath,(@{server_url='https://fixture.invalid';agent_id='fixture';token='fixture-key'} | ConvertTo-Json))
+    [IO.File]::Copy($package,(Join-Path $temporary 'ServersStatusService.exe'),$true)
+    foreach ($failTelemetry in @($false,$true)) {
+        $global:SSUpdateTest_progress=New-Object 'System.Collections.Generic.List[object]'
+        $global:SSUpdateTest_progressFail=$failTelemetry
+        $manifestPath=Join-Path $temporary 'manifest.json'
+        $jobNumber=if ($failTelemetry) {502} else {501}
+        [IO.File]::WriteAllText($manifestPath,(@{job_id=$jobNumber;sha256=$hash;config_path=$configPath} | ConvertTo-Json))
+        [IO.File]::WriteAllText($global:SSUpdateTest_target,'OLD')
+        & $helper -Manifest $manifestPath
+        if ([IO.File]::ReadAllText($global:SSUpdateTest_target) -ne 'NEW' -or $global:SSUpdateTest_status -ne 'Running') {throw 'Progress telemetry changed update outcome'}
+        if (-not $failTelemetry) {
+            foreach ($name in @('verify','stop','wait_exit','backup','replace','start','health')) {
+                if (-not ($global:SSUpdateTest_progress | Where-Object {$_.stage -eq $name -and $_.stage_state -eq 'completed'})) {throw ('Missing completed stage: '+$name)}
+            }
+            if (-not ($global:SSUpdateTest_progress | Where-Object {$_.stage -eq 'awaiting_version'})) {throw 'Missing version confirmation wait'}
+        } elseif ($global:SSUpdateTest_progress.Count -ne 2) {throw 'Failed progress telemetry was not disabled'}
+    }
+    Write-Host 'Проверены ожидание EXE, замена, откат, SHA-256, этапы и отказ телеметрии Windows.'
 } finally {
     if ($global:SSUpdateTest_lock) {$global:SSUpdateTest_lock.Dispose()}
     $env:ProgramFiles=$originalProgramFiles

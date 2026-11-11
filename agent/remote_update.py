@@ -35,11 +35,23 @@ def endpoint(config):
     return '/api/agent-update/'+urllib.parse.quote(config['agent_id'],safe='')
 
 
-def acknowledge(config,job,status,message,error_code=None):
+def acknowledge(config,job,status,message,error_code=None,stage=None,stage_state=None,rollback=None,timeout=45):
     body={'job_id':job,'status':status,'message':message}
     if error_code:body['error_code']=error_code
-    with request(config,endpoint(config)+'/status',body) as response:
+    if stage:body['stage']=stage
+    if stage_state:body['stage_state']=stage_state
+    if rollback:body['rollback']=rollback
+    with request(config,endpoint(config)+'/status',body,timeout=timeout) as response:
         response.read(4096)
+
+
+def progress(config,job,stage,phase='running'):
+    try:
+        acknowledge(config,job,'running','',stage=stage,stage_state=phase,timeout=2)
+        return True
+    except Exception:
+        logging.warning('Не удалось отправить этап обновления %s',stage)
+        return False
 
 
 def validate(job,platform):
@@ -96,11 +108,13 @@ def launch_windows(config,config_path,job):
         if child is not None and child.poll() not in (None,0):
             acknowledge(config,job['id'],'failed','PowerShell helper exited before installation',error_code='helper_startup')
         return
-    acknowledge(config,job['id'],'running','Скачивание проверенного пакета')
+    acknowledge(config,job['id'],'running','Скачивание проверенного пакета',stage='download',stage_state='running')
     stage='download'
     try:
         package=folder/'ServersStatusService.exe'
         download(config,job,package)
+        progress(config,job['id'],'download','completed')
+        progress(config,job['id'],'verify','completed')
         stage='helper_missing'
         script=Path(__file__).with_name('apply_update.ps1')
         target=folder/'apply_update.ps1'

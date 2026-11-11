@@ -27,6 +27,7 @@
           if(data.status!=='available'){info.textContent='В этом измерении агент не смог прочитать список. Проверьте права службы агента.';return}
           const when=received?new Date(received*1000).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'})+' МСК':'время неизвестно';
           info.textContent='Показано '+count+' из '+entries.length+' · Всего: '+(data.total??entries.length)+' · '+(historical?'Сохранено: '+when:'Обновлено '+Math.max(0,Math.floor(Date.now()/1000-received))+' с назад')+(data.unreadable?' · Ограничены сведения: '+data.unreadable:'')+(data.truncated?' · Список прочитан частично или сокращён агентом':'')+(data.archive_format==='legacy_top'?' · Старый архив: сохранён только топ по CPU и памяти':'');
+          if(!historical && received && Date.now()/1000-received>=180)info.textContent+=' · Данные устарели; свежий снимок ещё не получен';
         }
         function render(){
           const q=search.value.trim().toLocaleLowerCase('ru');

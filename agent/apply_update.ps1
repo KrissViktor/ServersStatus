@@ -28,14 +28,23 @@ $exe=Join-Path $env:ProgramFiles 'ServersStatus\ServersStatusService.exe'
 $identifier=if ($job) {$job.job_id} else {Get-Date -Format 'yyyyMMddHHmmssfff'}
 $backup="$exe.job-$identifier.previous"
 $stage='verify';$replacementAttempted=$false;$stopped=$false;$backupReady=$false
+$script:ProgressEnabled=$true
 
 function Report-Status($state,$code,$rollback='not_needed') {
     if (-not $job) {return}
     try {
         $endpoint=$config.server_url.TrimEnd('/')+'/api/agent-update/'+[uri]::EscapeDataString($config.agent_id)+'/status'
-        $body=@{job_id=[int]$job.job_id;status=$state;error_code=$code;rollback=$rollback} | ConvertTo-Json
+        $body=@{job_id=[int]$job.job_id;status=$state;error_code=$code;rollback=$rollback;stage=$code;stage_state=$(if ($state -eq 'failed') {'failed'} else {'running'})} | ConvertTo-Json
         Invoke-RestMethod -Uri $endpoint -Method Post -ContentType 'application/json; charset=utf-8' -Headers @{Authorization=('Bearer '+$config.token)} -Body ([Text.Encoding]::UTF8.GetBytes($body)) -MaximumRedirection 0 -TimeoutSec 30 | Out-Null
     } catch {Write-UpdateLog 'Status delivery failed; check panel connectivity.'}
+}
+function Report-Stage($name,$phase) {
+    if (-not $job -or -not $script:ProgressEnabled) {return}
+    try {
+        $endpoint=$config.server_url.TrimEnd('/')+'/api/agent-update/'+[uri]::EscapeDataString($config.agent_id)+'/status'
+        $body=@{job_id=[int]$job.job_id;status='running';stage=$name;stage_state=$phase} | ConvertTo-Json
+        Invoke-RestMethod -Uri $endpoint -Method Post -ContentType 'application/json; charset=utf-8' -Headers @{Authorization=('Bearer '+$config.token)} -Body ([Text.Encoding]::UTF8.GetBytes($body)) -MaximumRedirection 0 -TimeoutSec 2 | Out-Null
+    } catch {$script:ProgressEnabled=$false;Write-UpdateLog 'Progress telemetry unavailable; installation continues.'}
 }
 function Stop-Agent {
     $service=Get-Service ServersStatusAgent
@@ -67,18 +76,22 @@ function Copy-WithRetry($source,$destination) {
     } while ($true)
 }
 try {
-    Write-UpdateLog 'Begin update; stage=verify'
+    Write-UpdateLog 'Begin update; stage=verify';Report-Stage 'verify' 'running'
     if ((Get-FileHash -LiteralPath $Package -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Sha256.ToLowerInvariant()) {throw 'Checksum mismatch'}
     if (-not (Test-Path -LiteralPath $exe)) {throw 'Installed service executable not found'}
-    $stage='stop';Write-UpdateLog 'stage=stop';$stopped=$true;Stop-Agent
-    $stage='wait_exit';Write-UpdateLog 'stage=wait_exit';Wait-ExecutableReleased $exe
-    $stage='backup';Write-UpdateLog 'stage=backup';Copy-WithRetry $exe $backup;$backupReady=$true
-    $stage='replace';Write-UpdateLog 'stage=replace';$replacementAttempted=$true;Copy-WithRetry $Package $exe
+    Report-Stage 'verify' 'completed'
+    $stage='stop';Write-UpdateLog 'stage=stop';Report-Stage 'stop' 'running';$stopped=$true;Stop-Agent;Report-Stage 'stop' 'completed'
+    $stage='wait_exit';Write-UpdateLog 'stage=wait_exit';Report-Stage 'wait_exit' 'running';Wait-ExecutableReleased $exe;Report-Stage 'wait_exit' 'completed'
+    $stage='backup';Write-UpdateLog 'stage=backup';Report-Stage 'backup' 'running';Copy-WithRetry $exe $backup;$backupReady=$true;Report-Stage 'backup' 'completed'
+    $stage='replace';Write-UpdateLog 'stage=replace';Report-Stage 'replace' 'running';$replacementAttempted=$true;Copy-WithRetry $Package $exe
     if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Sha256.ToLowerInvariant()) {throw 'Installed executable checksum mismatch'}
-    $stage='start';Write-UpdateLog 'stage=start';Start-Service ServersStatusAgent
+    Report-Stage 'replace' 'completed'
+    $stage='start';Write-UpdateLog 'stage=start';Report-Stage 'start' 'running';Start-Service ServersStatusAgent
     (Get-Service ServersStatusAgent).WaitForStatus('Running',[TimeSpan]::FromSeconds(60))
-    $stage='health';Start-Sleep -Seconds 5
+    Report-Stage 'start' 'completed'
+    $stage='health';Report-Stage 'health' 'running';Start-Sleep -Seconds 5
     if ((Get-Service ServersStatusAgent).Status -ne 'Running') {throw 'Updated service stopped unexpectedly'}
+    Report-Stage 'health' 'completed'
     Write-UpdateLog 'Service running; waiting for version telemetry confirmation.'
     Report-Status 'running' 'awaiting_version'
 } catch {

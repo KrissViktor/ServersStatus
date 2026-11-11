@@ -52,6 +52,9 @@ def confirm(c,agent,data):
         c.execute("UPDATE agent_update_jobs SET status='applied',message='Версия подтверждена отчётом агента',updated=? WHERE id=?",(now,job['id']))
         from .update_versions import event
         event(c,job['id'],'applied','Версия подтверждена отчётом агента',now)
+        from .update_diagnostics import record
+        record(c,job['id'],{'stage':'awaiting_version','stage_state':'completed'},now,server=True)
+        record(c,job['id'],{'stage':'confirmed','stage_state':'completed'},now,server=True)
 
 
 BULK_LABELS={'queued':'Задач создано','current':'Уже последняя версия или нет новой сборки',
@@ -82,6 +85,8 @@ def enqueue_latest(c):
         if package is None:
             counts['current']+=1;continue
         job=c.execute("INSERT INTO agent_update_jobs(agent,package,status,message,created,updated) VALUES (?,?,'queued','Ожидание агента',?,?)",(agent,package['id'],now,now)).lastrowid
+        from .update_diagnostics import reset_job
+        reset_job(c,job)
         c.execute('INSERT INTO update_job_context VALUES (?,?)',(job,data.get('agent_version','неизвестна')))
         event(c,job,'queued','Ожидание агента',now);counts['queued']+=1
     return counts
@@ -152,6 +157,8 @@ def register(app,db,authenticated,csrf_token,digest):
             if c.execute("SELECT 1 FROM console_jobs WHERE agent=? AND status IN ('queued','running','uncertain')",(agent,)).fetchone():raise HTTPException(409,'Сначала завершите предыдущую операцию')
             now=time.time()
             job_id=c.execute("INSERT INTO agent_update_jobs(agent,package,status,message,created,updated) VALUES (?,?,'queued','Ожидание агента',?,?)",(agent,package,now,now)).lastrowid
+            from .update_diagnostics import reset_job
+            reset_job(c,job_id)
             c.execute('INSERT INTO update_job_context VALUES (?,?)',(job_id,data.get('agent_version','неизвестна')))
             from .update_versions import event
             event(c,job_id,'queued','Ожидание агента',now)
@@ -226,7 +233,7 @@ def register(app,db,authenticated,csrf_token,digest):
             except ValueError:raise HTTPException(400)
             if not isinstance(data,dict) or data.get('status') not in ('running','failed') or not isinstance(data.get('job_id'),int):raise HTTPException(400)
             # Never reflect raw exceptions, paths or download URLs from the agent.
-            codes={'download':'Не удалось скачать пакет или проверить SHA256',
+            codes={'archive_invalid':'Linux-архив содержит недопустимые пути, ссылки или неполный пакет','version_mismatch':'Версия в Linux-пакете не совпадает с заданием','dependency_changed':'Зависимости изменились: требуется отдельная ручная установка без автоматического изменения ОС','python_invalid':'Исходники Linux-агента не прошли проверку Python','permissions':'Не удалось подготовить права файлов Linux-агента','backup_exists':'Резервная копия этого задания уже существует; требуется локальная проверка', 'prepare':'Не удалось подготовить Linux-пакет: проверьте архив, версию, зависимости и права', 'download':'Не удалось скачать пакет или проверить SHA256',
                    'helper_missing':'В сборке отсутствует помощник установки Windows',
                    'helper_launch':'Не удалось запустить помощник PowerShell',
                    'helper_startup':'PowerShell завершился с ошибкой до установки; проверьте helper-launch.log',
@@ -251,6 +258,11 @@ def register(app,db,authenticated,csrf_token,digest):
             now=time.time()
             changed=c.execute("UPDATE agent_update_jobs SET status=?,message=?,updated=? WHERE id=? AND agent=? AND status IN ('queued','running')",(data['status'],message,now,data['job_id'],agent))
             if changed.rowcount:
+                from .update_diagnostics import record
+                progress_message=record(c,data['job_id'],data,now)
+                if progress_message and data['status']=='running':
+                    message=progress_message
+                    c.execute('UPDATE agent_update_jobs SET message=? WHERE id=?',(message,data['job_id']))
                 from .update_versions import event
                 event(c,data['job_id'],data['status'],message,now)
         return {'ok':True}

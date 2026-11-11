@@ -7,27 +7,47 @@
   const results = document.getElementById('server-results');
   let timer, pending, version = 0;
 
+  const scope='serversstatus.'+(form.dataset.preferenceScope||'local')+'.';
+  const keys=['name','status','cpu','ram','disk','availability','age','problems'];
+  let pins=new Set(),savedFilters=null;
+  try{const savedPins=JSON.parse(localStorage.getItem(scope+'pins')||'[]');if(Array.isArray(savedPins))pins=new Set(savedPins.filter(id=>typeof id==='string').slice(0,10000));savedFilters=JSON.parse(localStorage.getItem(scope+'filters')||'null')}catch(_){}
   let layout=new URLSearchParams(location.search).get('layout');
   let sortKey='name',sortDescending=false;
-  try{layout=layout||localStorage.getItem('serversstatus.layout');const saved=JSON.parse(localStorage.getItem('serversstatus.sort')||'null');if(saved && ['name','status','cpu','ram','disk','availability','age'].includes(saved.key)){sortKey=saved.key;sortDescending=!!saved.descending}}catch(_){}
+  try{layout=layout||localStorage.getItem(scope+'layout');const saved=JSON.parse(localStorage.getItem(scope+'sort')||'null');if(saved && keys.includes(saved.key)){sortKey=saved.key;sortDescending=!!saved.descending}}catch(_){}
   layout=layout==='table'?'table':'cards';
   function presentation(){
     results.dataset.layout=layout;
     document.querySelectorAll('[data-server-layout]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.serverLayout===layout)));
-    const table=results.querySelector('.fleet-table'),body=table?.querySelector('tbody');
-    if(body){
-      const rows=[...body.children];
-      rows.sort((a,b)=>{const av=a.getAttribute('data-sort-'+sortKey),bv=b.getAttribute('data-sort-'+sortKey);if(av===''||av==null)return bv===''||bv==null?0:1;if(bv===''||bv==null)return -1;const result=sortKey==='name'?av.localeCompare(bv,'ru',{sensitivity:'base'}):Number(av)-Number(bv);return sortDescending?-result:result});
-      body.append(...rows);
-      table.querySelectorAll('th').forEach(th=>{const key=th.querySelector('[data-server-sort]')?.dataset.serverSort,active=key===sortKey;th.setAttribute('aria-sort',active?(sortDescending?'descending':'ascending'):'none');const indicator=th.querySelector('.sort-indicator');if(indicator)indicator.textContent=active?(sortDescending?'↓':'↑'):'↕'});
+    const compare=(a,b)=>{
+      const aid=a.dataset.serverId||a.dataset.tableServerId,bid=b.dataset.serverId||b.dataset.tableServerId;
+      const pinned=Number(pins.has(bid))-Number(pins.has(aid));if(pinned)return pinned;
+      const av=a.getAttribute('data-sort-'+sortKey),bv=b.getAttribute('data-sort-'+sortKey);
+      if(av===''||av==null)return bv===''||bv==null?aid.localeCompare(bid):1;
+      if(bv===''||bv==null)return -1;
+      const result=sortKey==='name'?av.localeCompare(bv,'ru',{sensitivity:'base'}):Number(av)-Number(bv);
+      return (sortDescending?-result:result)||aid.localeCompare(bid);
+    };
+    for(const container of results.querySelectorAll('[data-server-group],.fleet-table tbody'))container.append(...[...container.children].sort(compare));
+    for(const button of document.querySelectorAll('[data-pin-server]')){
+      const pinned=pins.has(button.dataset.pinServer);button.setAttribute('aria-pressed',String(pinned));button.textContent=pinned?'★':'☆';button.title=pinned?'Открепить сервер':'Закрепить сервер';button.setAttribute('aria-label',button.title);
     }
+    const table=results.querySelector('.fleet-table');
+    table?.querySelectorAll('th').forEach(th=>{const key=th.querySelector('[data-server-sort]')?.dataset.serverSort,active=key===sortKey;th.setAttribute('aria-sort',active?(sortDescending?'descending':'ascending'):'none');const indicator=th.querySelector('.sort-indicator');if(indicator)indicator.textContent=active?(sortDescending?'↓':'↑'):'↕'});
+    const selector=document.querySelector('[data-overview-sort]');if(selector)selector.value=sortKey;
+    const direction=document.querySelector('[data-overview-direction]');if(direction)direction.textContent=sortDescending?'По убыванию ↓':'По возрастанию ↑';
+    const shortcut=document.querySelector('.overview-problem-shortcut');if(shortcut){const url=new URL('/',location.origin);url.searchParams.set('view','problems');if(form.elements.group?.value)url.searchParams.set('group',form.elements.group.value);if(input.value)url.searchParams.set('q',input.value);shortcut.href=url.pathname+url.search}
     document.querySelectorAll('[data-fleet-page]').forEach(link=>{const url=new URL(link.dataset.fleetPage,location.origin);if(form.elements.group?.value)url.searchParams.set('group',form.elements.group.value);link.href=url.pathname+url.search});
   }
+  function saveSort(){try{localStorage.setItem(scope+'sort',JSON.stringify({key:sortKey,descending:sortDescending}))}catch(_){}presentation()}
   document.addEventListener('click',event=>{
+    const pin=event.target.closest('[data-pin-server]');
+    if(pin){const id=pin.dataset.pinServer;if(pins.has(id))pins.delete(id);else pins.add(id);try{localStorage.setItem(scope+'pins',JSON.stringify([...pins]))}catch(_){}presentation();return}
+    if(event.target.closest('[data-overview-direction]')){sortDescending=!sortDescending;saveSort();return}
     const toggle=event.target.closest('[data-server-layout]'),sort=event.target.closest('[data-server-sort]');
-    if(toggle){layout=toggle.dataset.serverLayout;try{localStorage.setItem('serversstatus.layout',layout)}catch(_){}const url=new URL(location.href);if(layout==='table')url.searchParams.set('layout','table');else url.searchParams.delete('layout');history.replaceState(null,'',url.pathname+url.search);presentation()}
-    if(sort){const key=sort.dataset.serverSort;sortDescending=sortKey===key?!sortDescending:false;sortKey=key;try{localStorage.setItem('serversstatus.sort',JSON.stringify({key:sortKey,descending:sortDescending}))}catch(_){}presentation()}
+    if(toggle){layout=toggle.dataset.serverLayout;try{localStorage.setItem(scope+'layout',layout)}catch(_){}const url=new URL(location.href);if(layout==='table')url.searchParams.set('layout','table');else url.searchParams.delete('layout');history.replaceState(null,'',url.pathname+url.search);presentation()}
+    if(sort){const key=sort.dataset.serverSort;sortDescending=sortKey===key?!sortDescending:false;sortKey=key;try{localStorage.setItem(scope+'sort',JSON.stringify({key:sortKey,descending:sortDescending}))}catch(_){}presentation()}
   });
+  document.querySelector('[data-overview-sort]')?.addEventListener('change',event=>{if(keys.includes(event.target.value)){sortKey=event.target.value;sortDescending=['cpu','ram','disk','problems','age'].includes(sortKey);saveSort()}});
   presentation();
 
   function updateResults(next,background) {
@@ -70,6 +90,7 @@
     if (input.value) url.searchParams.set('q', input.value);
     if (form.elements.group?.value) url.searchParams.set('group',form.elements.group.value);
     if (view.value !== 'all') url.searchParams.set('view', view.value);
+    if(!background){try{localStorage.setItem(scope+'filters',JSON.stringify({q:input.value,view:view.value,group:form.elements.group?.value||''}))}catch(_){}}
     if (!background) status.textContent = 'Обновляем список…';
     results.setAttribute('aria-busy', 'true');
     try {
@@ -110,6 +131,7 @@
   }
 
   document.addEventListener('click',event=>{
+    if(event.target.closest('[data-overview-reset]')){event.preventDefault();input.value='';view.value='all';if(form.elements.group)form.elements.group.value='';search(false);return}
     const filter=event.target.closest('[data-overview-view]');
     if(!filter || event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)return;
     event.preventDefault();view.value=filter.dataset.overviewView;search(false);
@@ -124,5 +146,11 @@
   view.addEventListener('change', () => search(false));
   form.elements.group?.addEventListener('change',()=>search(false));
   form.addEventListener('submit', event => { event.preventDefault(); search(false); });
+  if(!location.search && savedFilters && typeof savedFilters==='object'){
+    input.value=typeof savedFilters.q==='string'?savedFilters.q.slice(0,200):'';
+    if([...view.options].some(option=>option.value===savedFilters.view))view.value=savedFilters.view;
+    if(form.elements.group && [...form.elements.group.options].some(option=>option.value===savedFilters.group))form.elements.group.value=savedFilters.group;
+    if(input.value||view.value!=='all'||form.elements.group?.value)search(false);
+  }
   setInterval(() => search(true), 10000);
 })();

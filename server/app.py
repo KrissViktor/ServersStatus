@@ -76,6 +76,8 @@ def db():
         connection.executescript(FLEET_SCHEMA+EQUIPMENT_SCHEMA+CHECK_SCHEMA)
         from .incident_history import SCHEMA as INCIDENT_SCHEMA
         connection.executescript(INCIDENT_SCHEMA)
+        from .update_diagnostics import SCHEMA as UPDATE_DIAGNOSTICS_SCHEMA
+        connection.executescript(UPDATE_DIAGNOSTICS_SCHEMA)
         from .updates import SCHEMA
         connection.executescript(SCHEMA)
         from .ai_chat import initialize as initialize_ai
@@ -486,6 +488,8 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM console_jobs WHERE agent=?', (name,))
                 c.execute('DELETE FROM console_controls WHERE agent=?', (name,))
                 c.execute('DELETE FROM agents WHERE id=?', (name,))
+                for table in ('update_job_steps','update_job_diagnostics','update_job_context','update_job_events'):
+                    c.execute('DELETE FROM '+table+' WHERE job IN (SELECT id FROM agent_update_jobs WHERE agent=?)',(name,))
                 c.execute('DELETE FROM agent_update_jobs WHERE agent=?', (name,))
                 c.execute('DELETE FROM incident_history WHERE agent=?',(name,))
                 for table in ('equipment_history','application_check_config','server_group_members','server_boot_events'):c.execute('DELETE FROM '+table+' WHERE agent=?',(name,))

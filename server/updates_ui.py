@@ -11,7 +11,7 @@ LABELS={'queued':('В очереди','neutral'),'running':('Установка'
 
 def render(c,csrf,result=None):
     packages=c.execute('SELECT p.*,d.built_at,d.commit_at FROM update_packages p LEFT JOIN update_package_dates d ON d.package=p.id').fetchall()
-    content='<header class="topbar"><a href="/">← Все серверы</a></header><h1>Обновление агентов</h1><p class="muted">Текущая версия, последняя новая сборка (New) и ближайшая предыдущая (Older). Даты указаны по Москве.</p>'
+    content='<header class="topbar"><a href="/">← Все серверы</a></header><h1>Обновление агентов</h1><p class="update-safety">Обновление перезапускает только службу агента. Перезагрузка ОС и установка драйверов запрещены.</p><p class="muted">Текущая версия, последняя новая сборка (New) и ближайшая предыдущая (Older). Даты указаны по Москве.</p>'
     if result and result.get('bulk')=='done':
         from .updates import BULK_LABELS
         summary=[]
@@ -35,7 +35,16 @@ def render(c,csrf,result=None):
         content+=f'<section class="server" data-update-card="{esc(agent)}"><div data-update-summary><header class="server-head"><div><h2>{esc(row["display_name"] or agent)}</h2><p class="muted">{esc(agent)} · {esc(platform or "платформа неизвестна")}</p></div>'
         if active:content+='<span class="badge warning">Обновление выполняется</span>'
         elif not online:content+='<span class="badge danger">Нет свежего отчёта</span>'
-        content+=f'</header><p><b>Текущая версия:</b> <code data-running-version="{esc(current)}">{esc(current)}</code> <span class="muted">· {stamp(current_date)} МСК</span></p></div>'
+        content+=f'</header><p><b>Текущая версия:</b> <code data-running-version="{esc(current)}">{esc(current)}</code> <span class="muted">· {stamp(current_date)} МСК</span></p>'
+        if active:
+            from .update_diagnostics import STAGES
+            diagnostic=c.execute('SELECT * FROM update_job_diagnostics WHERE job=?',(active['id'],)).fetchone()
+            stage=STAGES.get(diagnostic['stage'],'Ожидание первого сообщения об этапе') if diagnostic else 'Ожидание принятия задания агентом'
+            content+='<p class="update-current-stage">Текущий этап: <b>'+esc(stage)+'</b></p>'
+        else:
+            last=c.execute('SELECT status,message FROM agent_update_jobs WHERE agent=? ORDER BY id DESC LIMIT 1',(agent,)).fetchone()
+            if last and last['status']=='failed':content+='<p class="notice">Последнее обновление: '+esc(last['message'])+'</p>'
+        content+='</div>'
         if platform=='portal':content+='<p>Локальный монитор обновляется вместе с кодом портала.</p>'
         elif 'remote_update_v1' not in data.get('features',[]):content+='<p class="muted">Обновите агент вручную для поддержки установки через панель.</p>'
         else:
@@ -50,13 +59,15 @@ def render(c,csrf,result=None):
             else:cancellation='<p class="muted">Агент уже принял задание. Безопасная отмена установки недоступна.</p>'
         content+='<div data-update-cancel>'+cancellation+'</div>'
         content+='<div data-update-history tabindex="0" aria-label="История обновлений: прокручиваемый список" style="max-height:300px;overflow:hidden;overscroll-behavior:auto;border:1px solid var(--line);border-radius:12px;padding:0 14px;margin-top:18px">'
-        jobs=c.execute('SELECT j.*,p.version,x.from_version FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package LEFT JOIN update_job_context x ON x.job=j.id WHERE j.agent=? ORDER BY j.id DESC LIMIT 10',(agent,)).fetchall()
+        jobs=c.execute('SELECT j.*,p.version,p.platform AS package_platform,x.from_version FROM agent_update_jobs j JOIN update_packages p ON p.id=j.package LEFT JOIN update_job_context x ON x.job=j.id WHERE j.agent=? ORDER BY j.id DESC LIMIT 10',(agent,)).fetchall()
         if jobs:
             content+='<h3 class="update-history-heading">История обновлений</h3>'
             for index,job in enumerate(jobs):
                 label,color=LABELS.get(job['status'],(job['status'],'neutral'))
                 content+=f'<details data-update-job="{job["id"]}"><summary style="padding:12px 0"><span class="badge {color}">{esc(label)}</span> <b>{esc(job["version"])}</b> · {stamp(job["created"])} МСК · #{job["id"]}</summary>'
                 if job['from_version']:content+=f'<p><code>{esc(job["from_version"])}</code> → <code>{esc(job["version"])}</code></p>'
+                from .update_diagnostics import render as diagnostics
+                content+=diagnostics(c,job)
                 content+='<p>'+esc(job['message'])+'</p><div class="table-scroll"><table class="metric-table"><thead><tr><th>Время (МСК)</th><th>Этап</th><th>Результат</th></tr></thead><tbody>'
                 events=c.execute('SELECT created,status,message FROM update_job_events WHERE job=? ORDER BY id',(job['id'],)).fetchall()
                 if not events:

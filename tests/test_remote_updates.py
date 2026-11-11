@@ -146,3 +146,53 @@ class UpdateDiagnosticsTest(unittest.TestCase):
                 with application.db() as c:message=c.execute('SELECT message FROM agent_update_jobs').fetchone()[0]
                 self.assertIn('EXE',message);self.assertIn('восстановлен',message);self.assertNotIn('SECRET',message)
             finally:application.DB=prior
+
+class LinuxProgressTest(unittest.TestCase):
+    def prepare(self,root):
+        current=root/'current';(current/'agent').mkdir(parents=True)
+        (current/'agent/client.py').write_text('OLD=True')
+        (current/'agent/requirements-linux.txt').write_text('psutil==7.2.2')
+        package=root/'x.tar.gz'
+        PackageTest().archive(package,{'agent/client.py':b'NEW=True','agent/VERSION':b'v2','agent/requirements-linux.txt':b'psutil==7.2.2'})
+        return package
+
+    def test_reported_stages_are_real_and_telemetry_failure_does_not_break_install(self):
+        for broken in (False,True):
+            with self.subTest(broken=broken),tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);package=self.prepare(root);events=[];calls=[]
+                def report(stage,phase):
+                    events.append((stage,phase))
+                    if broken:raise OSError('telemetry down')
+                with patch('agent.update_worker.time.sleep'):
+                    install(package,{'id':1,'version':'v2'},lambda args,**kwargs:calls.append(args),root,report)
+                for stage in ['prepare','stop','backup','replace','start','health']:
+                    self.assertIn((stage,'completed'),events)
+                self.assertIn(('awaiting_version','running'),events)
+                self.assertTrue(all(command[0]=='systemctl' and 'serversstatus-agent' in command for command in calls))
+                self.assertIn('NEW',(root/'current/agent/client.py').read_text())
+
+    def test_health_failure_has_exact_stage_and_verified_rollback(self):
+        from agent.update_worker import UpdateFailure
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);package=self.prepare(root);checks=[]
+            def execute(args,**kwargs):
+                if 'is-active' in args:
+                    checks.append(args)
+                    if len(checks)==1:raise RuntimeError('failed new service')
+            with patch('agent.update_worker.time.sleep'),self.assertRaises(UpdateFailure) as caught:
+                install(package,{'id':1,'version':'v2'},execute,root)
+            self.assertEqual(caught.exception.stage,'health')
+            self.assertEqual(caught.exception.rollback,'restored')
+            self.assertEqual(len(checks),2)
+            self.assertIn('OLD',(root/'current/agent/client.py').read_text())
+
+    def test_dependency_change_is_rejected_before_stopping_service(self):
+        from agent.update_worker import UpdateFailure
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);package=self.prepare(root)
+            (root/'current/agent/requirements-linux.txt').write_text('old-dependency')
+            calls=[]
+            with self.assertRaises(UpdateFailure) as caught:install(package,{'id':1,'version':'v2'},lambda args,**kwargs:calls.append(args),root)
+            self.assertEqual(caught.exception.error_code,'dependency_changed')
+            self.assertEqual(caught.exception.rollback,'not_needed')
+            self.assertEqual(calls,[])

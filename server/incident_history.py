@@ -8,7 +8,8 @@ SCHEMA='''CREATE TABLE IF NOT EXISTS incident_history (
     opened REAL NOT NULL, last_seen REAL NOT NULL, closed REAL, resolution TEXT, message TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS incident_history_agent_time ON incident_history(agent,opened);
 CREATE UNIQUE INDEX IF NOT EXISTS incident_history_open ON incident_history(key) WHERE closed IS NULL;
-CREATE TABLE IF NOT EXISTS incident_acknowledgements(incident INTEGER PRIMARY KEY,problem_key TEXT NOT NULL,episode_opened REAL NOT NULL,acknowledged REAL NOT NULL,owner TEXT NOT NULL);'''
+CREATE TABLE IF NOT EXISTS incident_acknowledgements(incident INTEGER PRIMARY KEY,problem_key TEXT NOT NULL,episode_opened REAL NOT NULL,acknowledged REAL NOT NULL,owner TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS incident_acknowledgement_comments(incident INTEGER PRIMARY KEY,problem_key TEXT NOT NULL,episode_opened REAL NOT NULL,comment TEXT NOT NULL);'''
 
 
 def current(rows, existing, now):
@@ -100,6 +101,7 @@ def summary_html(rows,now,csrf='',return_to='/'):
     if not items:content+='<span class="text-normal">Всё в порядке</span>'
     else:content+='<span class="problem-counts">'+esc(' · '.join(labels[i]+': '+str(n) for i,n in enumerate(counts) if n))+'</span>'
     if ignored:content+='<span class="problem-counts">Отмечено «Всё окей»: '+str(ignored)+'</span>'
+    if can_history():content+='<a class="problem-management" href="/problems">Управление отметками</a>'
     content+='</header>'
     if not items:return content+'</section>'
     names={row['id']:display_name(row) for row in rows}
