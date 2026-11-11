@@ -311,3 +311,16 @@ button,input,select,textarea{font-family:inherit}
 .overview-order-controls>.overview-problem-shortcut:hover,.overview-order-controls>button:hover{background:#242424;border-color:#626262}
 .overview-order-hint{margin:9px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
 @media(max-width:640px){.overview-order-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"sort sort" "problem direction";gap:8px}.overview-order-controls>.overview-problem-shortcut,.overview-order-controls>button{width:100%;padding:0 8px;font-size:11px}.overview-order-hint{font-size:10px}}
+
+/* Compact icon controls with readable labels and touch targets on phones. */
+.overview-order-controls{grid-template-columns:max-content minmax(180px,240px) 142px;gap:8px}
+.overview-order-controls>.overview-problem-shortcut,.overview-order-controls>button,.overview-order-controls select{height:32px;min-height:32px;padding:0 10px;font-size:11px;border-radius:7px;line-height:18px}
+.overview-order-controls>.overview-problem-shortcut,.overview-order-controls>button{gap:6px}
+.overview-order-controls .portal-icon{width:15px;height:15px;flex:none}
+.overview-order-controls select{padding-right:26px}
+.order-field-title{display:inline-flex;align-items:center;gap:5px}
+.order-field-title .portal-icon{width:12px;height:12px;color:var(--muted)}
+[data-overview-direction][data-direction=desc]>.portal-icon{transform:rotate(180deg)}
+.overview-order-controls a:focus-visible,.overview-order-controls button:focus-visible,.overview-order-controls select:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.overview-order-hint{font-size:10px;margin-top:7px}
+@media(max-width:640px){.overview-order-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.overview-order-controls>.overview-problem-shortcut,.overview-order-controls>button,.overview-order-controls select{height:36px;min-height:36px;font-size:12px}}

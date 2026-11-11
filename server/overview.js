@@ -34,7 +34,7 @@
     const table=results.querySelector('.fleet-table');
     table?.querySelectorAll('th').forEach(th=>{const key=th.querySelector('[data-server-sort]')?.dataset.serverSort,active=key===sortKey;th.setAttribute('aria-sort',active?(sortDescending?'descending':'ascending'):'none');const indicator=th.querySelector('.sort-indicator');if(indicator)indicator.textContent=active?(sortDescending?'↓':'↑'):'↕'});
     const selector=document.querySelector('[data-overview-sort]');if(selector)selector.value=sortKey;
-    const direction=document.querySelector('[data-overview-direction]');if(direction)direction.textContent=sortDescending?'По убыванию ↓':'По возрастанию ↑';
+    const direction=document.querySelector('[data-overview-direction]');if(direction){direction.dataset.direction=sortDescending?'desc':'asc';const label=direction.querySelector('[data-direction-label]');if(label)label.textContent=sortDescending?'Убывание':'Возрастание';direction.title=sortDescending?'Сейчас по убыванию — переключить на возрастание':'Сейчас по возрастанию — переключить на убывание';direction.setAttribute('aria-label',direction.title)}
     const shortcut=document.querySelector('.overview-problem-shortcut');if(shortcut){const url=new URL('/',location.origin);url.searchParams.set('view','problems');if(form.elements.group?.value)url.searchParams.set('group',form.elements.group.value);if(input.value)url.searchParams.set('q',input.value);shortcut.href=url.pathname+url.search}
     document.querySelectorAll('[data-fleet-page]').forEach(link=>{const url=new URL(link.dataset.fleetPage,location.origin);if(form.elements.group?.value)url.searchParams.set('group',form.elements.group.value);link.href=url.pathname+url.search});
   }

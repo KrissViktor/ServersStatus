@@ -1,5 +1,7 @@
 """Small original line icons shared by the portal views."""
 PATHS={
+ 'filter':'<path d="M3 4h18l-7 8v7l-4 2v-9Z"/>',
+ 'sort':'<path d="M8 19V5m-4 4 4-4 4 4M15 7h6m-6 5h4m-4 5h2"/>',
  'table':'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12M3 15h18"/>',
  'cards':'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  'heatmap':'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M3 15h18M9 3v18m6-18v18"/><path d="M10 10h4v4h-4Z" fill="currentColor"/>',
