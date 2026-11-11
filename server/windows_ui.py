@@ -16,7 +16,7 @@ def section(data):
     if not windows:return content+'<p class="muted">Обновите Windows-агент для сведений об обновлениях.</p></section>'
     required=windows.get('reboot_required')
     label='🟠 Требуется перезагрузка' if required is True else '🟢 Признаков необходимости перезагрузки нет' if required is False else 'Не удалось определить необходимость перезагрузки'
-    content+='<p class="notice">'+label+'</p>'
+    content+='<p class="status-note '+('warning' if required is True else 'normal' if required is False else 'neutral')+'">'+label+'</p>'
     if windows.get('reboot_reasons'):content+='<p>'+esc(', '.join(windows['reboot_reasons']))+'</p>'
     content+='<p class="muted">История проверена: '+stamp(windows.get('checked_at'))+' · обновление истории каждые 15 минут.</p>'
     if windows.get('status')=='checking':content+='<p>Получаем сведения Windows…</p>'

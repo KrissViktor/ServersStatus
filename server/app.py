@@ -737,20 +737,24 @@ async def request_protection(request: Request, call_next):
     return response
 
 @app.get('/events', response_class=HTMLResponse)
-def journal(request: Request, agent: str = '', level: str = '', before: int = 0):
+def journal(request: Request, agent: str = '', level: str = '', before: int = 0,q:str='',category:str=''):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
-    if level not in ('','warning','info') or len(agent)>255 or before<0:
+    if level not in ('','warning','info') or len(agent)>255 or before<0 or len(q)>200 or len(category)>40:
         raise HTTPException(400)
     from .events import event_page
     from .console_access import unlocked
     access=unlocked(request,db)
     from .access import can_users
     with db() as c:
-        rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) AND (? OR category!='console') AND (? OR category!='users') ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before,access,can_users())).fetchall()
+        c.create_function('portal_casefold',1,lambda value:(value or '').casefold(),deterministic=True)
+        rows=c.execute("SELECT * FROM events WHERE (?='' OR agent=?) AND (?='' OR level=?) AND (?=0 OR id<?) AND (? OR category!='console') AND (? OR category!='users') AND (?='' OR category=?) AND instr(portal_casefold(message),?)>0 ORDER BY id DESC LIMIT 51",(agent,agent,level,level,before,before,access,can_users(),category,category,q.casefold())).fetchall()
         from .portal_settings import retention_days
         days=retention_days(c)
-    return HTMLResponse(event_page(rows,agent,level,before,days=days))
+        from .fleet import members
+        agents=members(c)
+        categories=[row[0] for row in c.execute("SELECT DISTINCT category FROM events WHERE (? OR category!='console') AND (? OR category!='users') ORDER BY category",(access,can_users()))]
+    return HTMLResponse(event_page(rows,agent,level,before,days=days,agents=agents,categories=categories,q=q,category=category))
 
 @app.get('/bot', response_class=HTMLResponse)
 def bot_status(request: Request):

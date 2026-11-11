@@ -194,11 +194,11 @@ def pdf_bytes(report):
 
 def export_links(kind,params):
     from .dashboard import esc
-    result='<nav class="report-downloads" aria-label="Скачать отчёт"><span>Скачать</span>'
+    result='<details class="report-export-menu"><summary>⇩ Скачать отчёт</summary><nav class="report-downloads" aria-label="Скачать отчёт">'
     for format in ('csv','pdf','xml','json'):
         url='/export/'+kind+'?'+urlencode({**params,'format':format},doseq=True)
         result+='<a href="'+esc(url)+'">'+format.upper()+'</a>'
-    return result+'</nav>'
+    return result+'</nav></details>'
 
 
 def register(app,db,authenticated):

@@ -36,7 +36,13 @@ def line(received,now=None,info=None,historical=False,max_age=180):
         text+=' · Отчёт получен: '+stamp(received)
         if not historical:text+=' ('+duration(max(0,now-received))+' назад)'
     if state=='stale':text+=' · Недоступность самого сервера не подтверждена'
-    return '<p class="data-freshness text-'+color+'" data-freshness="'+state+'">'+esc(text)+'</p>'
+    title=text
+    if not historical:
+        text=label
+        if received is not None:text+=' · '+duration(max(0,now-received))+' назад'
+        if sampled is not None:text+=' · замер '+duration(max(0,now-sampled))+' назад'
+        if state=='stale':text+=' · Недоступность самого сервера не подтверждена'
+    return '<p class="data-freshness text-'+color+'" data-freshness="'+state+'" title="'+esc(title)+'">'+esc(text)+'</p>'
 
 
 def sections(content,received,now,info=None,historical=False):

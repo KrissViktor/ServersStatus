@@ -84,7 +84,7 @@ def register(app,db,authenticated):
                 for cell in cells(c,row['id'],start,now,days):
                     value=cell['percent'];style='heat-empty' if value is None else 'heat-good' if value>=99.9 else 'heat-warn' if value>=95 else 'heat-poor' if value>0 else 'heat-down'
                     label=cell['day']+' · '+percentage(value)+(' · без данных '+duration(cell['missing']) if value is not None else '')+(' · неполный день' if cell['partial'] else '')
-                    content+='<td><a class="heat-cell '+style+'" href="/timeline/'+esc(quote(row['id'],safe=''))+'?day='+cell['day']+'" title="'+esc(label)+'" aria-label="'+esc(label)+'">'+('—' if value is None else '·' if value>=99.9 else '&lt;1' if 0<value<1 else str(int(value)))+'</a></td>'
+                    content+='<td><a class="heat-cell '+style+'" href="/timeline/'+esc(quote(row['id'],safe=''))+'?day='+cell['day']+'" data-heat-day="'+esc(cell['day'])+'" data-heat-server="'+esc(row['name'])+'" title="'+esc(label)+'" aria-label="'+esc(label)+'">'+('—' if value is None else '·' if value>=99.9 else '&lt;1' if 0<value<1 else str(int(value)))+'</a></td>'
                 content+='</tr>'
             content+='</tbody></table></div><p class="muted legend">Дни по Москве. Сегодня учитывается прошедшая часть дня. Нажмите ячейку, чтобы открыть ленту с пропусками и событиями. Отсутствие отчётов не доказывает выключение сервера.</p>'
         return HTMLResponse(page(content))

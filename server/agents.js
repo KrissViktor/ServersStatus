@@ -16,6 +16,6 @@
       if(!response.ok)throw new Error();const result=await response.json();if(!result.ok)throw new Error();
       status.textContent='Сохранено';
     }catch(_){input.checked=!enabled;status.textContent='Не удалось сохранить. Повторите изменение.'}
-    finally{input.disabled=false}
+    finally{input.disabled=false;document.dispatchEvent(new Event('portal-list-refresh'))}
   });
 })();

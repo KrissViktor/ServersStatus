@@ -30,7 +30,7 @@ def render(rows,csrf,actor,message='',draft=None,ip_blocks=None):
     for row in rows:
         name=row['name'];role='superadmin' if name=='admin' else row['role'];enabled=bool(row['enabled'])
         fields=hidden+'<input type="hidden" name="name" value="'+esc(name)+'">'
-        content+='<article class="server user-card"><header class="server-head"><h2>'+esc(name)+(' · Вы' if name==actor else '')+'</h2><span class="badge '+('normal' if enabled else 'neutral')+'">'+('Включён' if enabled else 'Отключён')+'</span></header><p class="muted">'+ROLES[role]+'</p>'
+        content+='<article class="server user-card" data-list-name="'+esc(name)+'" data-user-role="'+esc(role)+'" data-user-enabled="'+('1' if enabled else '0')+'"><header class="server-head"><h2>'+esc(name)+(' · Вы' if name==actor else '')+'</h2><span class="badge '+('normal' if enabled else 'neutral')+'">'+('Включён' if enabled else 'Отключён')+'</span></header><p class="muted">'+ROLES[role]+'</p>'
         until=int(row.get('blocked_until','0'))
         if until>time.time():
             content+='<p class="notice">Вход заблокирован до <b>'+esc(stamp(until))+'</b></p><form method="post" action="/users/unblock">'+fields+'<button>Снять блокировку входа</button></form>'

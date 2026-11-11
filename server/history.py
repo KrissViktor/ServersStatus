@@ -71,7 +71,7 @@ def chart(points, metric, title, start, end, color):
         attributes=f'data-detail-metric="{esc(metric)}" data-detail-first="{point["first"]}" data-detail-last="{point["last"]}" data-detail-count="{point["samples"]}" data-detail-title="{esc(title)}" tabindex="0" role="button" aria-label="Открыть исходные отчёты: {esc(tooltip)}"'
         drawing += f'<circle {attributes} class="chart-point" cx="{px:.2f}" cy="{py:.2f}" r="3" fill="{color}"><title>{esc(tooltip)}</title></circle>'
         previous = point
-    return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
+    return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" data-chart-start="{start}" data-chart-end="{end}" data-chart-left="48" data-chart-right="982" data-chart-top="14" data-chart-bottom="202" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
 
 
 def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None,retention_days=186, display_name=None):

@@ -35,6 +35,10 @@ def control(row,key,csrf='',return_to='/'):
     return '<form class="problem-ack-form" method="post" action="/problems/acknowledge"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="incident" value="'+str(state['id'])+'"><input type="hidden" name="return_to" value="'+esc(return_to)+'"><button class="problem-ack-button" title="Игнорировать только этот случай проблемы">Всё окей</button></form>'
 
 
+def problem_tabs(selected):
+    return '<nav class="problem-tabs" aria-label="Центр проблем">'+''.join('<a href="'+url+'" '+('aria-current="page"' if key==selected else '')+'>'+label+'</a>' for key,url,label in [('active','/problems?view=active','Активные'),('marked','/problems','Отмеченные'),('history','/events','История')])+'</nav>'
+
+
 def register(app,db,authenticated,csrf_token):
     async def management_form(request):
         from .access import can_history
@@ -50,29 +54,49 @@ def register(app,db,authenticated,csrf_token):
         return form
 
     @app.get('/problems')
-    def management(request:Request):
+    def management(request:Request,view:str='marked',q:str='',agent:str='',category:str='',group:str=''):
         from .access import can_history
         from .dashboard import page,esc
         from .server_names import lookup
         from .windows_ui import stamp
+        from .fleet import group_select,members
+        from .incident_history import current
         from fastapi.responses import HTMLResponse
         from urllib.parse import quote
         if not authenticated(request):return RedirectResponse('/',303)
         if not can_history():raise HTTPException(403)
+        labels={'connection':'Связь','backup':'Бэкапы','application':'Приложения','service':'Службы','cpu_percent':'CPU','memory_percent':'RAM','disk':'Диски','collector':'Сбор данных','report_delay':'Задержка отчётов'}
+        if view not in ('active','marked') or len(q)>200 or len(agent)>255 or len(group)>20 or category not in ('',*labels):raise HTTPException(400)
         with db() as c:
             c.execute('BEGIN IMMEDIATE')
-            reports=c.execute('SELECT a.id,p.display_name,r.received,r.data FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id').fetchall()
-            sync(c,reports,time.time())
+            reports=[dict(row) for row in c.execute('SELECT a.id,p.display_name,r.received,r.data FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id')]
+            attach(c,reports,time.time())
+            confirmed,_,_=current(reports,[],time.time());by_agent={row['id']:row for row in reports}
+            selected={row['id'] for row in members(c,group)} if group else set(by_agent)
             rows=c.execute('''SELECT h.*,a.owner,a.acknowledged,COALESCE(n.comment,'') AS comment FROM incident_history h
-                JOIN incident_acknowledgements a ON a.incident=h.id AND a.problem_key=h.key AND a.episode_opened=h.opened
+                LEFT JOIN incident_acknowledgements a ON a.incident=h.id AND a.problem_key=h.key AND a.episode_opened=h.opened
                 LEFT JOIN incident_acknowledgement_comments n ON n.incident=h.id AND n.problem_key=h.key AND n.episode_opened=h.opened
-                WHERE h.closed IS NULL ORDER BY a.acknowledged DESC,h.id DESC''').fetchall()
-            content='<header class="topbar"><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/admin">Администрирование</a></header><div class="heading"><h1>Отмеченные проблемы <span class="count">'+str(len(rows))+'</span></h1></div><p class="muted">Только текущие случаи, отмеченные «Всё окей». После подтверждённого исчезновения отметка прекращает действовать автоматически. Можно вернуть предупреждение раньше.</p>'
-            if not rows:content+='<section class="server"><p class="text-normal">Скрытых проблем нет</p></section>'
-            csrf='<input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
+                WHERE h.closed IS NULL ORDER BY h.opened DESC,h.id DESC''').fetchall()
+            filtered=[]
             for row in rows:
+                marked=row['acknowledged'] is not None
+                if marked!=(view=='marked') or (not marked and row['key'] not in confirmed):continue
+                if row['agent'] not in selected or (agent and row['agent']!=agent) or (category and row['category']!=category):continue
+                name=lookup(c,row['agent'])
+                if q.casefold() not in (name+' '+row['agent']+' '+row['message']+' '+row['comment']+' '+(row['owner'] or '')).casefold():continue
+                filtered.append((row,name))
+            content='<header class="topbar"><a class="nav-link" href="/">← Все серверы</a><a class="nav-link" href="/events">Журнал событий</a></header><div class="heading"><h1>Центр проблем <span class="count">'+str(len(filtered))+'</span></h1></div>'+problem_tabs(view)
+            content+='<form class="fleet-filter problem-filters"><input type="hidden" name="view" value="'+view+'"><label>Поиск<input name="q" value="'+esc(q)+'" maxlength="200" placeholder="Сервер, проблема, комментарий"></label>'+group_select(c,group)+'<label>Сервер<select name="agent"><option value="">Все серверы</option>'+''.join('<option value="'+esc(row['id'])+'" '+('selected' if agent==row['id'] else '')+'>'+esc(lookup(c,row['id']))+'</option>' for row in reports)+'</select></label><label>Категория<select name="category"><option value="">Все категории</option>'+''.join('<option value="'+key+'" '+('selected' if category==key else '')+'>'+label+'</option>' for key,label in labels.items())+'</select></label><button>Найти</button></form>'
+            content+='<p class="muted">'+('Только текущие случаи, отмеченные «Всё окей». После исчезновения отметка прекращает действовать автоматически.' if view=='marked' else 'Подтверждённые проблемы по последним данным. Отметка «Всё окей» относится только к текущему случаю.')+'</p>'
+            if not filtered:content+='<section class="server"><p class="text-normal">'+('Скрытых проблем нет' if view=='marked' else 'Активных проблем нет')+'</p></section>'
+            csrf='<input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
+            for row,name in filtered:
                 endpoint='/problems/'+str(row['id'])
-                content+='<section class="server acknowledgement-card"><h2><a class="nav-link" href="/servers/'+esc(quote(row['agent'],safe=''))+'">'+esc(lookup(c,row['agent']))+'</a></h2><p class="acknowledgement-message">'+esc(row['message'])+'</p><p class="muted">Отметил: <b>'+esc(row['owner'] or 'Не указан')+'</b> · '+esc(stamp(row['acknowledged']))+'</p><form method="post" action="'+endpoint+'/comment">'+csrf+'<label>Комментарий<textarea name="comment" maxlength="1000" rows="2" placeholder="Почему эту проблему можно временно игнорировать">'+esc(row['comment'])+'</textarea></label><button>Сохранить комментарий</button></form><form method="post" action="'+endpoint+'/restore">'+csrf+'<button class="restore-problem">Вернуть предупреждение</button></form></section>'
+                content+='<section class="server acknowledgement-card"><header class="server-head"><h2><a class="nav-link" href="/servers/'+esc(quote(row['agent'],safe=''))+'">'+esc(name)+'</a></h2><span class="badge '+('neutral' if view=='marked' else 'warning')+'">'+esc(labels.get(row['category'],row['category']))+'</span></header><p class="acknowledgement-message">'+esc(row['message'])+'</p>'
+                if view=='marked':
+                    content+='<p class="muted">Отметил: <b>'+esc(row['owner'] or 'Не указан')+'</b> · '+esc(stamp(row['acknowledged']))+'</p><form method="post" action="'+endpoint+'/comment">'+csrf+'<label>Комментарий<textarea name="comment" maxlength="1000" rows="2" placeholder="Почему эту проблему можно временно игнорировать">'+esc(row['comment'])+'</textarea></label><button>Сохранить комментарий</button></form><form method="post" action="'+endpoint+'/restore">'+csrf+'<button class="restore-problem">Вернуть предупреждение</button></form>'
+                else:content+='<p class="muted">Наблюдается с '+esc(stamp(row['opened']))+'</p>'+control(by_agent[row['agent']],row['key'],csrf_token(request),'/problems?view=active')
+                content+='</section>'
         return HTMLResponse(page(content))
 
     async def change_mark(incident,request,restore):
@@ -135,4 +159,5 @@ def register(app,db,authenticated,csrf_token):
                 record(c,incident['agent'],'configuration','Проблема отмечена «Всё окей»: '+incident['message'])
         from urllib.parse import quote
         destination='/servers/'+quote(incident['agent'],safe='')
-        return RedirectResponse(destination if form.get('return_to',[''])[0]==destination else '/',303)
+        target=form.get('return_to',[''])[0]
+        return RedirectResponse(target if target in (destination,'/problems','/problems?view=active') else '/',303)

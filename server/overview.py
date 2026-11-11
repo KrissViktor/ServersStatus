@@ -140,7 +140,7 @@ def detail_page(row, csrf,console_access=False):
     else:content+='<span class="panel-name-value">'+esc(name)+'</span>'
     content+='</div>'
     if can_history():content+='<nav class="detail-analysis-links"><a class="nav-link" href="/timeline/'+esc(identifier)+'">◷ Лента событий</a><a class="nav-link" href="/dependencies">Связи серверов</a></nav>'
-    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details" hidden>Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}),csrf=csrf)
+    content += '<div class="server-detail" data-detail-server="'+esc(row['id'])+'"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details" hidden>Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}),csrf=csrf)
     content+='</div>'
     from .task_manager import section as task_section,assets as task_assets
     content += task_section(row['id'])+task_assets()

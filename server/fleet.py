@@ -43,7 +43,7 @@ def stats(c,agent,start,end):
 
 def multi_chart(series,field,title,start,end):
     colors=['#8ecbad','#80b9ed','#d9b37c','#c3a0df','#e89da5','#8ad1d1']
-    result='<section class="server"><h2>'+title+'</h2><svg class="comparison-chart" viewBox="0 0 1000 250" role="img" aria-label="'+title+'">'
+    result='<section class="server"><h2>'+title+'</h2><svg class="comparison-chart" data-chart-start="'+str(start)+'" data-chart-end="'+str(end)+'" data-chart-left="45" data-chart-right="980" data-chart-top="25" data-chart-bottom="215" viewBox="0 0 1000 250" role="img" aria-label="'+title+'">'
     for value in [0,25,50,75,100]:
         y=215-value*1.9;result+=f'<line class="chart-grid" x1="45" y1="{y}" x2="980" y2="{y}"/><text class="chart-label" x="3" y="{y+4}">{value}%</text>'
     for i,(agent,name,points) in enumerate(series):
@@ -162,7 +162,7 @@ def register(app,db,authenticated,csrf_token):
             content=header('Сводка за '+date.strftime('%d.%m.%Y'))+'<form class="fleet-filter"><label>Дата (МСК)<input type="date" name="day" value="'+date.isoformat()+'" max="'+today.isoformat()+'"></label>'+group_select(c,group)+'<button>Показать</button></form><p class="muted">'+esc(stamp(start))+' — '+esc(stamp(end))+'. Для сегодняшнего дня сводка неполная. Показатели относятся к выбранным суткам.</p>'
             from .report_exports import export_links
             content+=export_links('daily',{'day':date.isoformat(),'group':group})
-            content+='<section class="server"><div class="table-scroll"><table class="metric-table"><tr><th>Сервер</th><th>Доступность</th><th>Без данных</th><th>CPU ср. / пик</th><th>RAM ср. / пик</th><th>Изменение CPU / RAM³</th><th>Перезагрузки¹</th><th>Началось / завершилось инцидентов</th><th>Изменения комплектации²</th></tr>'
+            content+='<section class="server"><div class="table-scroll"><table class="metric-table daily-table"><tr><th>Сервер</th><th>Доступность</th><th>Без данных</th><th>CPU ср. / пик</th><th>RAM ср. / пик</th><th>Изменение CPU / RAM³</th><th>Перезагрузки¹</th><th>Началось / завершилось инцидентов</th><th>Изменения комплектации²</th></tr>'
             for row in rows:
                 agent=row['id'];summary=stats(c,agent,start,end);up=availability(c,agent,start,end)
                 opened=c.execute('SELECT COUNT(*) FROM incident_history WHERE agent=? AND opened>=? AND opened<?',(agent,start,end)).fetchone()[0]

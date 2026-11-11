@@ -31,7 +31,7 @@
         const caption=document.createElement('span');caption.className='sr-only';caption.textContent=name;button.append(caption);
         body.id=`server-section-${++informationSequence}-${fold.dataset.foldKey}`;button.setAttribute('aria-controls',body.id);
         button.addEventListener('click',()=>choose(fold));
-        button.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...nav.querySelectorAll('button')];const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next].focus();buttons[next].click()});
+        button.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...nav.querySelectorAll('button')].filter(item=>!item.hidden);const current=buttons.indexOf(button);const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(current+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next].focus();buttons[next].click()});
         nav.append(button);
         const heading=document.createElement('h3');heading.className='section-browser-title';heading.innerHTML=title.innerHTML;body.prepend(heading);
       });
