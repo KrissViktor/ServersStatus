@@ -58,13 +58,14 @@ def meter(label,value,description,points=None,field='cpu',now=None,snapshot=Fals
     percent=min(100,number(value))
     now=time.time() if now is None else now
     formatted=f'{percent:.1f}' if value is not None else '—'
-    if not can_history():return f'<div class="metric current-metric"><div class="metric-top"><span>{esc(label)}<small class="resource-current-label">{'В момент снимка' if snapshot else 'Последний отчёт'}</small></span><strong>{formatted}<small>%</small></strong></div><p class="muted task-description">{esc(description)}</p></div>'
+    measurement_label='В момент снимка' if snapshot else 'Последний отчёт'
+    if not can_history():return f'<div class="metric current-metric"><div class="metric-top"><span>{esc(label)}<small class="resource-current-label">{measurement_label}</small></span><strong>{formatted}<small>%</small></strong></div><p class="muted task-description">{esc(description)}</p></div>'
     values=[p.get(field) for p in (points or []) if isinstance(p.get(field),(int,float)) and p.get('timestamp',0)>=now-(300 if snapshot else 900)]
     delta=values[-1]-values[0] if len(values)>1 else None
     trend=('<span class="resource-trend">'+('↗ +' if delta>0 else '↘ ' if delta<0 else '→ ')+f'{delta:.1f} п.п.</span>') if delta is not None else '<span class="resource-trend">Мало данных</span>'
     axis_class='task-axis snapshot-axis' if snapshot else 'task-axis'
     axis='<span>−5 минут</span><span>Снимок</span><span>+5 минут</span>' if snapshot else '<span>15 минут</span><span>Сейчас</span>'
-    return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}<small class="resource-current-label">{'В момент снимка' if snapshot else 'Последний отчёт'}</small></span><strong>{formatted}<small>%</small></strong></div>{trend}<div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now,snapshot=snapshot,window=300 if snapshot else 900) + '</div><div class="'+axis_class+'">'+axis+'</div><p class="muted task-description">' + esc(description) + '</p>'+extra+'</div>'
+    return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}<small class="resource-current-label">{measurement_label}</small></span><strong>{formatted}<small>%</small></strong></div>{trend}<div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now,snapshot=snapshot,window=300 if snapshot else 900) + '</div><div class="'+axis_class+'">'+axis+'</div><p class="muted task-description">' + esc(description) + '</p>'+extra+'</div>'
 
 
 def resource_points(row,data):
