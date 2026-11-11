@@ -248,7 +248,7 @@ def register(app,db,authenticated,csrf_token,digest):
             if data['status']=='running' and data.get('message') in ('Скачивание проверенного пакета','Скачивание Linux-пакета'):
                 message='Скачивание пакета и проверка SHA256'
             if data['status']=='failed':
-                if data.get('rollback')=='restored':message+='; предыдущий EXE восстановлен'
+                if data.get('rollback')=='restored':message+='; предыдущая версия восстановлена'
                 elif data.get('rollback')=='failed':message+='; восстановление не завершено, проверьте службу локально'
                 elif data.get('message')=='Не удалось скачать или проверить пакет; служба не заменена':message='Не удалось скачать пакет или проверить SHA256; EXE службы не заменён'
             c.execute('BEGIN IMMEDIATE')
