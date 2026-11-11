@@ -1,6 +1,6 @@
 (() => {
   const ns='http://www.w3.org/2000/svg';
-  const graphs=()=>[...document.querySelectorAll('.history-chart[data-chart-start],.comparison-chart[data-chart-start],.server-detail .task-graph[data-chart-start]')];
+  const graphs=()=>[...document.querySelectorAll('.history-chart[data-chart-start]:not([data-resource-metric]),.comparison-chart[data-chart-start],.server-detail .task-graph[data-chart-start]:not([data-resource-metric])')];
   let frame=null,pending=null;
   function sync(source,clientX,focusPoint){
     const matrix=source.getScreenCTM();if(!matrix)return;

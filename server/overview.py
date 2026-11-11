@@ -101,7 +101,7 @@ def compact_card(row, now, csrf=""):
         content += '<p class="notice">Данные устарели — нет связи с агентом</p>'
     points=resource_points(row,data)
     from .cpu_cores import controls as cpu_controls
-    content += '<div class="metrics">' + meter('CPU', data.get('cpu_percent'), cpu_description(data),points,'cpu',now,extra=cpu_controls(row)) + meter('RAM', data.get('memory_percent'), memory_description(data),points,'ram',now) + '</div>'
+    content += '<div class="metrics" data-resource-agent="'+esc(row['id'])+'" data-resource-mode="compact">' + meter('CPU', data.get('cpu_percent'), cpu_description(data),points,'cpu',now,extra=cpu_controls(row)) + meter('RAM', data.get('memory_percent'), memory_description(data),points,'ram',now) + '</div>'
     content += '<div class="compact-disks">'
     for disk in monitored_disks(data):
         content += '<p><b>' + esc(disk.get('path', '')) + '</b><span>' + size(disk.get('free_bytes')) + ' свободно · ' + f'{number(disk.get("used_percent")):.1f}% занято' + '</span></p>'

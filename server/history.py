@@ -8,7 +8,7 @@ IO_SCRIPT=Path(__file__).with_name("io_history.js").read_text(encoding="utf-8")
 from .dashboard import esc, page, size
 from .memory import RAM_USED_SQL, RAM_TOTAL_SQL, memory_tooltip
 
-PERIODS = {'1h': ('Час', 3600, 60), '6h': ('6 часов', 21600, 60),
+PERIODS = {'15m': ('15 минут',900,10), '1h': ('Час', 3600, 60), '6h': ('6 часов', 21600, 60),
            '24h': ('Сутки', 86400, 300), '7d': ('Неделя', 604800, 1800),
            '30d': ('30 дней', 2592000, 3600)}
 
@@ -28,8 +28,8 @@ def load_history(connection, agent_id, start, end, bucket):
         SELECT CAST(received / ? AS INTEGER) AS bucket,
                AVG(received) AS timestamp, MIN(received) AS first,
                MAX(received) AS last, COUNT(*) AS samples,
-               AVG(cpu) AS cpu, MAX(cpu) AS cpu_peak,
-               AVG(ram) AS ram, MAX(ram) AS ram_peak,
+               AVG(cpu) AS cpu, MIN(cpu) AS cpu_min, MAX(cpu) AS cpu_peak,
+               AVG(ram) AS ram, MIN(ram) AS ram_min, MAX(ram) AS ram_peak,
                AVG(ram_used_bytes) AS ram_used_bytes, MAX(ram_used_bytes) AS ram_used_peak_bytes,
                AVG(ram_total_bytes) AS ram_total_bytes, COUNT(ram_used_bytes) AS ram_size_samples,
                MAX(CASE WHEN gap>180 THEN 1 ELSE 0 END) AS has_gap
@@ -42,6 +42,9 @@ def stamp(timestamp):
 
 
 def chart(points, metric, title, start, end, color):
+    from .resource_charts import metadata,CPU,RAM
+    color=CPU if metric=='cpu' else RAM
+    resource_attrs=metadata(points,metric,start,end)
     width, height, left, top, bottom = 1000, 240, 48, 14, 202
     plot_width = width - left - 18
     plot_height = bottom - top
@@ -71,11 +74,12 @@ def chart(points, metric, title, start, end, color):
         attributes=f'data-detail-metric="{esc(metric)}" data-detail-first="{point["first"]}" data-detail-last="{point["last"]}" data-detail-count="{point["samples"]}" data-detail-title="{esc(title)}" tabindex="0" role="button" aria-label="Открыть исходные отчёты: {esc(tooltip)}"'
         drawing += f'<circle {attributes} class="chart-point" cx="{px:.2f}" cy="{py:.2f}" r="3" fill="{color}"><title>{esc(tooltip)}</title></circle>'
         previous = point
-    return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" data-chart-start="{start}" data-chart-end="{end}" data-chart-left="48" data-chart-right="982" data-chart-top="14" data-chart-bottom="202" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
+    return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart"{resource_attrs} data-chart-start="{start}" data-chart-end="{end}" data-chart-left="48" data-chart-right="982" data-chart-top="14" data-chart-bottom="202" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
 
 
 def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None,retention_days=186, display_name=None):
     _, _, bucket = PERIODS[period]
+    bucket_label=str(bucket)+' с' if bucket<60 else str(bucket//60)+' мин'
     url = '/history/' + quote(agent_id, safe='')
     links = ''.join(f'<a class="period {"selected" if key == period else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{label}</a>' for key, (label, _, _) in PERIODS.items())
     content = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/">← Обзор серверов</a></header>'
@@ -107,9 +111,9 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         record=extremes.get('ram_min')
         if record:content+=stat('Минимум RAM',f'{record["value"]:.1f}%<small class="stat-detail">{size(record.get("ram_used_bytes"))}</small>',record,'ram')
         content+='</div>'
-        content += f'<p class="muted history-note">Отчётов: {total} · Точки — средние за {bucket // 60} мин. Наведите на точку, чтобы увидеть пик и время. Нажмите на точку для просмотра исходных отчётов и масштаба до 900 отчётов. Разрывы означают отсутствие отчётов более 3 минут; интервалы с пропусками показаны отдельными точками. Время — московское (МСК).</p>'
+        content += f'<p class="muted history-note">Отчётов: {total} · Точки — средние за {bucket_label}. Наведите на точку, чтобы увидеть пик и время. Нажмите на точку для просмотра исходных отчётов и масштаба до 900 отчётов. Разрывы означают отсутствие отчётов более 3 минут; интервалы с пропусками показаны отдельными точками. Время — московское (МСК).</p>'
         content += chart(points, 'cpu', 'Процессор · CPU', start, end, '#4adeab')
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
     content += extra_html
     from .drilldown import widget
-    return page('<div id="history-content" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится '+str(retention_days)+' дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
+    return page('<div id="history-content" data-resource-agent="'+esc(agent_id)+'" data-resource-period="'+period+'" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится '+str(retention_days)+' дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)

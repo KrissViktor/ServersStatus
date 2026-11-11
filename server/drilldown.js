@@ -8,13 +8,13 @@
   function node(tag,attributes={},text=''){const n=document.createElementNS(svgNS,tag);for(const [k,v] of Object.entries(attributes))n.setAttribute(k,v);if(text)n.textContent=text;return n}
   const stamp=t=>new Date(t*1000).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',hour12:false})+' МСК';
   function size(v){if(v==null)return '—';let i=0;const units=['Б','Кб','Мб','Гб','Тб'];while(Math.abs(v)>=1024 && i<4){v/=1024;i++}return v.toLocaleString('ru-RU',{maximumFractionDigits:1})+' '+units[i]}
-  const format=v=>unit==='%'?v.toFixed(1)+'%':unit==='bytes/s'?size(v)+'/с':v.toFixed(1)+' оп/с';
-  function describe(p){let text=stamp(p.timestamp)+' · '+format(p.value);if(metric==='ram')text+=' · занято '+size(p.ram_used_bytes)+' из '+size(p.ram_total_bytes);return text}
+  const format=v=>v==null?'—':unit==='%'?v.toFixed(1)+'%':unit==='bytes/s'?size(v)+'/с':v.toFixed(1)+' оп/с';
+  function describe(p){return stamp(p.timestamp)+' · '+format(p.value)+'\nCPU '+(p.cpu==null?'—':p.cpu.toFixed(1)+'%')+' · RAM '+(p.ram==null?'—':p.ram.toFixed(1)+'%')+' · Память '+size(p.ram_used_bytes)+' / '+size(p.ram_total_bytes)+'\nИсходный отчёт #'+p.report_id}
   function selectPoint(p,clientX=null,clientY=null,commit=true){
-    if(!p || p.value==null)return;
+    if(!p)return;
     if(commit){
       if(selected?.report_id!==p.report_id){snapshotPending?.abort();snapshotContent.hidden=true;snapshotContent.replaceChildren()}
-      selected=p;wanted=p.report_id;snapshotButton.disabled=!p.report_id;
+      selected=p;wanted=p.report_id;snapshotButton.disabled=!p.report_id;for(const button of dialog.querySelectorAll('[data-report-step]'))button.disabled=!p.report_id;
       document.getElementById('detail-selected-label').textContent='Выбран отчёт: '+stamp(p.timestamp);
       for(const circle of plot.querySelectorAll('.detail-report-point')){const active=circle.dataset.reportId===String(p.report_id);circle.setAttribute('r',active?'5':'3.5');circle.classList.toggle('is-selected',active)}
     }
@@ -27,18 +27,22 @@
     const start=domain[0]+offset,end=domain[1]+offset,span=Math.max(1,end-start);
     const maximum=unit==='%'?100:Math.max(1,...points.map(p=>p.value==null?0:p.value*1.1));
     const x=t=>left+(t-start)/span*(right-left),y=v=>bottom-v/maximum*(bottom-top);
+    const color=metric==='ram'?'#b9a0ff':'#7dbbff';
     const svg=node('svg',{viewBox:`0 0 ${w} ${h}`,role:'img','aria-label':'Исходные отчёты сервера'});
     for(const ratio of [0,.25,.5,.75,1]){
       const v=maximum*ratio;svg.append(node('line',{x1:left,x2:right,y1:y(v),y2:y(v),class:'chart-grid'}),node('text',{x:left-8,y:y(v)+4,'text-anchor':'end',class:'chart-label'},format(v)));
     }
     const axisStamp=t=>w<700?new Date(t*1000).toLocaleTimeString('ru-RU',{timeZone:'Europe/Moscow',hour12:false}):stamp(t);
     for(const f of [0,.5,1])svg.append(node('text',{x:left+f*(right-left),y:h-12,'text-anchor':f===0?'start':f===1?'end':'middle',class:'chart-label'},axisStamp(start+span*f)));
+    if(unit==='%'){svg.append(node('rect',{x:left,y:top,width:right-left,height:y(85)-top,fill:'#e4b56b','fill-opacity':.025}),node('line',{x1:left,x2:right,y1:y(95),y2:y(95),class:'resource-threshold'}))}
+    let segment=[];const fillSegment=()=>{if(segment.length>1){const d='M '+segment.map(p=>x(p.timestamp)+','+y(p.value)).join(' L ')+` L ${x(segment.at(-1).timestamp)},${bottom} L ${x(segment[0].timestamp)},${bottom} Z`;svg.append(node('path',{d,fill:color,'fill-opacity':.075,class:'resource-area'}))}segment=[]};
+    for(const p of points){if(p.value==null||p.timestamp<start||p.timestamp>end){fillSegment();continue}if(segment.length&&p.timestamp-segment.at(-1).timestamp>180)fillSegment();segment.push(p)}fillSegment();
     let previous=null;
     for(const p of points){
       if(p.value==null){previous=null;continue}
       if(p.timestamp<start || p.timestamp>end){previous=null;continue}
-      if(previous && p.timestamp-previous.timestamp<=180)svg.append(node('line',{x1:x(previous.timestamp),y1:y(previous.value),x2:x(p.timestamp),y2:y(p.value),stroke:'#83c4ff','stroke-width':1.7}));
-      const circle=node('circle',{cx:x(p.timestamp),cy:y(p.value),r:3.5,fill:'#83c4ff',tabindex:'0',class:'detail-report-point','data-report-id':p.report_id});
+      if(previous && p.timestamp-previous.timestamp<=180)svg.append(node('line',{x1:x(previous.timestamp),y1:y(previous.value),x2:x(p.timestamp),y2:y(p.value),stroke:color,'stroke-width':1.7}));
+      const circle=node('circle',{cx:x(p.timestamp),cy:y(p.value),r:3.5,fill:color,tabindex:'0',class:'detail-report-point','data-report-id':p.report_id});
       let title=stamp(p.timestamp)+' · '+format(p.value);
       if(metric==='ram')title+=' · занято '+size(p.ram_used_bytes)+' из '+size(p.ram_total_bytes);
       circle.append(node('title',{},title));circle.addEventListener('pointerenter',event=>selectPoint(p,event.clientX,event.clientY,false));circle.addEventListener('focus',()=>selectPoint(p));circle.addEventListener('click',()=>selectPoint(p));svg.append(circle);previous=p;
@@ -50,6 +54,7 @@
     if(pending)pending.abort();const controller=new AbortController();pending=controller;const current=++version;
     const url=new URL(dialog.dataset.url,location.origin);for(const [key,value] of Object.entries({center,count,metric,name}))url.searchParams.set(key,value);
     if(first!=null && last!=null){url.searchParams.set('first',first);url.searchParams.set('last',last)}
+    if(wanted!=null)url.searchParams.set('report_id',wanted);
     tooltip.hidden=true;snapshotButton.disabled=true;
     status.textContent='Загрузка исходных отчётов…';plot.setAttribute('aria-busy','true');
     try{
@@ -64,7 +69,7 @@
       countLabel.textContent=`Показано ${data.count} · масштаб ${count} отчётов · максимум 900`;
       dialog.querySelector('[data-zoom="out"]').disabled=count>=900;dialog.querySelector('[data-zoom="in"]').disabled=count<=3;
       const available=points.filter(p=>p.value!=null);
-      const target=available.find(p=>p.report_id===wanted)||available.reduce((best,p)=>!best||Math.abs(p.timestamp-center)<Math.abs(best.timestamp-center)?p:best,null);
+      const target=points.find(p=>p.report_id===wanted)||available.reduce((best,p)=>!best||Math.abs(p.timestamp-center)<Math.abs(best.timestamp-center)?p:best,null);
       if(target)selectPoint(target);else{selected=null;wanted=null;info.textContent='Нет измерений выбранной метрики.';snapshotContent.hidden=true}
       for(const kind of ['min','max']){const button=dialog.querySelector('[data-view-extreme="'+kind+'"]');button.disabled=!available.length;if(available.length){const p=available.reduce((a,b)=>(kind==='min'?b.value<a.value:b.value>a.value)?b:a);button.textContent=(kind==='min'?'Минимум: ':'Максимум: ')+format(p.value)}}
     }catch(error){if(error.name!=='AbortError' && current===version)status.textContent='Не удалось загрузить отчёты. Повторите изменение масштаба.'}
@@ -96,7 +101,9 @@
   dialog.querySelector('[data-detail-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{version++;pending?.abort();pending=null;drag=null;tooltip.hidden=true;snapshotPending?.abort()});
   dialog.addEventListener('click',event=>{const zoomButton=event.target.closest('[data-zoom]'),panButton=event.target.closest('[data-pan]');if(zoomButton)zoom(zoomButton.dataset.zoom==='out');if(panButton)pan(Number(panButton.dataset.pan));const extreme=event.target.closest('[data-view-extreme]');if(extreme){const candidates=points.filter(p=>p.value!=null);if(candidates.length)selectPoint(candidates.reduce((a,b)=>(extreme.dataset.viewExtreme==='min'?b.value<a.value:b.value>a.value)?b:a))}});
-  dialog.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();pan(event.key==='ArrowLeft'?-1:1)}});
+  async function stepReport(direction){if(!selected||pending)return;const before=selected.report_id,restore=!snapshotContent.hidden;const url=new URL(dialog.dataset.url.replace(/\/detail$/,'/report-step'),location.origin);url.searchParams.set('report_id',before);url.searchParams.set('direction',direction);status.textContent='Загрузка соседнего отчёта…';try{const response=await fetch(url,{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error('Отчёт недоступен');const target=await response.json();if(!dialog.open||selected?.report_id!==before)return;if(!target.report_id){status.textContent=direction<0?'Это первый сохранённый отчёт':'Это последний сохранённый отчёт';return}wanted=target.report_id;center=target.timestamp;await load(target.timestamp,target.timestamp);if(restore&&selected?.report_id===target.report_id)await showSnapshot()}catch(error){status.textContent=error.message}}
+  dialog.addEventListener('click',event=>{const step=event.target.closest('[data-report-step]');if(step)stepReport(Number(step.dataset.reportStep));if(event.target.closest('[data-detail-reset]')){count=30;center=selected?.timestamp||center;load()}});
+  dialog.addEventListener('keydown',event=>{if(event.target.closest('input,textarea,select,#detail-snapshot-content'))return;if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();stepReport(event.key==='ArrowLeft'?-1:1)}});
   plot.addEventListener('wheel',event=>{event.preventDefault();if(!pending)zoom(event.deltaY>0,Math.max(0,Math.min(1,(event.clientX-plot.getBoundingClientRect().left)/plot.clientWidth)))},{passive:false});
   plot.addEventListener('pointerleave',()=>{tooltip.hidden=true;if(selected)info.textContent=describe(selected)});
   plot.addEventListener('pointerdown',event=>{if(event.button!==0 || !points.length)return;event.preventDefault();drag={x:event.clientX,offset:0};plot.setPointerCapture(event.pointerId)});
@@ -110,7 +117,7 @@
     else{selectPoint(nearestPoint(event.clientX));render()}
   });
   plot.addEventListener('pointercancel',()=>{drag=null;render()});
-  snapshotButton.addEventListener('click',async()=>{
+  async function showSnapshot(){
     if(!selected?.report_id)return;const identifier=selected.report_id;
     snapshotPending?.abort();const controller=new AbortController();snapshotPending=controller;
     snapshotContent.hidden=false;snapshotContent.textContent='Загрузка снимка…';
@@ -121,6 +128,7 @@
       const data=await response.json();if(selected?.report_id!==identifier || !dialog.open)return;
       snapshotContent.innerHTML=data.html;window.initServerInformation?.(snapshotContent);window.initTaskManagers?.(snapshotContent);snapshotContent.scrollIntoView({block:'start',behavior:'smooth'});
     }catch(error){if(error.name!=='AbortError' && selected?.report_id===identifier)snapshotContent.textContent=error.message}
-  });
+  }
+  snapshotButton.addEventListener('click',showSnapshot);
   new ResizeObserver(()=>{if(dialog.open && points.length && !drag)render()}).observe(plot);
 })();

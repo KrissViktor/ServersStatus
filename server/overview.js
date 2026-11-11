@@ -66,7 +66,7 @@
         const id=card.dataset.serverId;wanted.add(id);
         let current=existing.get(id);
         if(!current)current=card;
-        else if(current.outerHTML!==card.outerHTML && !current.contains(document.activeElement)){
+        else if(current.outerHTML!==card.outerHTML && !current.contains(document.activeElement) && !current.querySelector('.resource-inspector:not([hidden])')){
           window.keepCpuCores?.(current,card);current.replaceWith(card);if(cursor===current)cursor=card;current=card;
         }
         if(current!==cursor)oldGrid.insertBefore(current,cursor);

@@ -6,8 +6,8 @@ import math
 WINDOW=300
 
 
-def graph(points,field,now,snapshot=False,core=None,interactive=True):
-    start=now-WINDOW
+def graph(points,field,now,snapshot=False,core=None,interactive=True,window=WINDOW):
+    start=now-window
     end=now+WINDOW if snapshot else now
     width=end-start
     samples=[];missing=[]
@@ -27,7 +27,9 @@ def graph(points,field,now,snapshot=False,core=None,interactive=True):
     x=lambda timestamp:(timestamp-start)/width*320
     y=lambda value:98-value*.96
     label=f'Логический процессор {core}' if core is not None else 'Загрузка процессора' if field=='cpu' else 'Использование памяти'
-    content='<svg class="task-graph" data-chart-start="'+str(start)+'" data-chart-end="'+str(end)+'" data-chart-left="0" data-chart-right="320" data-chart-top="0" data-chart-bottom="100" viewBox="0 0 320 100" preserveAspectRatio="none" role="img" aria-label="'+label+(' за 5 минут до и после снимка' if snapshot else ' за последние 5 минут')+'">'
+    from .resource_charts import metadata
+    resource_attrs=metadata(points,field,start,end) if core is None else ''
+    content='<svg class="task-graph"'+resource_attrs+' data-chart-start="'+str(start)+'" data-chart-end="'+str(end)+'" data-chart-left="0" data-chart-right="320" data-chart-top="0" data-chart-bottom="100" viewBox="0 0 320 100" preserveAspectRatio="none" role="img" aria-label="'+label+(' за 5 минут до и после снимка' if snapshot else f' за последние {window//60} минут')+'">'
     for position in (0,40,80,120,160,200,240,280,320):
         content+=f'<line class="task-grid" x1="{position}" x2="{position}" y1="0" y2="100"/>'
     for position in (2,26,50,74,98):

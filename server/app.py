@@ -142,12 +142,13 @@ def server_rows():
             from .stability import load as load_stability
             row['availability']=load_stability(c,row['id'],now-86400,now,details=False)['percent']
             row['sparkline']=[dict(point) for point in c.execute(f"""SELECT AVG(received) AS timestamp,
-                AVG(json_extract(data,'$.cpu_percent')) AS cpu,
-                AVG(json_extract(data,'$.memory_percent')) AS ram,
+                MIN(received) AS first, MAX(received) AS last, COUNT(*) AS samples,
+                AVG(json_extract(data,'$.cpu_percent')) AS cpu, MIN(json_extract(data,'$.cpu_percent')) AS cpu_min, MAX(json_extract(data,'$.cpu_percent')) AS cpu_peak,
+                AVG(json_extract(data,'$.memory_percent')) AS ram, MIN(json_extract(data,'$.memory_percent')) AS ram_min, MAX(json_extract(data,'$.memory_percent')) AS ram_peak,
                 AVG({RAM_USED_SQL}) AS ram_used_bytes, AVG({RAM_TOTAL_SQL}) AS ram_total_bytes
                 FROM reports INDEXED BY reports_resource_metrics
                 WHERE agent=? AND received>=? AND received<=?
-                GROUP BY CAST(received/10 AS INTEGER) ORDER BY timestamp""",(row['id'],now-300,now))]
+                GROUP BY CAST(received/30 AS INTEGER) ORDER BY timestamp""",(row['id'],now-900,now))]
         return rows
 
 
@@ -826,3 +827,6 @@ register_wallboard(app,db,authenticated)
 
 from .problem_acknowledgements import register as register_problem_acknowledgements
 register_problem_acknowledgements(app,db,authenticated,csrf_token)
+
+from .resource_charts import register as register_resource_charts
+register_resource_charts(app,db,authenticated)
