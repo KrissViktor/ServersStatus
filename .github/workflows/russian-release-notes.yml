@@ -1,0 +1,22 @@
+name: Перевод описаний релизов на русский
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/russian-release-notes.yml'
+      - 'deploy/translate_release_notes.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: russian-release-notes
+  cancel-in-progress: false
+jobs:
+  translate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Проверить и перевести описания существующих релизов
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m deploy.translate_release_notes --apply

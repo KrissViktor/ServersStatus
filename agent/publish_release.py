@@ -8,6 +8,15 @@ import tempfile
 from agent.github_releases import PLATFORMS,validate_manifest
 
 REPO='KrissViktor/ServersStatus'
+RELEASE_NOTES='Сборка агента ServersStatus. Установка выполняется через панель управления.'
+
+
+def release_title(tag):
+    if tag=='agents-stable':return 'Агенты ServersStatus — стабильный канал'
+    for platform,label in [('windows','Windows'),('linux','Linux')]:
+        prefix='agent-'+platform+'-'
+        if tag.startswith(prefix):return 'Агент ServersStatus для '+label+' · '+tag[len(prefix):]
+    return tag
 
 
 def gh(*args,check=True):
@@ -16,7 +25,7 @@ def gh(*args,check=True):
 
 def ensure(tag,commit):
     if gh('release','view',tag,check=False).returncode==0:return
-    result=gh('release','create',tag,'--target',commit,'--title',tag,'--notes','ServersStatus agent build. Installation is controlled from the panel.','--prerelease',check=False)
+    result=gh('release','create',tag,'--target',commit,'--title',release_title(tag),'--notes',RELEASE_NOTES,'--prerelease',check=False)
     if result.returncode:gh('release','view',tag)  # Another platform may create the shared channel concurrently.
 
 
