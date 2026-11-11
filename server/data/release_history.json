@@ -1121,5 +1121,13 @@
     "tags": [
       "agent-linux-e8d8fa8e3e57"
     ]
+  },
+  {
+    "sha": "3db3697dc5d5e8d439c51eb5eb45465859fa68bf",
+    "published": 1794355459,
+    "title": "Таблица серверов, карта стабильности, лента событий, большой экран и новости",
+    "original": "Add table view, stability heatmap, timeline, wallboard, dependency map and release news",
+    "category": "portal",
+    "tags": []
   }
 ]
