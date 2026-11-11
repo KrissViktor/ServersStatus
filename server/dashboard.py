@@ -10,7 +10,7 @@ import time
 from urllib.parse import quote, urlencode
 from pathlib import Path
 
-CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')
+CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')+'\n'+Path(__file__).with_name('appearance.css').read_text(encoding='utf-8')
 PROTECTION_SCRIPT=Path(__file__).with_name('protection.js').read_text(encoding='utf-8')
 
 FOLD_SCRIPT=Path(__file__).with_name('folding.js').read_text(encoding='utf-8')
@@ -139,7 +139,9 @@ def page(content, refresh=False, protection_entry=False):
     if '<header class="topbar"' in content:
         links=[('/?reset=1','Серверы'),('/wallboard','Большой экран')]
         if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/problems?view=active','Проблемы'),('/updates','Обновления'),('/admin','Обслуживание')]
-        navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+esc(label)+'</a>' for url,label in links)
+        from .ui_icons import icon
+        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/updates':'update','/admin':'equipment'}
+        navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+icon(navigation_icons[url.split('?')[0]])+esc(label)+'</a>' for url,label in links)
         bar='<nav class="portal-navigation" aria-label="Основные разделы"><div class="portal-navigation-desktop">'+navigation+'</div><details class="portal-navigation-mobile"><summary>Разделы портала <span aria-hidden="true">⌄</span></summary><div>'+navigation+'</div></details></nav><nav class="portal-breadcrumbs" aria-label="Путь страницы" hidden></nav>'
         content=topbar_insert(content,bar,after=True)
     widget=''

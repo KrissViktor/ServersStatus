@@ -1,5 +1,11 @@
 """Small original line icons shared by the portal views."""
 PATHS={
+ 'server':'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M12 6.5h5m-5 11h5"/>',
+ 'layers':'<path d="m12 2 10 5-10 5L2 7Zm-10 10 10 5 10-5M2 17l10 5 10-5"/>',
+ 'users':'<circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2m2-17a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2"/>',
+ 'sparkles':'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5ZM20 2v4m-2-2h4"/>',
+ 'settings':'<path d="M4 3v4m0 4v10M12 3v10m0 4v4M20 3v4m0 4v10M1 7h6m2 10h6m2-10h6"/>',
+ 'message':'<path d="M21 13a7 7 0 0 1-7 7H5l-3 2V9a7 7 0 0 1 7-7h5a7 7 0 0 1 7 7ZM7 8h9M7 13h6"/>',
  'chart':'<path d="M3 3v18h18M6 15l4-6 4 3 6-8"/>',
  'compact':'<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/>',
  'filter':'<path d="M3 4h18l-7 8v7l-4 2v-9Z"/>',

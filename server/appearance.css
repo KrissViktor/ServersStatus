@@ -1,0 +1,259 @@
+/* Графит, цветные акценты и стекло; геометрия интерфейса задаётся dashboard.css. */
+:root {
+  --bg: #0d1119;
+  --panel: #161e2a;
+  --line: #a8bdd623;
+  --text: #e6edf7;
+  --muted: #a0aec2;
+  --green: #7adba7;
+  --yellow: #edc77e;
+  --red: #ff96a3;
+  --accent: #80b6ff;
+  --accent-soft: #5598ff16;
+  --violet: #bba5ff;
+  --surface: #161e2bda;
+  --surface-raised: #1a2433ed;
+  --field: #0b121d99;
+  --glass: blur(22px) saturate(125%);
+  --soft-shadow: 0 8px 28px #00000020, inset 0 1px 0 #ffffff05;
+  --float-shadow: 0 24px 80px #00000066, 0 2px 12px #00000033;
+  --ease: cubic-bezier(.2,.7,.2,1);
+}
+html { background: var(--bg); scrollbar-color: #7188a150 transparent; scrollbar-width: thin; }
+body {
+  background: radial-gradient(ellipse 75% 45% at 0% 0%, #4084ff14, transparent 78%),
+              radial-gradient(ellipse 65% 40% at 100% 5%, #a17bff10, transparent 78%),
+              var(--bg);
+  background-attachment: fixed;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: #659fff50; color: #ffffff; }
+a { text-underline-offset: 3px; }
+button, a, summary, input, select, textarea {
+  -webkit-tap-highlight-color: #80b6ff22;
+}
+button, a, summary {
+  transition: color 160ms var(--ease), background-color 160ms var(--ease),
+              border-color 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+button { background: linear-gradient(#ffffff06, #ffffff00), #1b2635; border-color: var(--line); box-shadow: inset 0 1px 0 #ffffff07; }
+button:hover { background-color: #26364b; border-color: #80b6ff55; }
+button:active:not(:disabled) { box-shadow: inset 0 2px 5px #00000030; }
+button:disabled { cursor: default; }
+:is(button, input, select, textarea, summary, a):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px;
+}
+input, select, textarea { background: var(--field); border-color: #a8bdd62c; color: var(--text); transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease); }
+input::placeholder, textarea::placeholder { color: #8191a8; opacity: 1; }
+input:focus, select:focus, textarea:focus { border-color: #80b6ff99; box-shadow: 0 0 0 3px #5598ff13; }
+select option { background: #182232; color: var(--text); }
+input[type=checkbox], input[type=radio] { accent-color: #80b6ff; }
+.primary, #ai-send { background: linear-gradient(#2372d6, #1b59b7); border-color: #609fff70; color: #ffffff; box-shadow: inset 0 1px 0 #ffffff1a, 0 3px 10px #145ac222; }
+.primary:hover, #ai-send:hover { background: linear-gradient(#2671d2, #2064c2); border-color: #90bdff99; }
+.delete-button { color: var(--red); background: #ff70820b; border-color: #ff708240; }
+.delete-button:hover { color: #ffc0c8; background: #ff70821a; border-color: #ff708280; }
+
+/* Верхняя панель и навигация, цвет обозначает раздел, а не состояние сервера. */
+.topbar { border-bottom-color: #a8bdd61a; }
+.brand { color: #f0f5ff; letter-spacing: -.35px; }
+.brand>span { color: #8ee0be; text-shadow: 0 0 12px #60d8b840; }
+.topbar>.nav-link { color: #b5c3d8; }
+.portal-navigation {
+  padding: 7px; border: 1px solid #a8bdd624; border-radius: 12px;
+  background: #1721329e; box-shadow: inset 0 1px 0 #ffffff06, 0 4px 16px #00000015;
+}
+.portal-navigation a { --nav-rgb: 128,182,255; gap: 7px; color: #afbdd1; border: 1px solid transparent; }
+.portal-navigation a .portal-icon { width: 16px; height: 16px; color: rgb(var(--nav-rgb)); opacity: .85; }
+.portal-navigation a[data-primary-page='/'] { --nav-rgb: 126,218,177; }
+.portal-navigation a[data-primary-page='/groups'] { --nav-rgb: 189,164,255; }
+.portal-navigation a[data-primary-page='/problems'] { --nav-rgb: 237,199,126; }
+.portal-navigation a[data-primary-page='/updates'] { --nav-rgb: 118,218,213; }
+.portal-navigation a[data-primary-page='/admin'] { --nav-rgb: 176,179,255; }
+.portal-navigation a:hover { background: #ffffff06; color: #eef4ff; }
+.portal-navigation a[aria-current=page] {
+  color: rgb(var(--nav-rgb)); background: rgba(var(--nav-rgb),.105);
+  border-color: rgba(var(--nav-rgb),.18); box-shadow: inset 0 1px 0 #ffffff05;
+}
+.portal-navigation a[aria-current=page] .portal-icon { opacity: 1; }
+.portal-breadcrumbs, .portal-breadcrumbs a { color: #94a6c0; }
+.portal-breadcrumbs [aria-current=page] { color: #c7d4e8; }
+.eyebrow { color: #a7b8d1; }
+h1 { color: #f0f5ff; }
+.heading .badge { box-shadow: inset 0 1px 0 #ffffff08; }
+
+/* Полупрозрачные поверхности без размытия каждой карточки в большом списке. */
+.server, .stat, .admin-card, .wallboard-tile, .login {
+  background: linear-gradient(145deg,#ffffff04 0%,transparent 80%),var(--surface);
+  border-color: var(--line); box-shadow: var(--soft-shadow);
+}
+.server { transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease); }
+.server-grid>.server:hover, .agent-card:hover, .user-card:hover { border-color: #90b8ee40; box-shadow: 0 10px 32px #00000028, inset 0 1px 0 #ffffff08; }
+.server.problem-server { background: linear-gradient(140deg,#e5ad5910,transparent 65%),#211e23e8; border-color: #d3a15850; }
+.server.problem-server .task-metric.task-cpu, .task-metric.task-cpu { background: linear-gradient(145deg,#498dff13,transparent 85%),#111c2bbf; border-color: #7dbbff29; }
+.server.problem-server .task-metric.task-ram, .task-metric.task-ram { background: linear-gradient(145deg,#ac84ff14,transparent 85%),#1b172abf; border-color: #b9a0ff2b; }
+.metric, .disk, .backup-rule, .stability-stats>div { background-color: #10182599; border-color: #a8bdd61e; box-shadow: inset 0 1px 0 #ffffff03; }
+.badge { border: 1px solid transparent; font-weight: 500; }
+.badge.normal { background: #3fb97813; color: var(--green); border-color: #58c78a28; }
+.badge.warning { background: #d8a44113; color: var(--yellow); border-color: #d8a4412b; }
+.badge.danger { background: #ef657b13; color: var(--red); border-color: #ef657b2b; }
+.badge.neutral { background: #8b9fbb12; color: #b2bfd2; border-color: #8b9fbb23; }
+.count { background: #7fa7dd16; color: #b4cae8; border: 1px solid #7fa7dd17; }
+.notice { background: #ef657b10; color: var(--red); border: 1px solid #ef657b24; }
+.status-note { background: #111a26a0; }
+.status-note.normal { border-color: #58c78a35; }
+.status-note.warning { border-color: #d8a44138; }
+.backup-alarm { background: linear-gradient(130deg,#9b30452e,#231a27f2); border-color: #ef657b70; box-shadow: 0 8px 28px #00000025; }
+.backup-alarm h2 { color: #ffb6c1; }
+.empty { border-color: #8da6c333; background: #8da6c305; }
+pre { background: #0b121dd9; border: 1px solid #a8bdd615; color: #cad6e9; }
+
+/* Переключатели остаются компактными и одинаковыми по высоте. */
+.overview-resultbar .layout-switch, .overview-resultbar .density-switch { background: #101826a8; border-color: var(--line); box-shadow: inset 0 1px 3px #00000018; }
+.overview-resultbar .overview-view-link { background: #182333a6; border-color: var(--line); color: #afbdd1; }
+.overview-resultbar [aria-pressed=true] { background: #74adff1b!important; color: #b2d3ff!important; box-shadow: inset 0 1px 0 #ffffff0b, 0 1px 4px #00000022; }
+.overview-resultbar .overview-view-link:hover { color: #d9e9ff; background: #22344c; border-color: #80b6ff4d; }
+.overview-view-link .portal-icon { color: #99baf0; }
+.overview-page .stats { background: #172132a6; border-color: var(--line); box-shadow: var(--soft-shadow); }
+.overview-page .stat-filter { border-right-color: #a8bdd61c; }
+.overview-page .stat-filter[data-overview-view=all] strong { color: var(--accent); }
+.overview-page .stat-filter[data-overview-view=online] strong { color: var(--green); }
+.overview-page .stat-filter[data-overview-view=offline] strong { color: var(--red); }
+.overview-page .stat-filter[data-overview-view=disks] strong { color: var(--yellow); }
+.overview-page .stat-filter[aria-current=true] { background: #80b6ff0c; box-shadow: inset 0 -2px #80b6ff90; }
+.overview-shortcut { background: #17213299; border-color: #a8bdd624; color: #d6e4f8; }
+.overview-shortcut:hover { background: #21334d; border-color: #80b6ff50; }
+.shortcut-icon { color: var(--accent); }
+.problem-summary { background: #111a278a; border-color: #9db4d024; }
+.overview-order-hint { color: #91a2bb; }
+.server-pin { color: #91a2bb; }
+.server-pin[aria-pressed=true] { color: #f1cc83; background: #d8a44110; }
+.problem-ack-button { color: #98deb5; border-color: #58c78a40; background: #3fb9780b; }
+.problem-ack-button:hover { background: #3fb97819; border-color: #58c78a70; }
+.problem-acknowledged { color: #94cbaa; }
+
+/* Информация о сервере и страницы управления. */
+.detail-tabs, .problem-tabs { background: #162132a3; border-color: #a8bdd624; box-shadow: inset 0 1px 0 #ffffff05; }
+.detail-tabs [aria-selected=true], .problem-tabs [aria-current=page] { background: #80b6ff17; border-color: #80b6ff40; color: #b9d8ff; box-shadow: inset 0 1px 0 #ffffff08; }
+.detail-tabs button:hover, .problem-tabs a:hover { background: #ffffff06; color: #dceaff; }
+.section-browser>.section-picker { background: #111c2cbb; border-color: #a8bdd624; }
+.section-picker button { color: #9daec6; }
+.section-picker button[aria-pressed=true] { color: #a6cdff; border-color: #80b6ff50; background: #80b6ff13; box-shadow: 0 2px 8px #00000018; }
+.server-information.section-browser .section-fold>section { background: #121d2b99; border-color: #a8bdd61e; }
+.section-browser-title { border-bottom-color: #a8bdd61c; }
+.section-browser-title .section-icon { color: #a7c9f4; }
+.server-fold { border-color: var(--line); box-shadow: var(--soft-shadow); background: var(--surface); }
+.server-fold>summary { background: #ffffff02; }
+.admin-card { --tile-color: #80b6ff; border-top-color: #80b6ff3b; transition: transform 180ms var(--ease), border-color 180ms var(--ease), background-color 180ms var(--ease), box-shadow 180ms var(--ease); }
+.admin-card:nth-child(3n+2) { --tile-color: #bba5ff; border-top-color: #bba5ff3b; }
+.admin-card:nth-child(3n+3) { --tile-color: #7adbbd; border-top-color: #7adbbd3b; }
+.admin-card h3 { color: #dce7f7; }
+.admin-card h3>span { color: var(--tile-color); }
+.admin-card:hover { transform: translateY(-2px); border-color: var(--tile-color); background-color: #1e2e44; box-shadow: 0 12px 30px #00000033; }
+.admin-category>h2 { color: #b0c9ed; }
+.group-server-option, .group-server-picker { background-color: #111a28a6; border-color: #a8bdd624; }
+.group-server-option:hover { border-color: #80b6ff50; background-color: #80b6ff08; }
+.group-server-option.is-selected { background: #80b6ff13; border-color: #80b6ff55; }
+.group-server-mark { color: #a4cfff; }
+.group-server-option.is-selected .group-server-mark { background: #3877ca; color: #ffffff; }
+.user-card .badge { box-shadow: none; }
+.form-actions { background: #19263aec; border-color: #a8bdd638; box-shadow: 0 8px 32px #0000003b; }
+.has-changes .form-actions { border-color: #e4b56b66; }
+.update-agent-row { background: var(--surface); border-color: var(--line); box-shadow: inset 0 1px 0 #ffffff04; }
+.update-agent-row>summary:hover { background: #80b6ff07; }
+.update-agent-row[open]>summary { background: #80b6ff06; border-bottom-color: #a8bdd61f; }
+.update-agent-row[data-update-priority='0'] { border-color: #edc77e55; }
+.update-agent-row[data-update-priority='1'] { border-color: #ff96a355; }
+
+/* Таблицы и схемы: под закреплёнными ячейками остаётся непрозрачная поверхность. */
+.metric-table th { color: #a9bed9; }
+.metric-table td, .metric-table th { border-bottom-color: #a8bdd61b; }
+.metric-table tbody tr:hover>td { background-color: #80b6ff06; }
+.metric-table th button { color: #b5c9e5; }
+.compare-table tr>:first-child, .daily-table tr>:first-child,
+.compare-table tr:first-child>*, .daily-table tr:first-child>*,
+.heatmap-table th:first-child, .heatmap-table thead th { background: var(--panel); }
+.fleet-table tbody tr:hover>td:first-child { background: var(--panel); }
+.dependency-canvas { border-color: var(--line); background: radial-gradient(#93b4e015 1px,transparent 1px) 0 0/20px 20px,#0e1622d9; box-shadow: inset 0 2px 12px #00000018; }
+.dependency-node rect { fill: #1b293b; stroke: #5f85b0; }
+.dependency-node text { fill: #e3ecfa; }
+.dependency-node .dependency-state { fill: #a6b7ce; }
+.dependency-node.node-danger rect { fill: #30212e; stroke: #b97388; }
+.dependency-node.node-warning rect { fill: #2a2730; stroke: #b59b64; }
+.dependency-node.node-focused rect { stroke: #9bc8ff; }
+.dependency-node.node-search-match rect { stroke: #edc77e; }
+.dependency-line { stroke: #799ac5; }
+.dependency-tools button[aria-pressed=true] { background: #80b6ff15; border-color: #80b6ff55; }
+.heatmap-scroll, .heat-day-panel { background: #131d2bd9; border-color: var(--line); }
+.timeline-symbol { background: var(--panel); border-color: var(--line); }
+.timeline-normal .timeline-symbol { color: var(--green); border-color: #58c78a40; }
+.timeline-warning .timeline-symbol { color: var(--yellow); border-color: #d8a44140; }
+.timeline-danger .timeline-symbol { color: var(--red); border-color: #ef657b40; }
+
+/* Стекло применяется к небольшим панелям, окнам и всплывающим подсказкам. */
+.news-popover, #protection-dialog, .ai-widget, .login, .report-export-menu .report-downloads {
+  background: var(--surface-raised); border-color: #b4c8e038; box-shadow: var(--float-shadow);
+}
+#protection-dialog::backdrop, #chart-detail::backdrop { background: #060b14b3; backdrop-filter: blur(5px); }
+#chart-detail { background: #0d1521f5; }
+#detail-chart-plot { background: linear-gradient(145deg,#1a29423d,#101927d9); border-color: var(--line); }
+#detail-point-info, .resource-inspector { background: linear-gradient(135deg,#4583df12,#1a2638d9); border-color: #80b6ff35; }
+.resource-toolbar select, .resource-toolbar button { background: #172436c9; border-color: var(--line); }
+.resource-toolbar button[aria-pressed=true] { color: #e5c891; border-color: #d8a44144; background: #d8a4410c; }
+.resource-tooltip, #detail-chart-tooltip { background: #172337f0; border-color: #95b3dc50; color: #e6edf7; box-shadow: 0 12px 36px #00000050; }
+.chart-grid, .resource-grid { stroke: #9fbbdf12; }
+.chart-label { fill: #9db1cb; }
+.ai-launcher { color: #d6e7ff; border-color: #8db8ff50; background: linear-gradient(135deg,#284e83ed,#323c6fed); box-shadow: 0 8px 28px #00000055, inset 0 1px 0 #ffffff14; }
+.ai-launcher:hover { background: linear-gradient(135deg,#3264a5,#454d8c); border-color: #a6c8ff80; }
+.ai-widget-head { background: #24345170; border-bottom-color: #a8bdd624; }
+.ai-toolbar { background: #182437bb; border-color: var(--line); }
+.ai-user { background: linear-gradient(135deg,#294a7155,#28355188); border-color: #80b6ff35; }
+.ai-assistant { background: #131f30d9; border-color: #a8bdd626; }
+#ai-form { background: #182437ee; border-color: #8ba9d244; box-shadow: 0 4px 20px #00000020; }
+#ai-form:focus-within { border-color: #80b6ff90; box-shadow: 0 0 0 3px #80b6ff0c; }
+.ai-empty>span { color: #bba5ff; text-shadow: 0 0 26px #a180ff40; }
+.ai-bubble>span, .ai-bubble header>span { color: #a9c5ed; }
+.login { border-radius: 22px; border-top-color: #a7c7ff45; }
+.login .logo { color: #a7ceff; text-shadow: 0 0 36px #6c9dfc35; }
+.login .eyebrow { color: #b6a7e6; }
+.credits { border-top-color: #a8bdd61a; color: #8293ad; }
+@supports (backdrop-filter: blur(1px)) {
+  .portal-navigation, .news-popover, #protection-dialog, .ai-widget, .login,
+  .report-export-menu .report-downloads, .resource-tooltip { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
+}
+
+/* Короткие появления без движения больших списков и без мигания при обновлении. */
+@keyframes portal-panel-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+#protection-dialog[open], .ai-widget:not([hidden]), .news-popover,
+.portal-navigation-mobile[open]>div { animation: portal-panel-in 180ms var(--ease) both; }
+@media(max-width:760px) {
+  body { background-attachment: scroll; }
+  .portal-navigation { padding: 3px; }
+  .portal-navigation-mobile>summary { color: #b8cbe5; }
+  .portal-navigation-mobile[open]>div { border-top: 1px solid #a8bdd61a; }
+  .portal-navigation a { gap: 6px; }
+  .login { margin-top: 8vh; }
+  #protection-dialog { padding: 24px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  *, *::before, *::after { animation: none!important; transition: none!important; scroll-behavior: auto!important; }
+  .admin-card:hover { transform: none; }
+}
+@media(prefers-reduced-transparency:reduce) {
+  :root { --surface: #161e2a; --surface-raised: #1a2433; --field: #0b121d; }
+  body { background: var(--bg); }
+  .server, .stat, .admin-card, .wallboard-tile, .portal-navigation, .news-popover, #protection-dialog, .ai-widget,
+  .login, .resource-tooltip, .report-export-menu .report-downloads { background: var(--panel); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media(prefers-contrast:more) {
+  :root { --line: #8496b3; --muted: #c0cfe5; --surface: #161e2a; --surface-raised: #1a2433; }
+  .server, .stat, input, select, textarea, .portal-navigation { border-color: var(--line); }
+  .resource-grid { stroke: #9fbbdf33; }
+}
+.admin-card h3 { display: flex; align-items: center; gap: 10px; }
+.admin-card-icon { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid #80b6ff25; border-radius: 9px; background: #80b6ff10; }
+.admin-card-icon .portal-icon { width: 18px; height: 18px; }
+.admin-card:nth-child(3n+2) .admin-card-icon { background: #bba5ff10; border-color: #bba5ff25; }
+.admin-card:nth-child(3n+3) .admin-card-icon { background: #7adbbd10; border-color: #7adbbd25; }
+.admin-card .admin-card-title { color: #dce7f7; }
+.admin-card-arrow { margin-left: auto; }
