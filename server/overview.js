@@ -7,10 +7,12 @@
   const results = document.getElementById('server-results');
   let timer, pending, version = 0;
 
+  const navigation=new URL(location.href);
+  const resetFilters=navigation.searchParams.get('reset')==='1';
   const scope='serversstatus.'+(form.dataset.preferenceScope||'local')+'.';
   const keys=['name','status','cpu','ram','disk','availability','age','problems'];
   let pins=new Set(),savedFilters=null;
-  try{const savedPins=JSON.parse(localStorage.getItem(scope+'pins')||'[]');if(Array.isArray(savedPins))pins=new Set(savedPins.filter(id=>typeof id==='string').slice(0,10000));savedFilters=JSON.parse(localStorage.getItem(scope+'filters')||'null')}catch(_){}
+  try{if(resetFilters)localStorage.removeItem(scope+'filters');const savedPins=JSON.parse(localStorage.getItem(scope+'pins')||'[]');if(Array.isArray(savedPins))pins=new Set(savedPins.filter(id=>typeof id==='string').slice(0,10000));savedFilters=JSON.parse(localStorage.getItem(scope+'filters')||'null')}catch(_){}
   let layout=new URLSearchParams(location.search).get('layout');
   let sortKey='name',sortDescending=false;
   try{layout=layout||localStorage.getItem(scope+'layout');const saved=JSON.parse(localStorage.getItem(scope+'sort')||'null');if(saved && keys.includes(saved.key)){sortKey=saved.key;sortDescending=!!saved.descending}}catch(_){}
@@ -146,7 +148,14 @@
   view.addEventListener('change', () => search(false));
   form.elements.group?.addEventListener('change',()=>search(false));
   form.addEventListener('submit', event => { event.preventDefault(); search(false); });
-  if(!location.search && savedFilters && typeof savedFilters==='object'){
+  if(resetFilters){
+    const filtered=!!(input.value||view.value!=='all'||form.elements.group?.value);
+    input.value='';view.value='all';if(form.elements.group)form.elements.group.value='';
+    navigation.searchParams.delete('reset');navigation.searchParams.delete('q');navigation.searchParams.delete('view');navigation.searchParams.delete('group');
+    history.replaceState(null,'',navigation.pathname+navigation.search);
+    if(filtered)search(false);
+  }
+  if(!resetFilters && !location.search && savedFilters && typeof savedFilters==='object'){
     input.value=typeof savedFilters.q==='string'?savedFilters.q.slice(0,200):'';
     if([...view.options].some(option=>option.value===savedFilters.view))view.value=savedFilters.view;
     if(form.elements.group && [...form.elements.group.options].some(option=>option.value===savedFilters.group))form.elements.group.value=savedFilters.group;

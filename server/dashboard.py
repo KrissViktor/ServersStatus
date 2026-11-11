@@ -101,7 +101,7 @@ def page(content, refresh=False, protection_entry=False):
     # Every section uses the same brand markup, including older page templates.
     def unify_header(match):
         body=match.group(1)
-        brand='<a class="brand" href="/" aria-label="ServersStatus — обзор серверов">S<span>●</span> <b>ServersStatus</b></a>'
+        brand='<a class="brand" href="/?reset=1" aria-label="ServersStatus — обзор серверов">S<span>●</span> <b>ServersStatus</b></a>'
         if re.search(r'<a class="brand"[^>]*>.*?</a>',body,re.S):
             body=re.sub(r'<a class="brand"[^>]*>.*?</a>',lambda _:brand,body,count=1,flags=re.S)
         else:body=brand+body
