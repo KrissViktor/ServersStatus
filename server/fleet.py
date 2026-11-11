@@ -34,7 +34,7 @@ def members(c,group=''):
 
 
 def group_select(c,selected=''):
-    return '<label>Группа<select name="group"><option value="">Все серверы</option>'+''.join('<option value="'+str(row['id'])+'" '+('selected' if str(row['id'])==str(selected) else '')+'>'+esc(row['name'])+'</option>' for row in groups(c))+'</select></label>'
+    return '<label>Группа<select name="group" data-auto-group><option value="">Все серверы</option>'+''.join('<option value="'+str(row['id'])+'" '+('selected' if str(row['id'])==str(selected) else '')+'>'+esc(row['name'])+'</option>' for row in groups(c))+'</select></label>'
 
 
 def stats(c,agent,start,end):
@@ -73,7 +73,6 @@ def register(app,db,authenticated,csrf_token):
             if any(agent not in available for agent in chosen):raise HTTPException(400,'Сервер отсутствует в выбранной группе')
             content=header('Сравнение серверов')+'<form id="compare-filter" class="fleet-filter">'+group_select(c,group)+'<label>Период<select name="period">'+''.join('<option value="'+p+'" '+('selected' if p==period else '')+'>'+label+'</option>' for p,(label,_,_) in PERIODS.items())+'</select></label><fieldset class="fleet-selection"><legend>Серверы · до 6</legend>'
             content+=''.join('<label class="check"><input type="checkbox" name="agents" value="'+esc(r['id'])+'" '+('checked' if r['id'] in chosen else '')+'>'+esc(r['name'])+'</label>' for r in all_rows)+'</fieldset><button>Сравнить</button></form>'
-            content+='''<script>document.querySelector('#compare-filter select[name=group]').addEventListener('change',event=>{const form=event.target.form;for(const input of form.querySelectorAll('input[name=agents]'))input.disabled=true;form.submit()});</script>'''
             from .report_exports import export_links
             content+=export_links('compare',{'agents':chosen,'period':period,'group':group})
             names={r['id']:r['name'] for r in all_rows};results=[];series=[]

@@ -1,5 +1,15 @@
 (() => {
   const path=location.pathname;
+  document.addEventListener('change',event=>{
+    const select=event.target.closest('select[data-auto-group]');const form=select?.form;
+    if(!form||form.method.toLowerCase()!=='get')return;
+    if(!form.reportValidity())return;
+    if(form.id==='compare-filter')for(const input of form.querySelectorAll('input[name=agents]'))input.disabled=true;
+    form.setAttribute('aria-busy','true');
+    if(form.requestSubmit)form.requestSubmit();else form.submit();
+  });
+
+  window.addEventListener('pageshow',()=>document.querySelectorAll('select[data-auto-group]').forEach(select=>select.form?.removeAttribute('aria-busy')));
   const areas={groups:['/groups'],compare:['/compare','/daily','/history/','/heatmap','/dependencies','/timeline/'],events:['/events','/problems'],updates:['/updates'],admin:['/admin','/agents','/settings/','/checks/','/users','/host','/portal-health','/portal-settings','/bot','/ai','/windows/','/console-access']};
   let active=path==='/wallboard'?'/wallboard':'/';
   for(const [area,paths] of Object.entries(areas))if(paths.some(prefix=>prefix.endsWith('/')?path.startsWith(prefix):path===prefix))active='/'+area;
