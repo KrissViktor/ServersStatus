@@ -251,3 +251,46 @@ body:has(#chart-detail[open]){overflow:hidden}
 .group-server-option{flex-direction:row}.group-server-copy{align-items:flex-start}.group-server-grid{align-content:start}
 .problem-action-row{display:flex;align-items:center;gap:12px}.problem-action-row>.problem-summary-row{flex:1;min-width:0}.problem-action-row>form{flex-shrink:0;margin:0}.problem-ack-button{font-size:10px;padding:5px 10px;border-color:#568b6b;background:#568b6b14;color:var(--green);white-space:nowrap}.problem-ack-hint{font-size:10px;line-height:1.6;margin:12px 0 4px}@media(max-width:600px){.problem-action-row{align-items:flex-start}.problem-action-row>.problem-summary-row{display:flex;flex-wrap:wrap}.problem-action-row>.problem-summary-row>span:last-child{white-space:normal;flex-basis:100%}.problem-action-row>form{padding-top:8px}}
 .card-problem{display:flex;align-items:center;justify-content:space-between;gap:10px}.card-problem>span{min-width:0;overflow-wrap:anywhere}.problem-ack-form{margin:0;flex-shrink:0}.compact-issues .problem-ack-button{font-size:10px;padding:4px 8px}.problem-acknowledged{display:inline-flex;align-items:center;font-size:10px;color:var(--muted);padding:4px 8px;border:1px solid var(--line);border-radius:6px;white-space:nowrap}.service-status{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}.tracked-service{gap:12px}.tracked-service>b{min-width:0;overflow-wrap:anywhere}.service-acknowledged{color:var(--muted)}.card-more-problems{margin:8px 0}.card-more-problems>summary{font-size:11px;color:var(--muted);cursor:pointer}.server-detail .problem-summary{margin:14px 0}.disk>.problem-ack-form,.backup>.problem-ack-form{margin-top:10px}.disk>.problem-acknowledged,.backup>.problem-acknowledged{margin-top:8px}@media(max-width:600px){.tracked-service{align-items:flex-start;flex-wrap:wrap}.service-status{justify-content:flex-start}.card-problem{align-items:flex-start}.card-problem .problem-ack-button{white-space:nowrap}}
+
+/* Shared typography and navigation across every portal section. */
+:root{
+  --font-ui:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --font-title:24px;
+  --font-nav:12px;
+}
+body{font-family:var(--font-ui)}
+button,input,select,textarea{font-family:inherit}
+:root h1{font-size:var(--font-title);font-weight:600;line-height:1.3;letter-spacing:-.5px;overflow-wrap:anywhere}
+:root .heading h1{font-size:var(--font-title);font-weight:600;line-height:1.3;letter-spacing:-.5px}
+:root .heading{margin:20px 0 18px}
+:root .topbar{
+  height:auto;min-height:56px;padding:8px 0;gap:8px 16px;
+  align-items:center;justify-content:flex-start;flex-wrap:wrap;
+  font-family:var(--font-ui);font-size:var(--font-nav);line-height:1.5;
+}
+:root .topbar .brand{
+  display:inline-flex;align-items:center;flex:none;gap:0;
+  margin:0 auto 0 0;font-family:inherit;font-size:18px;font-weight:500;
+  line-height:1.5;letter-spacing:0;white-space:nowrap;text-decoration:none;color:var(--text);
+}
+:root .topbar .brand span{font-size:10px;line-height:inherit}
+:root .topbar .brand b{font-size:16px;font-weight:600;margin-left:6px;line-height:inherit;letter-spacing:0}
+:root .topbar>a:not(.brand),:root .topbar .nav-link{
+  margin:0;font-family:inherit;font-size:var(--font-nav);font-weight:500;
+  line-height:1.5;letter-spacing:0;color:var(--text);text-decoration:none;
+}
+:root .topbar>a:not(.brand):hover{text-decoration:underline}
+:root .topbar form{margin:0}
+:root .topbar form button{
+  font-family:inherit;font-size:var(--font-nav);font-weight:500;line-height:1.5;
+  letter-spacing:0;min-height:34px;padding:6px 12px;
+}
+:root .topbar+h1{margin:20px 0 18px}
+@media(max-width:760px){
+  :root{--font-title:22px;--font-nav:11px}
+  :root .topbar{min-height:50px;padding:7px 0;gap:8px 12px}
+  :root .topbar .brand{font-size:16px;flex-basis:auto}
+  :root .topbar .brand b{font-size:14px;margin-left:5px}
+  :root .heading{margin:16px 0 14px}
+  :root .topbar+h1{margin:16px 0 14px}
+}

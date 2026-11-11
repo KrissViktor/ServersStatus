@@ -5,6 +5,7 @@ from .access import can_history,can_console
 import html
 import json
 import math
+import re
 import time
 from urllib.parse import quote, urlencode
 from pathlib import Path
@@ -97,6 +98,15 @@ def memory_description(data):
     return size(used) + ' / ' + size(total) + ' · занято / всего'
 
 def page(content, refresh=False, protection_entry=False):
+    # Every section uses the same brand markup, including older page templates.
+    def unify_header(match):
+        body=match.group(1)
+        brand='<a class="brand" href="/" aria-label="ServersStatus — обзор серверов">S<span>●</span> <b>ServersStatus</b></a>'
+        if re.search(r'<a class="brand"[^>]*>.*?</a>',body,re.S):
+            body=re.sub(r'<a class="brand"[^>]*>.*?</a>',lambda _:brand,body,count=1,flags=re.S)
+        else:body=brand+body
+        return '<header class="topbar">'+body+'</header>'
+    content=re.sub(r'<header class="topbar">(.*?)</header>',unify_header,content,count=1,flags=re.S)
     if '<header class="topbar"' in content:
         if can_history() and 'href="/admin"' not in content:
             content=content.replace('</header>','<a class="nav-link" href="/admin">Администрирование</a></header>',1)
