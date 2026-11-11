@@ -57,7 +57,7 @@ def diagram(rows,edges,group_ids=None):
         result+='<a href="/servers/'+esc(quote(key,safe=''))+'"><g class="dependency-node node-'+state+'"><title>'+esc(row['name'])+'</title><rect x="'+str(x)+'" y="'+str(y)+'" width="190" height="68" rx="11"/><circle cx="'+str(x+16)+'" cy="'+str(y+20)+'" r="4"/><text x="'+str(x+29)+'" y="'+str(y+24)+'">'+esc(row['name'][:23])+'</text><text class="dependency-state" x="'+str(x+14)+'" y="'+str(y+49)+'">'+esc(label)+'</text></g></a>'
     result+='</svg></div>'
     if omitted:result+='<p class="muted">На схеме показаны 60 серверов. Выберите группу, чтобы сузить обзор.</p>'
-    return result+'<p class="muted legend">A → B: сервер A зависит от B. Влияние — предположение по вручную заданным связям, не подтверждение сбоя приложения. Циклические связи допускаются. По группе видны также соседние узлы.</p>'
+    return result+'<details class="server dependency-help"><summary>Как читать схему связей</summary><div class="dependency-help-grid"><div><strong>A → B</strong><p>Сервер A зависит от сервера B. Нажмите на сервер, чтобы открыть его карточку.</p></div><div><strong>Возможное влияние</strong><p>Предположение по вручную заданным связям, не подтверждение сбоя приложения.</p></div><div><strong>Расположение серверов</strong><p>Серверы без стрелок находятся слева под связанными узлами. По группе видны также соседние узлы. Циклические связи допускаются.</p></div></div></details>'
 
 
 def register(app,db,authenticated,csrf_token):
@@ -72,11 +72,12 @@ def register(app,db,authenticated,csrf_token):
             csrf='<input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
             content+='<details class="server dependency-editor"><summary>Добавить или изменить связь</summary><form method="post">'+csrf+'<div class="rule-grid">'
             for field,label in [('dependent','Зависимый сервер'),('provider','От какого сервера зависит')]:content+='<label>'+label+'<select name="'+field+'">'+''.join('<option value="'+esc(row['id'])+'">'+esc(row['name'])+'</option>' for row in rows)+'</select></label>'
-            content+='<label>Назначение (необязательно)<input name="label" maxlength="80" placeholder="SQL, файловое хранилище…"></label></div><button name="mode" value="save">Сохранить связь</button></form></details><div class="dependency-list">'
+            content+='<label>Назначение (необязательно)<input name="label" maxlength="80" placeholder="SQL, файловое хранилище…"></label></div><button name="mode" value="save">Сохранить связь</button></form></details><details class="server dependency-records"><summary>Настроенные связи <span class="count">'+str(len(edges))+'</span></summary><div class="dependency-list">'
             names={row['id']:row['name'] for row in rows}
             for edge in edges:
                 content+='<form method="post" class="dependency-list-row">'+csrf+'<input type="hidden" name="dependent" value="'+esc(edge['dependent'])+'"><input type="hidden" name="provider" value="'+esc(edge['provider'])+'"><span>'+esc(names.get(edge['dependent'],edge['dependent']))+' → '+esc(names.get(edge['provider'],edge['provider']))+(' · '+esc(edge['label']) if edge['label'] else '')+'</span><button name="mode" value="delete" aria-label="Удалить связь '+esc(names.get(edge['dependent'],edge['dependent'])+' → '+names.get(edge['provider'],edge['provider']))+'">Удалить</button></form>'
-            return HTMLResponse(page(content+'</div>'))
+            if not edges:content+='<p class="muted">Связей пока нет. Добавьте зависимость между двумя серверами.</p>'
+            return HTMLResponse(page(content+'</div></details>'))
 
     @app.post('/dependencies')
     async def save(request:Request):

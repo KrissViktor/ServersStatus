@@ -1,5 +1,6 @@
 """Server groups, period comparison and daily portal reports."""
 import json
+from pathlib import Path
 import time
 from datetime import datetime,timedelta,timezone
 from urllib.parse import quote,parse_qs,urlencode
@@ -111,9 +112,9 @@ def register(app,db,authenticated,csrf_token):
                 assigned={r['agent'] for r in c.execute('SELECT agent FROM server_group_members WHERE group_id=?',(group['id'],))}
                 states=[c.execute('SELECT received FROM current_reports WHERE agent=?',(agent,)).fetchone() for agent in assigned]
                 online=sum(row is not None and now-row[0]<180 for row in states)
-                content+='<section class="server"><h2>'+esc(group['name'])+' <span class="count">'+str(len(assigned))+'</span></h2><p class="muted">На связи: '+str(online)+' · <a class="nav-link" href="/?group='+str(group['id'])+'">Карточки</a> · <a class="nav-link" href="/compare?group='+str(group['id'])+'">Сравнить</a> · <a class="nav-link" href="/daily?group='+str(group['id'])+'">Сутки</a></p><form method="post"><input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'"><input type="hidden" name="group" value="'+str(group['id'])+'"><div class="fleet-selection">'
-                content+=''.join('<label class="check"><input type="checkbox" name="agents" value="'+esc(row['id'])+'" '+('checked' if row['id'] in assigned else '')+'>'+esc(row['name'])+'</label>' for row in rows)+'</div><button name="mode" value="members">Сохранить состав</button><button name="mode" value="delete" class="quiet">Удалить группу</button></form></section>'
-        return HTMLResponse(page(content))
+                content+='<section class="server group-card"><h2>'+esc(group['name'])+' <span class="count">'+str(len(assigned))+'</span></h2><p class="muted">На связи: '+str(online)+' · <a class="nav-link" href="/?group='+str(group['id'])+'">Карточки</a> · <a class="nav-link" href="/compare?group='+str(group['id'])+'">Сравнить</a> · <a class="nav-link" href="/daily?group='+str(group['id'])+'">Сутки</a></p><details class="group-editor"><summary>Изменить состав <span class="count">'+str(len(assigned))+'</span></summary><form method="post" data-group-editor><input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'"><input type="hidden" name="group" value="'+str(group['id'])+'"><div class="group-toolbar"><label>Найти сервер<input type="search" data-group-search placeholder="Название или ID сервера" autocomplete="off"></label><span class="group-selection-count" data-group-count role="status"></span><div class="group-actions"><button type="button" class="quiet" data-group-select="all">Выбрать найденные</button><button type="button" class="quiet" data-group-select="none">Снять выбор найденных</button></div></div><div class="group-server-grid">'
+                content+=''.join('<label class="group-server-option" data-group-option><input type="checkbox" name="agents" value="'+esc(row['id'])+'" '+('checked' if row['id'] in assigned else '')+'><span class="group-server-copy"><strong>'+esc(row['name'])+'</strong><small>'+esc(row['id'])+'</small></span><span class="group-server-mark" aria-hidden="true">✓</span></label>' for row in rows)+'</div><p class="muted" data-group-empty hidden>По вашему запросу серверы не найдены.</p>'+('' if rows else '<p class="muted">Сначала добавьте серверы в разделе «Управление агентами».</p>')+'<div class="group-footer"><button name="mode" value="members">Сохранить состав</button><button name="mode" value="delete" class="quiet">Удалить группу</button></div></form></details></section>'
+        return HTMLResponse(page(content+'<script>'+Path(__file__).with_name('groups.js').read_text(encoding='utf-8')+'</script>'))
 
     @app.post('/groups')
     async def group_save(request:Request):
