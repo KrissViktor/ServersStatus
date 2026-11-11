@@ -18,7 +18,21 @@ def attach(c, rows, now):
     states={}
     for item in active(c):
         states.setdefault(item['agent'],{})[item['key']]={'id':item['id'],'acknowledged':item['acknowledged'] is not None}
-    for row in rows:row['problem_states']=states.get(row['id'],{})
+    from .incident_history import current
+    for row in rows:
+        row['problem_states']=states.get(row['id'],{})
+        confirmed,_,_=current([row],[],now)
+        for key,state in row['problem_states'].items():state['confirmable']=key in confirmed
+
+
+def control(row,key,csrf='',return_to='/'):
+    from .dashboard import esc
+    from .access import can_history
+    state=dict(row).get('problem_states',{}).get(key,{})
+    if state.get('acknowledged'):
+        return '<span class="problem-acknowledged" title="Игнорируется до исчезновения и повторного появления">✓ Всё окей</span>'
+    if not (can_history() and csrf and state.get('id') and state.get('confirmable')):return ''
+    return '<form class="problem-ack-form" method="post" action="/problems/acknowledge"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="incident" value="'+str(state['id'])+'"><input type="hidden" name="return_to" value="'+esc(return_to)+'"><button class="problem-ack-button" title="Игнорировать только этот случай проблемы">Всё окей</button></form>'
 
 
 def register(app,db,authenticated,csrf_token):
@@ -54,4 +68,6 @@ def register(app,db,authenticated,csrf_token):
                     c.execute('UPDATE telegram_state SET sent=0,next_attempt=0 WHERE key=?',(incident['key'],))
                 from .events import record
                 record(c,incident['agent'],'configuration','Проблема отмечена «Всё окей»: '+incident['message'])
-        return RedirectResponse('/',303)
+        from urllib.parse import quote
+        destination='/servers/'+quote(incident['agent'],safe='')
+        return RedirectResponse(destination if form.get('return_to',[''])[0]==destination else '/',303)

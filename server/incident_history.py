@@ -79,7 +79,7 @@ def history_html(c,agent,start,end):
     return result
 
 
-def summary_html(rows,now,csrf=''):
+def summary_html(rows,now,csrf='',return_to='/'):
     from .dashboard import esc
     from .access import can_history
     from urllib.parse import quote
@@ -109,9 +109,9 @@ def summary_html(rows,now,csrf=''):
         short=' '.join(short.split())
         if len(short)>140:short=short[:137]+'…'
         link='<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'" title="'+esc(message)+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(names.get(agent,agent))+'</b><span>'+esc(short)+'</span></a>'
-        state=states.get(key,{})
-        if not (csrf and can_history() and state.get('id')):return link
-        return '<div class="problem-action-row">'+link+'<form method="post" action="/problems/acknowledge"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="incident" value="'+str(state['id'])+'"><button class="problem-ack-button" title="Игнорировать эту проблему до исчезновения и повторного появления">Всё окей</button></form></div>'
+        from .problem_acknowledgements import control
+        action=control(next(row for row in rows if row['id']==agent),key,csrf,return_to)
+        return '<div class="problem-action-row">'+link+action+'</div>' if action else link
     content+='<details class="problem-more" data-fold-key="overview-problems"><summary>Посмотреть проблемы <span aria-hidden="true">⌄</span></summary>'+''.join(line(item) for item in items)
     content+='<p class="muted problem-ack-hint">«Всё окей» скрывает только текущий случай для всех пользователей. После исчезновения проблема снова появится при повторении.</p></details>'
     return content+'</section>'

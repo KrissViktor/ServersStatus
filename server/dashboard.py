@@ -158,7 +158,7 @@ def backup_alerts(rows, now):
     return '<section class="backup-alarm" role="alert"><p class="eyebrow">ТРЕБУЕТСЯ ВНИМАНИЕ</p><h2>Ошибка резервного копирования</h2><ul>' + ''.join(items) + '</ul></section>'
 
 
-def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
+def server_card(row, now, rdp_access=None, historical=False, forecasts=None, csrf=""):
     data = json.loads(row['data']) if row['data'] else {}
     data['disks'] = monitored_disks(data)
     age = max(0, now - row['received']) if row['received'] is not None else None
@@ -183,6 +183,12 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
         content += f'<div class="timing"><span>Последний отчёт: <b>{duration(age)} назад</b></span><span>Время работы: <b>{duration(data.get("uptime_seconds"))}</b></span></div>'
     if not online:
         content += '<p class="notice">Данные устарели: агент не присылал отчёт более 3 минут.</p>'
+    if not historical:
+        from .incident_history import summary_html
+        content+=summary_html([row],now,csrf,'/servers/'+quote(row['id'],safe=''))
+    from .problem_acknowledgements import control
+    from .incidents import service_key,disk_key,incident_key
+    return_to='/servers/'+quote(row['id'],safe='')
     points=resource_points(row,data)
     from .cpu_cores import controls as cpu_controls
     content += '<div class="metrics">' + meter('Процессор', data.get('cpu_percent'), cpu_description(data),points,'cpu',now,snapshot=historical,extra=cpu_controls(row,historical)) + meter('Оперативная память', data.get('memory_percent'), memory_description(data),points,'ram',now,snapshot=historical) + '</div><div class="server-information"><section><h3>Диски <span class="count">' + str(len(monitored_disks(data))) + '</span></h3><div class="disks">'
@@ -192,6 +198,7 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
         if forecasts is not None and can_history():
             from .forecast import disk_forecast_html
             content+=disk_forecast_html(forecasts.get(disk.get('path'),{'status':'insufficient'}),disk,not online)
+        if not historical and percent>=85:content+=control(row,disk_key(row['id'],str(disk.get('path',''))),csrf,return_to)
         content+='</div>'
     content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section>'
     from .temperatures import section as temperature_section
@@ -203,7 +210,10 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
         state = service.get('status', 'unavailable')
         labels = {'running': '🟢 Работает', 'stopped': '🔴 Остановлена', 'paused': '🟡 На паузе', 'failed':'🔴 Ошибка','start_pending':'🟠 Запускается','stop_pending':'🟠 Останавливается','continue_pending':'🟠 Возобновляется','pause_pending':'🟠 Переход на паузу','unavailable': '⚪ Недоступна'}
         service_file = ('<small class="service-executable" title="'+('Процесс' if service.get('executable_source')=='process' else 'Из конфигурации службы')+'">'+esc(service['executable'])+'</small>') if service.get('executable') else ''
-        content += f'<div class="list-row"><b>{esc(service.get("display_name") or service.get("name", "—"))}{service_file}</b><span class="badge {"normal" if state == "running" else "warning"}">{esc(labels.get(state, state))}</span></div>'
+        key=service_key(row['id'],service.get('name',''))
+        acknowledged=not historical and dict(row).get('problem_states',{}).get(key,{}).get('acknowledged')
+        service_control=control(row,key,csrf,return_to) if not historical and state!='running' else ''
+        content += f'<div class="list-row tracked-service{ " service-acknowledged" if acknowledged else ""}" data-service-name="{esc(service.get("name",""))}"><b>{esc(service.get("display_name") or service.get("name", "—"))}{service_file}</b><div class="service-status"><span class="badge {"normal" if state == "running" else "neutral" if acknowledged else "warning"}">{esc(labels.get(state, state))}</span>'+service_control+'</div></div>'
     content += '</section><section><h3>Резервные копии</h3>'
     backups = data.get('backups', [])
     if not backups:
@@ -223,8 +233,11 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None):
             content += f'<p>Ожидается копия за 1-е число месяца от {esc(backup["expected_since"])}</p>'
         if backup.get('file'):
             content += f'<p>{esc(backup["file"])} · {size(backup.get("size_bytes"))} · {duration(backup.get("age_seconds"))} назад</p>'
+        backup_key=incident_key(row['id'],backup.get('path',backup.get('name','')))
+        acknowledged=not historical and dict(row).get('problem_states',{}).get(backup_key,{}).get('acknowledged')
         for problem in problems:
-            content += '<p class="backup-error">' + esc(problem) + '</p>'
+            content += '<p class="'+('muted' if acknowledged else 'backup-error')+'">' + esc(problem) + '</p>'
+        if not historical and problems:content+=control(row,backup_key,csrf,return_to)
         content += '</div>'
     if backups:
         content += '<p class="muted legend">Свежесть файла не подтверждает возможность восстановления SQL.</p>'
@@ -283,8 +296,8 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf=''):
     selected = [row for row in rows if matches(row, now, q, view) and (not group or group in [item['id'] for item in dict(row).get('groups',[])])]
     active=[row for row in selected if dict(row).get('active',1)]
     inactive=[row for row in selected if not dict(row).get('active',1)]
-    cards='<div class="server-grid" data-server-group="active">'+''.join(compact_card(row,now) for row in active)+'</div>'
-    cards+='<details id="inactive-servers" class="inactive-servers" '+('hidden' if not inactive else '')+' '+('open' if inactive and (q or view!='all') else '')+'><summary>Не активные <span class="count">'+str(len(inactive))+'</span></summary><div class="server-grid" data-server-group="inactive">'+''.join(compact_card(row,now) for row in inactive)+'</div></details>'
+    cards='<div class="server-grid" data-server-group="active">'+''.join(compact_card(row,now,csrf) for row in active)+'</div>'
+    cards+='<details id="inactive-servers" class="inactive-servers" '+('hidden' if not inactive else '')+' '+('open' if inactive and (q or view!='all') else '')+'><summary>Не активные <span class="count">'+str(len(inactive))+'</span></summary><div class="server-grid" data-server-group="inactive">'+''.join(compact_card(row,now,csrf) for row in inactive)+'</div></details>'
     from .overview_table import render as table_render
     cards+=table_render(selected,now)
     cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'

@@ -10,34 +10,45 @@ from urllib.parse import quote
 from .dashboard import esc, page, duration, size, number, meter, server_card, backup_problems, cpu_description, memory_description, resource_points
 
 
-def issues(row, now):
+def issue_entries(row, now):
     data = json.loads(row['data']) if row['data'] else {}
     elapsed = max(0, now - row['received']) if row['received'] is not None else 0
+    from .incidents import disk_key,incident_key,service_key
+    import hashlib
     problems = []
+    def add(key,message):
+        if not dict(row).get('problem_states',{}).get(key,{}).get('acknowledged'):
+            problems.append((key,message))
     if row['received'] is not None and elapsed >= 180:
-        problems.append('Нет связи с агентом')
+        add('connection:'+row['id'],'Нет связи с агентом')
     if number(data.get('cpu_percent')) >= 95:
-        problems.append('Высокая загрузка CPU')
+        add('cpu_percent:'+row['id'],'Высокая загрузка CPU')
     if number(data.get('memory_percent')) >= 95:
-        problems.append('Мало свободной RAM')
+        add('memory_percent:'+row['id'],'Мало свободной RAM')
     for disk in monitored_disks(data):
         if number(disk.get('used_percent')) >= 85:
-            problems.append('Заполнен диск ' + str(disk.get('path', '')))
+            add(disk_key(row['id'],str(disk.get('path',''))),'Заполнен диск ' + str(disk.get('path', '')))
     for backup in data.get('backups', []):
         if backup_problems(backup, elapsed):
-            problems.append('Ошибка бэкапа: ' + str(backup.get('name') or backup.get('path', '')))
+            add(incident_key(row['id'],backup.get('path',backup.get('name',''))),'Ошибка бэкапа: ' + str(backup.get('name') or backup.get('path', '')))
     for service in data.get('services', []):
         if service.get('status') != 'running':
-            problems.append('Служба не работает: ' + str(service.get('name', '')))
+            add(service_key(row['id'],service.get('name','')),'Служба не работает: ' + str(service.get('name', '')))
     from .stability import agent_health
     age,errors=agent_health(data,row['received'],now)
     if age is not None and age<180:
-        if age>30:problems.append('Задержка отчётов агента')
-        if errors:problems.append('Недоступен сбор: '+', '.join(errors))
+        if age>30:add('report_delay:'+row['id'],'Задержка отчётов агента')
+        for error in errors:add('collector:'+row['id']+':'+hashlib.sha256(error.encode()).hexdigest(),'Недоступен сбор: '+error)
     checks=data.get('application_checks') or {}
     if elapsed<180 and checks.get('checked_at') is not None and now-checks['checked_at']<180:
-        problems.extend('Не отвечает приложение: '+item['name'] for item in checks.get('items',[]) if item.get('status')=='failed')
+        for item in checks.get('items',[]):
+            if item.get('status')=='failed':add('application:'+row['id']+':'+item['id'],'Не отвечает приложение: '+item['name'])
     return problems
+
+
+
+def issues(row,now):
+    return [message for _,message in issue_entries(row,now)]
 
 
 def matches(row, now, query, view):
@@ -65,7 +76,7 @@ def search_form(query, view, shown, total, rows=None, group=''):
     return f'<form class="searchbar" method="get" action="/"><label>Поиск<input aria-label="Поиск по названию или имени" name="q" value="{esc(query)}" maxlength="200" placeholder="SQL, ERP, WIN-…" type="search"></label><label>Показать<select name="view">{options}</select></label>{group_control}<noscript><button>Найти</button></noscript><a class="nav-link" href="/">Сбросить</a></form><p class="muted search-status" role="status" aria-live="polite"></p><div class="overview-resultbar"><p class="muted result-count">Показано {shown} из {total}</p>{tools}</div>'
 
 
-def compact_card(row, now):
+def compact_card(row, now, csrf=""):
     data = json.loads(row['data']) if row['data'] else {}
     hostname = data.get('hostname') or row['id']
     title = dict(row).get('display_name') or hostname
@@ -85,11 +96,16 @@ def compact_card(row, now):
     for disk in monitored_disks(data):
         content += '<p><b>' + esc(disk.get('path', '')) + '</b><span>' + size(disk.get('free_bytes')) + ' свободно · ' + f'{number(disk.get("used_percent")):.1f}% занято' + '</span></p>'
     content += '</div>'
-    problems = issues(row, now)
+    from .problem_acknowledgements import control
+    problems = issue_entries(row, now)
     if problems:
-        content += '<ul class="compact-issues">' + ''.join('<li>' + esc(p) + '</li>' for p in problems[:3]) + '</ul>'
-        if len(problems) > 3:
-            content += f'<p class="muted">Ещё проблем: {len(problems)-3}</p>'
+        def problem_line(item):
+            key,message=item
+            return '<li class="card-problem"><span>'+esc(message)+'</span>'+control(row,key,csrf)+'</li>'
+        content += '<ul class="compact-issues">' + ''.join(problem_line(item) for item in problems[:3]) + '</ul>'
+        if len(problems)>3:
+            content+='<details class="card-more-problems"><summary>Ещё проблем: '+str(len(problems)-3)+'</summary><ul class="compact-issues">'+''.join(problem_line(item) for item in problems[3:])+'</ul></details>'
+
     else:
         content += '<p class="text-normal compact-ok">Проблем по полученным данным нет</p>'
     if can_history() and 'availability' in dict(row):
@@ -114,7 +130,7 @@ def detail_page(row, csrf,console_access=False):
     else:content+='<span class="panel-name-value">'+esc(name)+'</span>'
     content+='</div>'
     if can_history():content+='<nav class="detail-analysis-links"><a class="nav-link" href="/timeline/'+esc(identifier)+'">◷ Лента событий</a><a class="nav-link" href="/dependencies">Связи серверов</a></nav>'
-    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details" hidden>Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}))
+    content += '<div class="server-detail"><div class="detail-toolbar"><p class="muted">↻ Автообновление · 10 с</p><button type="button" id="collapse-details" hidden>Свернуть подробности</button></div><div id="server-live" data-refresh data-refresh-interval="10000">' + server_card(row, time.time(), {'agent':row['id'],'csrf':csrf} if console_access else None,forecasts=dict(row).get('forecasts',{}),csrf=csrf)
     content+='</div>'
     from .task_manager import section as task_section,assets as task_assets
     content += task_section(row['id'])+task_assets()

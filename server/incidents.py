@@ -13,6 +13,10 @@ def disk_key(agent,path):
     return 'disk:' + hashlib.sha256((agent+'\\0'+path).encode()).hexdigest()
 
 
+def service_key(agent,name):
+    return 'service:' + hashlib.sha256((agent+'\\0'+name).encode()).hexdigest()
+
+
 def evaluate(rows, existing, now, disk_threshold=85):
     incidents, valid, checked = {}, set(), set()
     for row in rows:
@@ -51,7 +55,7 @@ def evaluate(rows, existing, now, disk_threshold=85):
                 incidents[key] = (agent, f'{name} ({agent}) · {label}\n' + '\n'.join(problems))
         for service in report.get('services', []):
             service_name = service.get('name', '')
-            key = 'service:' + hashlib.sha256((agent+'\\0'+service_name).encode()).hexdigest()
+            key = service_key(agent,service_name)
             valid.add(key)
             checked.add(key)
             if service.get('status') != 'running':

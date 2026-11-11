@@ -129,3 +129,55 @@ class ProblemAcknowledgementTest(unittest.TestCase):
         with patch('server.notifications.delivery_window',return_value=True):tick(a.db,sent.append,time.time())
         self.assertEqual(len(sent),1)
         self.assertIn('служба SQL',sent[0])
+
+    def test_card_actions_share_episode_with_summary_and_filter(self):
+        import re
+        self.report(cpu_percent=99)
+        episode=self.episode('cpu_percent')
+        compact=lambda html:re.search(r'<article[^>]*data-server-id="pc".*?</article>',html,re.S).group(0)
+        html=compact(self.client.get('/').text)
+        self.assertIn('Высокая загрузка CPU',html)
+        self.assertIn('action="/problems/acknowledge"',html)
+        self.acknowledge(episode)
+        html=compact(self.client.get('/').text)
+        self.assertNotIn('Высокая загрузка CPU',html)
+        self.assertNotIn('problem-server',html)
+        self.assertNotIn('data-server-id="pc"',self.client.get('/?view=problems').text)
+        self.report(cpu_percent=10);self.report(cpu_percent=98)
+        self.assertIn('Высокая загрузка CPU',compact(self.client.get('/').text))
+
+    def test_tracked_services_show_control_and_shared_acknowledgement(self):
+        import re
+        self.report(services=[{'name':'SQL','display_name':'SQL <database>','status':'stopped'}, {'name':'healthy','status':'running'}])
+        episode=self.episode('service')
+        html=self.client.get('/servers/pc').text
+        row=lambda name,html:re.search(r'<div class="list-row tracked-service[^>]*data-service-name="'+name+r'".*?</form>.*?</div>',html,re.S).group(0)
+        service=row('SQL',html)
+        self.assertIn('SQL &lt;database&gt;',service)
+        self.assertIn('name="incident" value="'+str(episode['id'])+'"',service)
+        self.assertIn('name="return_to" value="/servers/pc"',service)
+        response=self.client.post('/problems/acknowledge',data={'csrf':self.csrf,'incident':episode['id'],'return_to':'/servers/pc'},follow_redirects=False)
+        self.assertEqual(response.status_code,303);self.assertEqual(response.headers['location'],'/servers/pc')
+        html=self.client.get('/servers/pc').text
+        marked=re.search(r'<div class="list-row tracked-service service-acknowledged".*?</div>',html,re.S).group(0)
+        self.assertIn('Остановлена',marked);self.assertIn('✓ Всё окей',marked)
+        self.assertNotIn('<form',marked)
+        self.assertNotIn('Служба не работает: SQL',self.client.get('/').text)
+        self.report(services=[{'name':'SQL','status':'running'}])
+        self.report(services=[{'name':'SQL','status':'stopped'}])
+        self.assertIn('action="/problems/acknowledge"',row('SQL',self.client.get('/servers/pc').text))
+
+    def test_detail_and_snapshots_do_not_expose_actions_to_viewers(self):
+        self.report(cpu_percent=99,services=[{'name':'SQL','status':'stopped'}])
+        for path in ['/', '/servers/pc']:
+            self.assertNotIn('action="/problems/acknowledge"',self.fixture.clients['reader'].get(path).text)
+        from server.dashboard import server_card
+        html=server_card({'id':'pc','data':json.dumps(self.data),'received':time.time()},time.time(),historical=True,csrf=self.csrf)
+        self.assertNotIn('action="/problems/acknowledge"',html)
+        self.assertNotIn('problem-acknowledged',html)
+
+    def test_redirect_is_limited_to_same_server(self):
+        self.report(cpu_percent=99);episode=self.episode('cpu_percent')
+        for target in ['https://outside.example','//outside.example','/servers/other']:
+            response=self.client.post('/problems/acknowledge',data={'csrf':self.csrf,'incident':episode['id'],'return_to':target},follow_redirects=False)
+            self.assertEqual(response.headers['location'],'/')
