@@ -15,7 +15,7 @@ def process_events(db, now=None):
     now = time.time() if now is None else now
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
-        rows = c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id').fetchall()
+        rows = c.execute('SELECT a.id,p.display_name,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_profiles p ON p.agent=a.id').fetchall()
         existing = c.execute('SELECT * FROM event_state').fetchall()
         from .incident_history import sync
         sync(c,rows,now)

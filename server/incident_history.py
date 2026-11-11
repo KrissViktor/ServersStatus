@@ -1,4 +1,5 @@
 """Durable incident intervals, independent of notifications and page visits."""
+from .server_names import display_name
 import json
 from .incidents import evaluate
 
@@ -89,13 +90,13 @@ def summary_html(rows,now):
     content='<section class="problem-summary"><header><h2>Проблемы <span class="count">'+str(len(items))+'</span></h2>'
     if not items:return content+'<span class="text-normal">Всё в порядке</span></header></section>'
     content+='<span class="problem-counts">'+esc(' · '.join(labels[i]+': '+str(n) for i,n in enumerate(counts) if n))+'</span></header>'
-    names={row['id']:(json.loads(row['data'] or '{}').get('hostname') or row['id']) for row in rows}
+    names={row['id']:display_name(row) for row in rows}
     def line(item):
         rank,agent,message=item
         short=message.removeprefix(names.get(agent,agent)+' ('+agent+')').lstrip(' :·')
         short=' '.join(short.split())
         if len(short)>140:short=short[:137]+'…'
-        return '<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'" title="'+esc(message)+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(agent)+'</b><span>'+esc(short)+'</span></a>'
+        return '<a class="problem-summary-row" href="/servers/'+esc(quote(agent,safe=''))+'" title="'+esc(message)+'"><span class="badge '+('danger' if rank==0 else 'warning')+'">'+labels[rank]+'</span><b>'+esc(names.get(agent,agent))+'</b><span>'+esc(short)+'</span></a>'
     content+='<details class="problem-more"><summary>Посмотреть проблемы <span aria-hidden="true">⌄</span></summary>'+''.join(line(item) for item in items[:20])
     if len(items)>20:content+='<p class="muted">Остальные — в карточках серверов.</p>'
     content+='</details>'

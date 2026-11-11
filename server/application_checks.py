@@ -48,6 +48,7 @@ def panel(data,agent=None,historical=False):
 
 def register(app,db,authenticated,csrf_token):
     from .dashboard import esc,page
+    from .server_names import lookup
     @app.get('/checks/{agent}',response_class=HTMLResponse)
     def settings(agent:str,request:Request):
         if not authenticated(request):return RedirectResponse('/',303)
@@ -55,8 +56,9 @@ def register(app,db,authenticated,csrf_token):
             row=c.execute('SELECT a.id,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id WHERE a.id=?',(agent,)).fetchone()
             if not row:raise HTTPException(404)
             config=configuration(c,agent) or {'revision':0,'checks':[]}
+            title=lookup(c,agent)
         data=json.loads(row['data'] or '{}');info=data.get('application_checks') or {}
-        content='<header class="topbar"><a class="brand" href="/">ServersStatus</a><a href="/servers/'+esc(quote(agent,safe=''))+'">← Сервер</a></header><div class="heading"><h1>Проверки приложений · '+esc(agent)+'</h1></div>'
+        content='<header class="topbar"><a class="brand" href="/">ServersStatus</a><a href="/servers/'+esc(quote(agent,safe=''))+'">← Сервер</a></header><div class="heading"><h1>Проверки приложений · '+esc(title)+'</h1></div>'
         if 'app_checks_v1' not in data.get('features',[]):content+='<p class="notice">Обновите агент для поддержки проверок отклика.</p>'
         elif not info.get('enabled'):content+='<p class="notice">В локальном config.json агента задайте allow_application_checks: true и перезапустите службу агента.</p>'
         elif info.get('revision')!=config['revision']:content+='<p class="muted">Ожидает применения агентом.</p>'

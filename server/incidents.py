@@ -1,4 +1,5 @@
 """Shared incident evaluation for events and Telegram."""
+from .server_names import display_name
 from .disks import monitored_disks, is_linux
 import hashlib
 import json
@@ -19,7 +20,7 @@ def evaluate(rows, existing, now, disk_threshold=85):
             continue  # Newly registered agents have not yet been connected.
         agent = row['id']
         report = json.loads(row['data'])
-        name = report.get('hostname') or agent
+        name = display_name(row)
         elapsed = max(0, now - row['received'])
         connection = 'connection:' + agent
         valid.add(connection)

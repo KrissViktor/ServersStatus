@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
+from .server_names import lookup as server_name
 from .agents_ui import agents_page
 from .history import PERIODS, load_history, history_page
 from .configuration import MonitoringSettings
@@ -513,12 +514,13 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
         extremes=extrema(c,agent_id,start,end)
         from .portal_settings import retention_days
         days=retention_days(c)
+        title=server_name(c,agent_id)
         from .stability import load as load_stability, render as stability_render
         from .incident_history import sync,history_html
         latest=c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id WHERE a.id=?',(agent_id,)).fetchone()
         sync(c,[latest],end)
         io=stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
-    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes,retention_days=days))
+    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes,retention_days=days,display_name=title))
 
 
 def settings_state(agent_id):
@@ -556,7 +558,9 @@ def monitoring_form(agent_id: str, request: Request):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
     values, revision, applied = settings_state(agent_id)
-    return HTMLResponse(settings_page(agent_id, values, csrf_token(request), revision, applied))
+    with db() as c:
+        title=server_name(c,agent_id)
+    return HTMLResponse(settings_page(agent_id, values, csrf_token(request), revision, applied, display_name=title))
 
 
 @app.post('/settings/{agent_id}', response_class=HTMLResponse)
@@ -623,7 +627,9 @@ async def monitoring_save(agent_id: str, request: Request):
             raise ValueError('Неизвестное действие.')
     except (ValueError, OverflowError, ValidationError):
         error = 'Настройки не сохранены. Проверьте расписание, размеры и числовые пороги (возраст 1–8760 ч, ожидание 0–672 ч).'
-    return HTMLResponse(settings_page(agent_id, values, csrf_token(request), revision, applied, error, not error), status_code=400 if error else 200)
+    with db() as c:
+        title=server_name(c,agent_id)
+    return HTMLResponse(settings_page(agent_id, values, csrf_token(request), revision, applied, error, not error, display_name=title), status_code=400 if error else 200)
 
 
 @app.get('/servers/{agent_id}', response_class=HTMLResponse)

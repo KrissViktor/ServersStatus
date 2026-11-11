@@ -2,14 +2,14 @@ from urllib.parse import quote
 from .dashboard import page, esc
 
 
-def settings_page(agent_id, values, csrf, revision, applied, error='', saved=False):
+def settings_page(agent_id, values, csrf, revision, applied, error='', saved=False, display_name=None):
     hidden = '<input type="hidden" name="csrf" value="' + esc(csrf) + '">'
     status = 'Используются локальные настройки агента' if not revision else 'Применено агентом' if applied == revision else 'Ожидает получения агентом'
     if revision == 0 and applied not in (None, 0):
         status = 'Ожидает возврата агента к локальному файлу'
     if applied is None:
         status += ' · Агент ещё не подтвердил поддержку настроек: обновите его EXE'
-    content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/agents">← Управление агентами</a></header><div class="heading"><div><p class="eyebrow">МОНИТОРИНГ</p><h1>' + esc(agent_id) + '</h1><p class="muted">' + esc(status) + '</p></div></div>'
+    content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/agents">← Управление агентами</a></header><div class="heading"><div><p class="eyebrow">МОНИТОРИНГ</p><h1>' + esc(display_name or agent_id) + '</h1><p class="muted">' + esc(status) + '</p></div></div>'
     if not revision:
         content += '<p class="muted">Поля предварительно заполнены по последнему отчёту. Перед первым сохранением проверьте маски файлов, вложенные папки и чтение даты из имени.</p>'
     if error:

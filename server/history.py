@@ -74,12 +74,12 @@ def chart(points, metric, title, start, end, color):
     return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
 
 
-def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None,retention_days=186):
+def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None,retention_days=186, display_name=None):
     _, _, bucket = PERIODS[period]
     url = '/history/' + quote(agent_id, safe='')
     links = ''.join(f'<a class="period {"selected" if key == period else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{label}</a>' for key, (label, _, _) in PERIODS.items())
     content = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/">← Обзор серверов</a></header>'
-    content += f'<div class="heading"><div><p class="eyebrow">ИСТОРИЯ НАГРУЗКИ</p><h1>{esc(agent_id)}</h1><p class="muted">{stamp(start)} — {stamp(end)} · обновление каждые 30 с</p></div></div><nav class="periods" aria-label="Период истории">{links}</nav>'
+    content += f'<div class="heading"><div><p class="eyebrow">ИСТОРИЯ НАГРУЗКИ</p><h1>{esc(display_name or agent_id)}</h1><p class="muted">{stamp(start)} — {stamp(end)} · обновление каждые 30 с</p></div></div><nav class="periods" aria-label="Период истории">{links}</nav>'
     if not points:
         content += '<div class="empty">За выбранный период отчётов нет. История появится после получения данных агента.</div>'
     else:

@@ -1,4 +1,5 @@
 """Server-rendered dashboard; all agent-provided text is escaped."""
+from .server_names import display_name
 from .disks import monitored_disks
 from .access import can_history,can_console
 import html
@@ -148,7 +149,7 @@ def backup_alerts(rows, now):
             if not problems:
                 continue
             name = backup.get('name') or backup.get('path', 'Бэкап')
-            items.append('<li><strong>' + esc(data.get('hostname') or row['id']) + ' · ' + esc(name) + '</strong><ul>' + ''.join('<li>' + esc(problem) + '</li>' for problem in problems) + '</ul>' + ('<p>Нет связи с агентом — состояние рассчитано по последнему отчёту.</p>' if elapsed >= 180 else '') + '</li>')
+            items.append('<li><strong>' + esc(display_name(row)) + ' · ' + esc(name) + '</strong><ul>' + ''.join('<li>' + esc(problem) + '</li>' for problem in problems) + '</ul>' + ('<p>Нет связи с агентом — состояние рассчитано по последнему отчёту.</p>' if elapsed >= 180 else '') + '</li>')
     if not items:
         return ''
     return '<section class="backup-alarm" role="alert"><p class="eyebrow">ТРЕБУЕТСЯ ВНИМАНИЕ</p><h2>Ошибка резервного копирования</h2><ul>' + ''.join(items) + '</ul></section>'

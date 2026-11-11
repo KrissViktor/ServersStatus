@@ -15,6 +15,29 @@ class ObservatoryTest(unittest.TestCase):
         self.fixture=fixtures.AccessRolesTest();self.fixture.setUp();self.addCleanup(self.fixture.doCleanups)
         self.clients=self.fixture.clients;self.csrf=a.digest('agent-management:admin')
 
+    def test_portal_name_in_history_settings_checks_and_incidents(self):
+        from server.incidents import evaluate
+        with a.db() as c:
+            c.execute("INSERT INTO agent_profiles VALUES ('pc',?)", ('Linux <portal>',))
+        for path in ['/history/pc', '/settings/pc', '/checks/pc']:
+            response=self.clients['admin'].get(path)
+            self.assertEqual(response.status_code,200)
+            self.assertIn('Linux &lt;portal&gt;</h1>',response.text)
+        rows=[{'id':'pc','display_name':'Linux <portal>','received':0,'data':json.dumps({'hostname':'internal-linux'})}]
+        incidents,_,_=evaluate(rows,[],1000)
+        self.assertIn('Linux <portal>',incidents['connection:pc'][1])
+        self.assertNotIn('internal-linux',incidents['connection:pc'][1])
+
+    def test_isolated_nodes_start_at_left_below_connected_nodes(self):
+        import re
+        from server.dependencies import diagram
+        rows=[{'id':key,'name':key,'received':None} for key in ['isolated','provider','dependent']]
+        html=diagram(rows,[{'dependent':'dependent','provider':'provider','label':''}])
+        positions={key:tuple(map(int,re.search(r'<rect x="(\d+)" y="(\d+)"',html.split('href="/servers/'+key+'"')[1]).groups())) for key in ['isolated','provider','dependent']}
+        self.assertEqual(positions['isolated'][0],positions['dependent'][0])
+        self.assertLess(positions['isolated'][0],positions['provider'][0])
+        self.assertGreater(positions['isolated'][1],positions['dependent'][1])
+
     def test_superadmin_only_retention_and_actual_cleanup(self):
         for name in ['reader','operator']:
             self.assertEqual(self.clients[name].get('/portal-settings').status_code,403)

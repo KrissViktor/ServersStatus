@@ -78,7 +78,7 @@ def tick(db, sender, now=None):
         c.execute('''CREATE TABLE IF NOT EXISTS telegram_state (
             key TEXT PRIMARY KEY, agent TEXT, body TEXT, active INTEGER,
             sent INTEGER, next_attempt REAL DEFAULT 0)''')
-        rows = c.execute('SELECT a.id, r.received, r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id WHERE COALESCE(f.important,1)=1').fetchall()
+        rows = c.execute('SELECT a.id,p.display_name,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id WHERE COALESCE(f.important,1)=1').fetchall()
         existing = c.execute('SELECT * FROM telegram_state').fetchall()
         incidents, valid, checked = evaluate(rows, existing, now, disk_threshold=98)
         c.execute('CREATE TABLE IF NOT EXISTS telegram_policy (name TEXT PRIMARY KEY, value TEXT)')
