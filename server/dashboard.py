@@ -97,29 +97,52 @@ def memory_description(data):
         used = max(0, total-number(system.get('memory_available_bytes')))
     return size(used) + ' / ' + size(total) + ' · занято / всего'
 
+def topbar_bounds(content):
+    start=content.find('<header class="topbar"')
+    if start<0:return None
+    opened=content.find('>',start)+1;depth=0
+    for token in re.finditer(r'</?header\b[^>]*>',content[start:],re.I):
+        depth+=-1 if token[0].startswith('</') else 1
+        if depth==0:return start,opened,start+token.start(),start+token.end()
+    return None
+
+
+def topbar_insert(content,addition,after=False):
+    bounds=topbar_bounds(content)
+    if not bounds:return content
+    index=bounds[3] if after else bounds[2]
+    return content[:index]+addition+content[index:]
+
+
 def page(content, refresh=False, protection_entry=False):
     # Every section uses the same brand markup, including older page templates.
-    def unify_header(match):
-        body=match.group(1)
+    def unify_header(body):
         brand='<a class="brand" href="/?reset=1" aria-label="ServersStatus — обзор серверов">S<span>●</span> <b>ServersStatus</b></a>'
         if re.search(r'<a class="brand"[^>]*>.*?</a>',body,re.S):
             body=re.sub(r'<a class="brand"[^>]*>.*?</a>',lambda _:brand,body,count=1,flags=re.S)
         else:body=brand+body
-        return '<header class="topbar">'+body+'</header>'
-    content=re.sub(r'<header class="topbar">(.*?)</header>',unify_header,content,count=1,flags=re.S)
+        return body
+    bounds=topbar_bounds(content)
+    if bounds:content=content[:bounds[1]]+unify_header(content[bounds[1]:bounds[2]])+content[bounds[2]:]
     if '<header class="topbar"' in content:
         if can_history() and 'href="/admin"' not in content:
-            content=content.replace('</header>','<a class="nav-link" href="/admin">Администрирование</a></header>',1)
+            content=topbar_insert(content,'<a class="nav-link" href="/admin">Администрирование</a>')
         if can_console():
             visibility='data-protection-entry="true"' if protection_entry else 'hidden'
-            content=content.replace('</header>',f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button></header>',1)
+            content=topbar_insert(content,f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button>')
             content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
+    if '<header class="topbar"' in content:
+        links=[('/?reset=1','Серверы'),('/wallboard','Большой экран')]
+        if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/events','События'),('/updates','Обновления'),('/admin','Обслуживание')]
+        navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+esc(label)+'</a>' for url,label in links)
+        bar='<nav class="portal-navigation" aria-label="Основные разделы"><div class="portal-navigation-desktop">'+navigation+'</div><details class="portal-navigation-mobile"><summary>Разделы портала <span aria-hidden="true">⌄</span></summary><div>'+navigation+'</div></details></nav><nav class="portal-breadcrumbs" aria-label="Путь страницы" hidden></nav>'
+        content=topbar_insert(content,bar,after=True)
     widget=''
     if can_history() and '<header class="topbar"' in content and 'data-ai-csrf=' not in content:
         widget=('<button type="button" id="ai-launcher" class="ai-launcher" aria-label="Открыть ИИ-помощника" aria-expanded="false" aria-controls="ai-widget">✦ <span>ИИ-помощник</span></button>'
                 '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside><script>'
                 +Path(__file__).with_name('ai_chat.js').read_text(encoding='utf-8')+'</script><script>'+Path(__file__).with_name('ai_widget.js').read_text(encoding='utf-8')+'</script>')
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script><script>'+Path(__file__).with_name('cpu_cores.js').read_text(encoding='utf-8')+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main>'+widget+'</body></html>'
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script><script>'+Path(__file__).with_name('cpu_cores.js').read_text(encoding='utf-8')+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<script>'+Path(__file__).with_name('portal_ui.js').read_text(encoding='utf-8')+'</script><footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 
 def login_page():

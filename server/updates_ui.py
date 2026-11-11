@@ -20,19 +20,34 @@ def render(c,csrf,result=None):
             except (ValueError,TypeError):count=0
             if count or key=='queued':summary.append(f'<li>{esc(label)}: <b>{count}</b></li>')
         content+='<section class="server" role="status"><h2>Массовое обновление</h2><ul>'+''.join(summary)+'</ul><p class="muted">Результаты установки появятся в истории каждого агента.</p></section>'
+    content+='<details class="server update-bulk-actions" '+('open' if result and ('bulk' in result or 'cancelled' in result) else '')+'><summary>Массовые действия и доступные версии</summary>'
     content+=f'<section class="server"><h2>Отмена заданий</h2><p>Можно отменить задания, которые агент ещё не принял. Уже принятую установку нельзя безопасно остановить из панели.</p><form method="post" action="/updates/all/cancel"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Отменить все ожидающие обновления</button></form></section>'
     if result and result.get('cancelled') is not None:
         try:count=max(0,int(result['cancelled']))
         except (ValueError,TypeError):count=0
         content+=f'<p role="status">Отменено ожидающих заданий: {count}. Уже принятые агентами задания продолжаются.</p>'
     content+=f'<section class="server"><h2>Обновить все агенты</h2><p>Проверить GitHub и отправить каждому доступному агенту последнюю новую версию для его платформы. Raspberry Pi обновляется вместе с порталом. Агенты без связи и с незавершёнными задачами будут пропущены.</p><form data-bulk-update method="post" action="/updates/all/latest"><input type="hidden" name="csrf" value="{esc(csrf)}"><label class="check"><input type="checkbox" name="confirm" value="yes" required> Разрешаю короткий перезапуск служб агентов</label><button>Обновить все агенты</button><p class="muted" data-bulk-progress hidden role="status">Проверяем GitHub и создаём задачи…</p></form></section>'
-    content+=f'<section class="server"><h2>Доступные версии</h2><p>Нажмите, чтобы получить новые сборки из GitHub.</p><form method="post" action="/updates/github/check"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Проверить GitHub</button></form></section><div data-updates-root>'
+    content+=f'<section class="server"><h2>Доступные версии</h2><p>Нажмите, чтобы получить новые сборки из GitHub.</p><form method="post" action="/updates/github/check"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Проверить GitHub</button></form></section></details><label class="update-search">Найти агента<input type="search" data-update-search placeholder="Название или ID сервера"></label><p class="muted update-list-hint">Сначала выполняющиеся задания и ошибки. Откройте строку для установки и подробной истории.</p><div class="update-list-heading"><span>Сервер / текущая версия</span><span>Состояние обновления</span></div><div data-updates-root>'
     from .updates import pending
-    for row in c.execute('SELECT a.id,r.data,r.received,p.display_name FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_profiles p ON p.agent=a.id ORDER BY a.id').fetchall():
+    rows=[dict(row) for row in c.execute('SELECT a.id,r.data,r.received,p.display_name FROM agents a LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_profiles p ON p.agent=a.id ORDER BY a.id').fetchall()]
+    priorities={};active_jobs={};latest={}
+    for row in rows:
+        active_jobs[row['id']]=pending(c,row['id'])
+        latest[row['id']]=c.execute('SELECT status,message FROM agent_update_jobs WHERE agent=? ORDER BY id DESC LIMIT 1',(row['id'],)).fetchone()
+        priorities[row['id']]=0 if active_jobs[row['id']] else 1 if latest[row['id']] and latest[row['id']]['status']=='failed' else 2
+    rows.sort(key=lambda row:(priorities[row['id']],(row['display_name'] or row['id']).casefold(),row['id']))
+    for row in rows:
         agent=row['id'];data=json.loads(row['data'] or '{}');platform=data.get('agent_platform');current=data.get('agent_version') or 'неизвестна'
-        active=pending(c,agent);options,current_date=choices(packages,platform,current)
+        active=active_jobs[agent];options,current_date=choices(packages,platform,current)
         online=row['received'] is not None and time.time()-row['received']<=120
-        content+=f'<section class="server" data-update-card="{esc(agent)}"><div data-update-summary><header class="server-head"><div><h2>{esc(row["display_name"] or agent)}</h2><p class="muted">{esc(agent)} · {esc(platform or "платформа неизвестна")}</p></div>'
+        last=latest[agent]
+        label=('В очереди' if last and last['status']=='queued' else 'Установка') if active else 'Ошибка' if last and last['status']=='failed' else 'Нет свежего отчёта' if not online else 'Готов'
+        color='warning' if active else 'danger' if label=='Ошибка' else 'neutral'
+        brief=(last['message'] if last and last['status']=='failed' else 'Откройте строку для выбора версии')
+        if active:
+            current_job=c.execute('SELECT message FROM agent_update_jobs WHERE id=?',(active['id'],)).fetchone()
+            brief=current_job['message'] if current_job else 'Ожидание агента'
+        content+=f'<details class="update-agent-row" data-update-card="{esc(agent)}" data-update-priority="{priorities[agent]}"><summary><div data-update-brief><div><strong>{esc(row["display_name"] or agent)}</strong><small>{esc(agent)} · {esc(current)}</small></div><div><span class="badge {color}">{esc(label)}</span><small>{esc(brief)}</small></div></div></summary><section class="server"><div data-update-summary><header class="server-head"><div><h2>{esc(row["display_name"] or agent)}</h2><p class="muted">{esc(agent)} · {esc(platform or "платформа неизвестна")}</p></div>'
         if active:content+='<span class="badge warning">Обновление выполняется</span>'
         elif not online:content+='<span class="badge danger">Нет свежего отчёта</span>'
         content+=f'</header><p><b>Текущая версия:</b> <code data-running-version="{esc(current)}">{esc(current)}</code> <span class="muted">· {stamp(current_date)} МСК</span></p>'
@@ -76,5 +91,5 @@ def render(c,csrf,result=None):
                     content+=f'<tr><td>{stamp(step["created"])}</td><td>{esc(LABELS.get(step["status"],(step["status"],""))[0])}</td><td>{esc(step["message"])}</td></tr>'
                 content+='</tbody></table></div></details>'
         else:content+='<p class="muted">История обновлений пока пуста.</p>'
-        content+='</div></section>'
+        content+='</div></section></details>'
     return page(content+'</div><script>'+SCRIPT+'</script>')

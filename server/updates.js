@@ -1,6 +1,9 @@
 (() => {
   if (!document.querySelector('[data-updates-root]'))return;
   let busy=false;
+  const search=document.querySelector('[data-update-search]');
+  function filter(){const query=(search?.value||'').trim().toLocaleLowerCase('ru');for(const card of document.querySelectorAll('[data-update-card]'))card.hidden=!card.querySelector('[data-update-brief]').textContent.toLocaleLowerCase('ru').includes(query)}
+  search?.addEventListener('input',filter);
   const bulk=document.querySelector('[data-bulk-update]');
   bulk?.addEventListener('submit',()=>{
     bulk.querySelector('button').disabled=true;
@@ -28,6 +31,8 @@
       for (const card of document.querySelectorAll('[data-update-card]')) {
         const source=[...next.querySelectorAll('[data-update-card]')].find(n=>n.dataset.updateCard===card.dataset.updateCard);
         if (!source)continue;
+        card.dataset.updatePriority=source.dataset.updatePriority;
+        const brief=card.querySelector('[data-update-brief]'),freshBrief=source.querySelector('[data-update-brief]');if(brief&&freshBrief&&brief.innerHTML!==freshBrief.innerHTML)brief.innerHTML=freshBrief.innerHTML;
         const summary=card.querySelector('[data-update-summary]'),fresh=source.querySelector('[data-update-summary]');
         const changedVersion=summary.querySelector('[data-running-version]')?.dataset.runningVersion!==fresh.querySelector('[data-running-version]')?.dataset.runningVersion;
         if (summary.innerHTML!==fresh.innerHTML)summary.innerHTML=fresh.innerHTML;
@@ -51,6 +56,7 @@
           if(focused)history.focus({preventScroll:true});
         }
       }
+      const root=document.querySelector('[data-updates-root]');if(!root.contains(document.activeElement)){const sorted=[...root.children].sort((a,b)=>Number(a.dataset.updatePriority)-Number(b.dataset.updatePriority));for(let i=0;i<sorted.length;i++)if(root.children[i]!==sorted[i])root.insertBefore(sorted[i],root.children[i]);}filter();
     } catch (_) {} finally {busy=false;}
   },10000);
 })();

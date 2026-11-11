@@ -19,7 +19,7 @@ def settings_page(agent_id, values, csrf, revision, applied, error='', saved=Fal
     url = '/settings/' + quote(agent_id, safe='')
     auto_checked = 'checked' if values.get('auto_monitor_services', True) else ''
     auto_control = '<label class="check"><input type="checkbox" name="auto_monitor_services" value="yes" ' + auto_checked + '>Автоматически контролировать обнаруженные службы 1С и SQL Server</label>'
-    content += '<form method="post" action="' + esc(url) + '">' + hidden + '<section class="server"><h2>Службы Windows / Linux</h2>' + auto_control + '<p class="muted">Системные имена служб, по одному на строку: MSSQLSERVER для Windows, nginx.service для Linux. Пустой список отключает ручные проверки; автоматический поиск 1С/SQL управляется флажком выше.</p><textarea name="services" rows="4" maxlength="26000">' + esc('\n'.join(values.get('services', []))) + '</textarea></section><section class="server"><h2>Правила бэкапов</h2><p class="muted">Пути на контролируемом компьютере. Пустой путь удаляет правило. Можно добавить до 20 правил. 1 Гб = 1024³ байт.</p><div id="backup-rules">'
+    content += '<form method="post" data-dirty-form action="' + esc(url) + '">' + hidden + '<section class="server"><h2>Службы Windows / Linux</h2>' + auto_control + '<p class="muted">Системные имена служб, по одному на строку: MSSQLSERVER для Windows, nginx.service для Linux. Пустой список отключает ручные проверки; автоматический поиск 1С/SQL управляется флажком выше.</p><textarea name="services" rows="4" maxlength="26000">' + esc('\n'.join(values.get('services', []))) + '</textarea></section><section class="server"><h2>Правила бэкапов</h2><p class="muted">Пути на контролируемом компьютере. Пустой путь удаляет правило. Можно добавить до 20 правил. 1 Гб = 1024³ байт.</p><div id="backup-rules">'
     def rule_html(index, rule):
         def field(key, label, default='', kind='text', extra=''):
             value = rule.get(key, default)
@@ -36,7 +36,7 @@ def settings_page(agent_id, values, csrf, revision, applied, error='', saved=Fal
         return text + '<button type="button" class="remove-rule">Удалить это правило</button></fieldset>'
     rules = values.get('backups', [])
     content += ''.join(rule_html(i, rule) for i, rule in enumerate(rules))
-    content += '</div><template id="rule-template">' + rule_html('__INDEX__', {}) + '</template><button type="button" id="add-rule">Добавить папку</button><p class="muted">Дата из имени: _backup_YYYY_MM_DD_HHMMSS_. Для месячных выбираются файлы за 1-е число. Расписание использует локальное время Windows.</p></section><button class="primary" name="mode" value="save">Сохранить и передать агенту</button></form>'
+    content += '</div><template id="rule-template">' + rule_html('__INDEX__', {}) + '</template><button type="button" id="add-rule">Добавить папку</button><p class="muted">Дата из имени: _backup_YYYY_MM_DD_HHMMSS_. Для месячных выбираются файлы за 1-е число. Расписание использует локальное время Windows.</p></section><div class="form-actions"><p data-form-state role="status">Изменений нет</p><button class="primary" name="mode" value="save">Сохранить и передать агенту</button></div></form>'
     content += '<section class="server"><h3>Вернуться к локальному файлу</h3><p class="muted">Агент снова использует папки и службы из своего config.json.</p><form method="post" action="' + esc(url) + '">' + hidden + '<label class="check"><input type="checkbox" name="confirm_local" value="yes" required>Подтверждаю возврат к локальным настройкам</label><button name="mode" value="local">Использовать локальные настройки</button></form></section>'
     content += '''<script>
 const container=document.getElementById('backup-rules');
@@ -44,8 +44,8 @@ let nextIndex=''' + str(len(rules)) + ''';
 document.getElementById('add-rule').addEventListener('click',()=>{
  if(container.children.length>=20){alert('Максимум 20 правил');return;}
  const markup=document.getElementById('rule-template').innerHTML.replaceAll('__INDEX__',String(nextIndex++));
- container.insertAdjacentHTML('beforeend',markup);
+ container.insertAdjacentHTML('beforeend',markup);container.closest('form').dispatchEvent(new Event('formchange'));
 });
-container.addEventListener('click',event=>{if(event.target.classList.contains('remove-rule'))event.target.closest('fieldset').remove();});
+container.addEventListener('click',event=>{if(event.target.classList.contains('remove-rule')){event.target.closest('fieldset').remove();container.closest('form').dispatchEvent(new Event('formchange'));}});
 </script>'''
     return page(content)

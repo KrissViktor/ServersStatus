@@ -63,14 +63,19 @@ def register(app,db,authenticated,csrf_token):
         elif not info.get('enabled'):content+='<p class="notice">В локальном config.json агента задайте allow_application_checks: true и перезапустите службу агента.</p>'
         elif info.get('revision')!=config['revision']:content+='<p class="muted">Ожидает применения агентом.</p>'
         content+='<p class="muted">До 6 проверок. HTTP: адрес без параметров и паролей, ожидается статус 200 и, при желании, текст в ответе. TCP: узел и порт. SQL: Windows, SELECT 1 с учётной записью службы и проверкой TLS-сертификата. Доступность порта SQL сама по себе не подтверждает выполнение запросов.</p>'
-        content+='<form method="post"><input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
+        content+='<form method="post" data-dirty-form data-check-editor><input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
+        slots={}
+        for rule in config['checks']:
+            identifier=str(rule.get('id',''))
+            index=int(identifier[6:]) if identifier.startswith('check-') and identifier[6:].isdigit() and int(identifier[6:])<6 else next(i for i in range(6) if i not in slots)
+            slots[index]=rule
         for index in range(6):
-            rule=config['checks'][index] if index<len(config['checks']) else {}
-            content+='<fieldset class="check-rule"><legend>Проверка '+str(index+1)+'</legend><div class="rule-grid">'
+            rule=slots.get(index,{})
+            content+='<fieldset class="check-rule" data-check-slot="'+str(index)+'" '+('hidden' if not rule else '')+'><legend>Проверка '+str(index+1)+'</legend><div class="rule-grid">'
             for key,label,default in [('name','Название',''),('target','HTTP URL или узел',''),('port','Порт для TCP / SQL',''),('contains','Текст в HTTP-ответе (необязательно)',''),('database','База SQL (по умолчанию master)','')]:
-                content+='<label>'+label+'<input name="'+key+'_'+str(index)+'" value="'+esc(rule.get(key,default))+'" maxlength="500"></label>'
-            content+='<label>Тип<select name="kind_'+str(index)+'">'+''.join('<option value="'+kind+'" '+('selected' if rule.get('kind','http')==kind else '')+'>'+label+'</option>' for kind,label in [('http','HTTP'),('tcp','TCP-порт'),('sql','SQL SELECT 1')])+'</select></label></div></fieldset>'
-        content+='<p class="muted">Пустое название удаляет проверку. Изменения не перезапускают приложения. Пароли и секреты в настройках проверок не указывайте.</p><button class="primary">Сохранить проверки</button></form>'
+                content+='<label '+('data-check-field="'+key+'"' if key in ('port','contains','database') else '')+'>'+label+'<input name="'+key+'_'+str(index)+'" value="'+esc(rule.get(key,default))+'" maxlength="500" '+('required' if key in ('name','target') else '')+'></label>'
+            content+='<label>Тип<select name="kind_'+str(index)+'">'+''.join('<option value="'+kind+'" '+('selected' if rule.get('kind','http')==kind else '')+'>'+label+'</option>' for kind,label in [('http','HTTP'),('tcp','TCP-порт'),('sql','SQL SELECT 1')])+'</select></label></div><button type="button" class="quiet" data-remove-check>Удалить проверку</button></fieldset>'
+        content+='<button type="button" data-add-check>＋ Добавить проверку</button><p class="muted" data-check-empty>Добавьте проверку приложения, сайта или порта.</p><p class="muted">Пустое название удаляет проверку. Изменения не перезапускают приложения. Пароли и секреты в настройках проверок не указывайте.</p><div class="form-actions"><p data-form-state role="status">Изменений нет</p><button class="primary">Сохранить проверки</button></div></form><noscript><p>Для добавления и редактирования проверок включите JavaScript.</p></noscript>'
         return HTMLResponse(page(content))
 
     @app.post('/checks/{agent}')

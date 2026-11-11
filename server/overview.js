@@ -14,11 +14,13 @@
   let pins=new Set(),savedFilters=null;
   try{if(resetFilters)localStorage.removeItem(scope+'filters');const savedPins=JSON.parse(localStorage.getItem(scope+'pins')||'[]');if(Array.isArray(savedPins))pins=new Set(savedPins.filter(id=>typeof id==='string').slice(0,10000));savedFilters=JSON.parse(localStorage.getItem(scope+'filters')||'null')}catch(_){}
   let layout=new URLSearchParams(location.search).get('layout');
+  let density='normal';try{density=localStorage.getItem(scope+'density')==='compact'?'compact':'normal'}catch(_){}
   let sortKey='name',sortDescending=false;
   try{layout=layout||localStorage.getItem(scope+'layout');const saved=JSON.parse(localStorage.getItem(scope+'sort')||'null');if(saved && keys.includes(saved.key)){sortKey=saved.key;sortDescending=!!saved.descending}}catch(_){}
   layout=layout==='table'?'table':'cards';
   function presentation(){
-    results.dataset.layout=layout;
+    results.dataset.layout=layout;results.dataset.density=density;
+    document.querySelectorAll('[data-density]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.density===density)));
     document.querySelectorAll('[data-server-layout]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.serverLayout===layout)));
     const compare=(a,b)=>{
       const aid=a.dataset.serverId||a.dataset.tableServerId,bid=b.dataset.serverId||b.dataset.tableServerId;
@@ -42,6 +44,7 @@
   }
   function saveSort(){try{localStorage.setItem(scope+'sort',JSON.stringify({key:sortKey,descending:sortDescending}))}catch(_){}presentation()}
   document.addEventListener('click',event=>{
+    const densityButton=event.target.closest('[data-density]');if(densityButton){density=densityButton.dataset.density;try{localStorage.setItem(scope+'density',density)}catch(_){}presentation();return}
     const pin=event.target.closest('[data-pin-server]');
     if(pin){const id=pin.dataset.pinServer;if(pins.has(id))pins.delete(id);else pins.add(id);try{localStorage.setItem(scope+'pins',JSON.stringify([...pins]))}catch(_){}presentation();return}
     if(event.target.closest('[data-overview-direction]')){sortDescending=!sortDescending;saveSort();return}

@@ -53,6 +53,7 @@ def render(rows,now):
 def controls():
     from .ui_icons import icon
     result='<div class="layout-switch" role="group" aria-label="Вид серверов"><button type="button" data-server-layout="cards" aria-pressed="true" title="Карточки">'+icon('cards')+'<span>Карточки</span></button><button type="button" data-server-layout="table" aria-pressed="false" title="Компактная таблица">'+icon('table')+'<span>Таблица</span></button></div>'
+    result+='<div class="density-switch" role="group" aria-label="Плотность карточек"><button type="button" data-density="normal" aria-pressed="true" title="Карточки с графиками">Обычные</button><button type="button" data-density="compact" aria-pressed="false" title="Компактные карточки без графиков">Компактные</button></div>'
     if can_history():
         for route,label,name in [('/heatmap','Карта','heatmap'),('/dependencies','Связи','dependencies')]:result+='<a class="overview-view-link" data-fleet-page="'+route+'" href="'+route+'">'+icon(name)+label+'</a>'
     result+='<a class="overview-view-link" data-fleet-page="/wallboard" href="/wallboard">'+icon('wallboard')+'Экран</a>'
