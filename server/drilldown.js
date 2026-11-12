@@ -133,7 +133,7 @@
       const response=await fetch(url,{signal:controller.signal,credentials:'same-origin',cache:'no-store'});
       if(!response.ok){let text='Не удалось получить снимок';try{text=(await response.json()).detail||text}catch(_){}throw new Error(text)}
       const data=await response.json();if(selected?.report_id!==identifier || !dialog.open)return;
-      const update=()=>{snapshotContent.innerHTML=data.html;snapshotContent.dataset.reportId=identifier;window.initServerInformation?.(snapshotContent);window.initTaskManagers?.(snapshotContent)};window.portalMotion?window.portalMotion.preserve(update):update();status.textContent='Снимок открыт ниже. Верхний график зафиксирован.';
+      const update=()=>{snapshotContent.innerHTML=data.html;snapshotContent.dataset.reportId=identifier;window.initServerInformation?.(snapshotContent);window.initTaskManagers?.(snapshotContent)};update();status.textContent='Снимок открыт ниже. Верхний график зафиксирован.';if(!keepSnapshot)snapshotContent.scrollIntoView({block:'start',behavior:window.portalMotion?.reduced()?'instant':'smooth'});
     }catch(error){if(error.name!=='AbortError' && selected?.report_id===identifier)snapshotContent.textContent=error.message}
   }
   snapshotButton.addEventListener('click',showSnapshot);

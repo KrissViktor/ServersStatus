@@ -1,5 +1,5 @@
 /* Тёплый графит и дымчатое стекло. Цвета самих графиков не изменяются. */
-:root{--bg:#0b0b0c;--panel:#1c1c1e;--line:#d4cab321;--text:#eeeae2;--muted:#b2aea6;--green:#d5d2c9;--yellow:#d7bd95;--red:#e2c4aa;--accent:#e8dcc7;--accent-soft:#d1ba9215;--violet:#dfd3be;--surface:#1c1c1edb;--surface-raised:#242425ed;--field:#111112b0;--glass:blur(16px) saturate(75%);--soft-shadow:0 6px 22px #00000027,inset 0 1px 0 #ffffff06;--float-shadow:0 22px 70px #0008;--ease:cubic-bezier(.2,.7,.2,1)}
+:root{--bg:#0b0b0c;--panel:#1c1c1e;--line:#d4cab321;--text:#eeeae2;--muted:#b2aea6;--green:#7adba7;--yellow:#edc77e;--red:#ff96a3;--accent:#e8dcc7;--accent-soft:#d1ba9215;--violet:#dfd3be;--surface:#1c1c1edb;--surface-raised:#242425ed;--field:#111112b0;--glass:blur(16px) saturate(75%);--soft-shadow:0 6px 22px #00000027,inset 0 1px 0 #ffffff06;--float-shadow:0 22px 70px #0008;--ease:cubic-bezier(.2,.7,.2,1)}
 html{background:var(--bg);scrollbar-color:#aaa29655 transparent;scrollbar-width:thin}
 body{background:radial-gradient(ellipse 80% 45% at 5% 0%,#b29b7210,transparent 80%),radial-gradient(ellipse 65% 40% at 100% 0%,#ffffff06,transparent 80%),var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 ::selection{background:#d6c4a545;color:#fff}a{text-underline-offset:3px}
@@ -40,3 +40,9 @@ input,select,textarea{background:var(--field);border-color:#d4cab32c;color:var(-
 .compact-chart-controls{grid-column:1/-1;margin:0;font-size:10px}#detail-chart-plot.plot-locked{touch-action:pan-y}#detail-chart-plot:not(.plot-locked){touch-action:none}
 html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspector button:focus-visible{outline-color:var(--accent)}
 .nav-link{color:#d8ccb7}.task-tabs button[aria-selected=true],.task-tabs button[aria-pressed=true]{color:#efe1c6;background:#c9b28b15;border-color:#c9b28b45}.cpu-core{background:#181819}.cpu-core .task-grid{stroke:#c6b99f18}
+
+/* Смысловые цвета состояний сохраняются на графитовых поверхностях. */
+.badge.normal{color:var(--green);border-color:#7adba747;background:#7adba70c}.badge.warning{color:var(--yellow);border-color:#edc77e55;background:#edc77e0d}.badge.danger{color:var(--red);border-color:#ff96a355;background:#ff96a30d}
+.status-note.normal{border-color:#7adba747}.status-note.warning{border-color:#edc77e55}.status-note.danger{color:var(--red);border-color:#ff96a355}.overview-page .stat-filter[data-overview-view=offline] strong{color:var(--red)}.overview-page .stat-filter[data-overview-view=disks] strong{color:var(--yellow)}
+.dependency-node.node-danger rect{stroke:var(--red)}.dependency-node.node-warning rect{stroke:var(--yellow)}.delete-button{color:var(--red);border-color:#ff96a355;background:#ff96a30a}.delete-button:hover{background:#ff96a318;border-color:var(--red)}.backup-alarm{border-color:#edc77e66}.backup-alarm h2{color:var(--yellow)}
+#chart-detail> :not(#detail-chart-plot){flex-shrink:0}
