@@ -8,7 +8,8 @@ SCRIPT=Path(__file__).with_name('task_manager.js').read_text(encoding='utf-8')
 
 
 def assets():
-    return '<script>'+SCRIPT+'</script>'
+    from .assets import script
+    return script('task_manager.js')
 
 
 def section(agent,payload=None):

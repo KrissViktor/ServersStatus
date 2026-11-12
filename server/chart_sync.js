@@ -10,7 +10,8 @@
     const selected=focusPoint?((Number(focusPoint.dataset.detailFirst)+Number(focusPoint.dataset.detailLast))/2):start+ratio*(end-start);
     const when=new Date(selected*1000).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'});
     for(const graph of graphs()){
-      if(!graph.getBoundingClientRect().width)continue;
+      if(graph.checkVisibility&&!graph.checkVisibility({contentVisibilityAuto:true,visibilityProperty:true}))continue;
+      const box=graph.getBoundingClientRect();if(!box.width||box.bottom<0||box.top>innerHeight)continue;
       let line=graph.querySelector('.synced-chart-cursor');if(!line){line=document.createElementNS(ns,'line');line.classList.add('synced-chart-cursor');graph.append(line)}
       const from=Number(graph.dataset.chartStart),to=Number(graph.dataset.chartEnd),min=Number(graph.dataset.chartLeft),max=Number(graph.dataset.chartRight);
       if(selected<from||selected>to){line.style.display='none';continue}

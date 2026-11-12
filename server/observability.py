@@ -1,5 +1,6 @@
 """Daily coverage heatmap and a merged, read-only server timeline."""
 import json
+import math
 import time
 from datetime import datetime,timedelta
 from urllib.parse import quote
@@ -46,7 +47,7 @@ def timeline(c,agent,start,end):
     for item in up['reboots'][-100:]:add(item['at'],'reboot','Перезагрузка по аптайму','Предполагаемое время загрузки, определённое из соседних отчётов','warning')
     for item in c.execute('SELECT * FROM incident_history WHERE agent=? AND opened<=? AND (closed IS NULL OR closed>=?) ORDER BY opened DESC LIMIT 200',(agent,end,start)):
         if item['category']=='connection':continue
-        add(item['opened'],'incident','Начало проблемы',item['message'],'danger')
+        add(max(item['opened'],start),'incident','Продолжающаяся проблема' if item['opened']<start else 'Начало проблемы',item['message'],'danger')
         if item['closed'] is not None:add(item['closed'],'incident','Восстановлено' if item['resolution']=='recovered' else 'Проверка исключена',item['message'],'normal' if item['resolution']=='recovered' else 'neutral')
     for item in c.execute("SELECT * FROM events WHERE agent=? AND received>=? AND received<=? AND category IN ('configuration','management','updates','update') ORDER BY id DESC LIMIT 200",(agent,start,end)):
         add(item['received'],'configuration' if item['category']=='configuration' else 'update','Настройки изменены' if item['category']=='configuration' else 'Управление сервером',item['message'],'warning' if item['level']=='warning' else 'neutral')
@@ -90,12 +91,16 @@ def register(app,db,authenticated):
         return HTMLResponse(page(content))
 
     @app.get('/timeline/{agent}',response_class=HTMLResponse)
-    def history(agent:str,request:Request,period:str='7d',day:str='',kind:str=''):
+    def history(agent:str,request:Request,period:str='7d',day:str='',kind:str='',start:float|None=None,end:float|None=None):
         if not authenticated(request):return RedirectResponse('/',303)
         types={'connection':'Связь','incident':'Проблемы','reboot':'Перезагрузки','update':'Обновления','equipment':'Комплектация','configuration':'Настройки'}
         if period not in ('24h','7d','30d') or kind not in ('',*types):raise HTTPException(400)
         now=time.time()
-        if day:
+        interval=start is not None or end is not None
+        if interval:
+            if start is None or end is None or not all(math.isfinite(v) and 0<=v<=4102444800 for v in (start,end)) or not 1<=end-start<=2678400 or start>now:raise HTTPException(400,'Некорректный интервал')
+            end=min(end,now)
+        elif day:
             try:start=datetime.strptime(day,'%Y-%m-%d').replace(tzinfo=MSK).timestamp()
             except ValueError:raise HTTPException(400)
             if start>now:raise HTTPException(400,'Дата в будущем')
@@ -108,6 +113,9 @@ def register(app,db,authenticated):
             if end<now-retention_days(c)*86400:raise HTTPException(400,'Дата вне срока хранения')
             items=timeline(c,agent,start,end);items=[item for item in items if not kind or item['kind']==kind]
         content='<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/servers/'+esc(quote(agent,safe=''))+'">← Сервер</a><a class="nav-link" href="/heatmap">Карта стабильности</a></header><div class="heading"><h1>'+icon('timeline')+' Лента · '+esc(row['name'])+'</h1></div><form class="fleet-filter"><label>Период<select name="period">'+''.join('<option value="'+p+'" '+('selected' if p==period else '')+'>'+label+'</option>' for p,label in [('24h','Сутки'),('7d','Неделя'),('30d','30 дней')])+'</select></label><label>Дата (необязательно)<input type="date" name="day" value="'+esc(day)+'"></label><label>События<select name="kind"><option value="">Все</option>'+''.join('<option value="'+key+'" '+('selected' if key==kind else '')+'>'+label+'</option>' for key,label in types.items())+'</select></label><button>Показать</button></form><p class="muted">'+esc(stamp(start))+' — '+esc(stamp(end))+'</p><div class="server-timeline">'
+        if interval:
+            form_start=content.index('<label>Период<select');form_end=content.index('<label>События<select',form_start)
+            content=content[:form_start]+'<input type="hidden" name="start" value="'+str(start)+'"><input type="hidden" name="end" value="'+str(end)+'"><a class="nav-link" href="/timeline/'+esc(quote(agent,safe=''))+'">↺ Сбросить интервал</a>'+content[form_end:]
         for item in items[:300]:
             content+='<article class="timeline-item timeline-'+item['level']+'"><div class="timeline-symbol">'+icon(item['kind'])+'</div><div><time>'+esc(stamp(item['at']))+'</time><h2>'+esc(item['title'])+'</h2><p>'+esc(item['description'])+'</p>'+('<small>До '+esc(stamp(item['finish']))+'</small>' if item['finish'] else '')+'</div></article>'
         if not items:content+='<p class="empty">Событий за этот период не найдено.</p>'

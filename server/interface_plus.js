@@ -19,11 +19,11 @@
         const candidate=folds.find(f=>f.dataset.detailGroup===active&&f.open)||folds.find(f=>f.dataset.detailGroup===active);
         if(candidate&&picker){const button=[...picker.querySelectorAll('button')].find(b=>b.dataset.sectionKey===candidate.dataset.foldKey);if(button&&button.getAttribute('aria-pressed')!=='true')button.click()}
       }
-      for(const button of controls.children){const selected=button.dataset.detailTab===active;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1}
+      for(const button of controls.querySelectorAll('button[data-detail-tab]')){const selected=button.dataset.detailTab===active;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1}
     }
-    for(const [id,label] of tabs){const button=make('button',label);button.type='button';button.dataset.detailTab=id;button.setAttribute('role','tab');button.addEventListener('click',()=>{active=id;try{sessionStorage.setItem('server-tab:'+detail.dataset.detailServer,id)}catch(_){}apply()});controls.append(button)}
-    controls.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();let index=[...controls.children].indexOf(document.activeElement);index=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;controls.children[index].click();controls.children[index].focus()});
-    detail.prepend(controls);apply();new MutationObserver(apply).observe(live,{childList:true,subtree:true});
+    for(const [id,label] of tabs){const button=make('button',label);button.type='button';button.dataset.detailTab=id;button.setAttribute('role','tab');button.addEventListener('click',()=>{active=id;try{sessionStorage.setItem('server-tab:'+detail.dataset.detailServer,id)}catch(_){}const change=()=>{apply();window.portalMotion?.reveal(live);window.portalMotion?.indicator(controls,button)};window.portalMotion?window.portalMotion.preserve(change):change()});controls.append(button)}
+    controls.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...controls.querySelectorAll('button[data-detail-tab]')];let index=buttons.indexOf(document.activeElement);index=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[index].click();buttons[index].focus({preventScroll:true})});
+    detail.prepend(controls);apply();new MutationObserver(records=>{if(records.some(r=>r.target===live||[...r.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('.server-information,.section-fold')||n.querySelector?.('.server-information')))))apply()}).observe(live,{childList:true,subtree:true});
   }
   function list(container,rows,type){
     if(!rows.length)return;

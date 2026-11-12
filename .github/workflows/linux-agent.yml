@@ -1,7 +1,7 @@
 name: Test Linux agent
 on:
   push:
-    paths: ['agent/**', 'server/**', 'tests/**', 'deploy/serversstatus-linux-agent.service', 'deploy/LINUX.md', '.github/workflows/linux-agent.yml']
+    paths: ['agent/**', 'server/**', 'tests/**', 'deploy/serversstatus-linux-agent.service', 'deploy/LINUX.md', 'deploy/upgrade-portal-python.sh', 'requirements*.txt', '.github/workflows/linux-agent.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -53,3 +53,19 @@ jobs:
         run: |
           python -m agent.release_manifest linux-source "$(cat dist/VERSION.txt)" dist/ServersStatus-Linux.tar.gz dist/update-linux.json
           python -m agent.publish_release dist/update-linux.json dist/ServersStatus-Linux.tar.gz
+
+  portal-python313:
+    name: Проверка портала на Python 3.13
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m compileall -q server agent tests
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m unittest discover -s tests -v
+      - run: node tests/chart_geometry.test.js
+      - run: bash -n deploy/upgrade-portal-python.sh

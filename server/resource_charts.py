@@ -30,7 +30,7 @@ def markers(c,agent,start,end):
 
 def register(app,db,authenticated):
     @app.get('/api/history/{agent_id}/resources')
-    def resources(agent_id:str,request:Request,period:str='15m',start:float|None=None,end:float|None=None):
+    def resources(agent_id:str,request:Request,period:str='15m',start:float|None=None,end:float|None=None,overview:bool=False):
         from .access import can_history
         from .history import load_history
         if not authenticated(request):raise HTTPException(401)
@@ -39,7 +39,7 @@ def register(app,db,authenticated):
         if period not in PERIODS or (start is None)!=(end is None):raise HTTPException(400,'Некорректный период')
         if start is None:end=now;start=end-PERIODS[period]
         if any(not math.isfinite(v) or v<0 or v>4102444800 for v in (start,end)) or not 1<=end-start<=2678400:raise HTTPException(400,'Некорректные границы периода')
-        bucket=max(10,math.ceil((end-start)/360))
+        bucket=max(30 if overview else 10,math.ceil((end-start)/360))
         with db() as c:
             if not c.execute('SELECT 1 FROM agents WHERE id=?',(agent_id,)).fetchone():raise HTTPException(404)
             points=[dict(row) for row in load_history(c,agent_id,start,end,bucket)]

@@ -9,6 +9,7 @@ import re
 import time
 from urllib.parse import quote, urlencode
 from pathlib import Path
+from .assets import script as ui_script,styles as ui_styles
 
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')+'\n'+Path(__file__).with_name('appearance.css').read_text(encoding='utf-8')
 PROTECTION_SCRIPT=Path(__file__).with_name('protection.js').read_text(encoding='utf-8')
@@ -65,7 +66,7 @@ def meter(label,value,description,points=None,field='cpu',now=None,snapshot=Fals
     trend=('<span class="resource-trend">'+('↗ +' if delta>0 else '↘ ' if delta<0 else '→ ')+f'{delta:.1f} п.п.</span>') if delta is not None else '<span class="resource-trend">Мало данных</span>'
     axis_class='task-axis snapshot-axis' if snapshot else 'task-axis'
     axis='<span>−5 минут</span><span>Снимок</span><span>+5 минут</span>' if snapshot else '<span>15 минут</span><span>Сейчас</span>'
-    return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}<small class="resource-current-label">{measurement_label}</small></span><strong>{formatted}<small>%</small></strong></div>{trend}<div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now,snapshot=snapshot,window=300 if snapshot else 900) + '</div><div class="'+axis_class+'">'+axis+'</div><p class="muted task-description">' + esc(description) + '</p>'+extra+'</div>'
+    return f'<div class="metric task-metric task-{field}"><div class="metric-top"><span>{esc(label)}<small class="resource-current-label">{measurement_label}</small></span><strong>{formatted}<small>%</small></strong></div>{trend}<div class="task-scale"><span>100%</span></div><div class="task-plot">' + graph(points or [],field,now,snapshot=snapshot,window=300 if snapshot else 900,interactive=snapshot) + '</div><div class="'+axis_class+'">'+axis+'</div><p class="muted task-description">' + esc(description) + '</p>'+extra+'</div>'
 
 
 def resource_points(row,data):
@@ -147,9 +148,12 @@ def page(content, refresh=False, protection_entry=False):
     widget=''
     if can_history() and '<header class="topbar"' in content and 'data-ai-csrf=' not in content:
         widget=('<button type="button" id="ai-launcher" class="ai-launcher" aria-label="Открыть ИИ-помощника" aria-expanded="false" aria-controls="ai-widget">✦ <span>ИИ-помощник</span></button>'
-                '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside><script>'
-                +Path(__file__).with_name('ai_chat.js').read_text(encoding='utf-8')+'</script><script>'+Path(__file__).with_name('ai_widget.js').read_text(encoding='utf-8')+'</script>')
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + '<title>Статус серверов</title><style>' + CSS + '</style></head><body><main>' + content + '<script>'+FOLD_SCRIPT+'</script><script>'+Path(__file__).with_name('cpu_cores.js').read_text(encoding='utf-8')+'</script>'+('<script>' + REFRESH_SCRIPT + '</script>' if refresh else '') + '<script>'+Path(__file__).with_name('portal_ui.js').read_text(encoding='utf-8')+'</script><script>'+Path(__file__).with_name('interface_plus.js').read_text(encoding='utf-8')+'</script><script>'+Path(__file__).with_name('chart_sync.js').read_text(encoding='utf-8')+'</script><script>'+Path(__file__).with_name('resource_charts.js').read_text(encoding='utf-8')+'</script><footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main>'+widget+'</body></html>'
+                '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside>'+ui_script('ai_chat.js')+ui_script('ai_widget.js'))
+    shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')
+    if refresh:shared+=ui_script('refresh.js')
+    shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js'))
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Статус серверов</title>'+ui_styles()+'</head><body><main>'+content+shared+'<footer class="credits">Данный портал статусов серверов был создан: tg @kissviktor и ds _krissviktor.</footer></main>'+widget+'</body></html>'
+
 
 
 def login_page():
@@ -352,7 +356,7 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf=''):
     cards+=table_render(selected,now)
     cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'
     from .overview import LIVE_SCRIPT
-    cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results">' + cards + '</div><script>' + LIVE_SCRIPT + '</script>'
+    cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results" data-refresh-interval="10000">' + cards + '</div>'+ui_script('overview.js')
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now,csrf)
     from .drilldown import widget

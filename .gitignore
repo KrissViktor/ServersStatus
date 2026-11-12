@@ -17,3 +17,10 @@ ai/versions.json
 
 # Local build output
 build/
+
+# Изолированный Python веб-портала и резервные настройки его запуска
+.portal-python/
+.portal-python-cache/
+.portal-venv-*/
+.portal-runtime-backups/
+.portal-runtime-upgrade.lock

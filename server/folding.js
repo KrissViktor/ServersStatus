@@ -19,8 +19,11 @@
       const nav=document.createElement('nav');nav.className='section-picker';nav.setAttribute('aria-label','Разделы информации о сервере');
       const requested=panel.closest('.server-detail') && new URLSearchParams(location.search).has('stability') ? folds.find(f=>f.querySelector(':scope>summary>.fold-title')?.textContent.trim()==='Доступность и агент') : null;
       const selected=folds.find(f=>f.open)||requested||folds[0];
+      let currentFold=null;
       function choose(fold){
+        const changed=currentFold&&currentFold!==fold;
         folds.forEach(item=>{const active=item===fold;item.open=active;item.querySelector(':scope>summary').setAttribute('aria-expanded',String(active));nav.querySelector(`[data-section-key="${item.dataset.foldKey}"]`).setAttribute('aria-pressed',String(active))});
+        const button=nav.querySelector(`[data-section-key="${fold.dataset.foldKey}"]`);window.portalMotion?.indicator(nav,button,!currentFold);if(changed)window.portalMotion?.reveal(fold.querySelector(':scope>section'));currentFold=fold;
       }
       folds.forEach((fold,index)=>{
         const title=fold.querySelector(':scope>summary>.fold-title'),body=fold.querySelector(':scope>section');
@@ -30,7 +33,7 @@
         button.append(title.querySelector('.section-icon').cloneNode(true));
         const caption=document.createElement('span');caption.className='sr-only';caption.textContent=name;button.append(caption);
         body.id=`server-section-${++informationSequence}-${fold.dataset.foldKey}`;button.setAttribute('aria-controls',body.id);
-        button.addEventListener('click',()=>choose(fold));
+        button.addEventListener('click',()=>window.portalMotion?window.portalMotion.preserve(()=>choose(fold)):choose(fold));
         button.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...nav.querySelectorAll('button')].filter(item=>!item.hidden);const current=buttons.indexOf(button);const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(current+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next].focus();buttons[next].click()});
         nav.append(button);
         const heading=document.createElement('h3');heading.className='section-browser-title';heading.innerHTML=title.innerHTML;body.prepend(heading);

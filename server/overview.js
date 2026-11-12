@@ -164,5 +164,5 @@
     if(form.elements.group && [...form.elements.group.options].some(option=>option.value===savedFilters.group))form.elements.group.value=savedFilters.group;
     if(input.value||view.value!=='all'||form.elements.group?.value)search(false);
   }
-  setInterval(() => search(true), 10000);
+  setInterval(() => search(true), Number(results.dataset.refreshInterval)||10000);
 })();

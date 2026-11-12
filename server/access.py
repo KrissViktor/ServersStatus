@@ -3,6 +3,7 @@ from contextvars import ContextVar
 import hashlib
 import time
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 SCHEMA='''CREATE TABLE IF NOT EXISTS user_roles(name TEXT PRIMARY KEY,role TEXT NOT NULL CHECK(role IN ('viewer','administrator','superadmin')),enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)));
 CREATE TABLE IF NOT EXISTS session_users(token TEXT PRIMARY KEY,name TEXT NOT NULL);
@@ -59,7 +60,9 @@ def revoke(c,name):
 
 def middleware(db):
     async def enforce(request,call_next):
-        user=principal(request,db) if request.cookies.get('session') else None
+        if request.url.path.startswith('/assets/'):
+            return await call_next(request)
+        user=await run_in_threadpool(principal,request,db) if request.cookies.get('session') else None
         token=_context.set(user or {'name':None,'role':None})
         try:
             path=request.url.path.rstrip('/') or '/'

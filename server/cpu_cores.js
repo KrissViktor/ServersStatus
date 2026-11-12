@@ -11,13 +11,13 @@
       const response=await fetch(url,{credentials:'same-origin',cache:'no-store',signal:controller.signal});
       if(!response.ok)throw Error(response.status===401||response.status===403?'Доступ к графикам закрыт. Войдите в портал снова.':'Не удалось получить графики ядер');
       const data=await response.json();if(!details.isConnected||!details.open)return;
-      state.offset=data.offset??state.offset;state.loaded=true;const top=content.scrollTop;content.innerHTML=data.html;content.scrollTop=top;
+      state.offset=data.offset??state.offset;state.loaded=true;const top=content.scrollTop;const update=()=>{content.innerHTML=data.html;content.scrollTop=top};window.portalMotion?window.portalMotion.preserve(update):update();
     }catch(error){if(error.name!=='AbortError'&&details.isConnected){const text=document.createElement('p'),button=document.createElement('button');text.textContent=error.message;button.type='button';button.textContent='Повторить';button.addEventListener('click',()=>load(details,true));content.replaceChildren(text,button)}}
     finally{state.busy=false;content.removeAttribute('aria-busy')}
   }
   document.addEventListener('toggle',event=>{const details=event.target;if(!details.matches?.('[data-cpu-cores]'))return;if(details.open)load(details,true);else{const state=states.get(details);if(state?.busy){state.controller.abort();state.busy=false;state.loaded=false}}},true);
   document.addEventListener('click',event=>{const button=event.target.closest('[data-core-page]');if(button){event.preventDefault();load(button.closest('[data-cpu-cores]'),true,Number(button.dataset.corePage))}});
   const scan=()=>document.querySelectorAll('[data-cpu-cores][open]').forEach(d=>load(d));
-  new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});scan();
-  setInterval(()=>{if(!document.hidden)document.querySelectorAll('[data-cpu-cores][open]:not([data-cpu-historical])').forEach(d=>load(d,true))},10000);
+  new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('[data-cpu-cores]')||n.querySelector?.('[data-cpu-cores]')))))scan()}).observe(document.body,{childList:true,subtree:true});scan();
+  setInterval(()=>{if(!document.hidden)document.querySelectorAll('[data-cpu-cores][open]:not([data-cpu-historical])').forEach(d=>{const box=d.getBoundingClientRect();if(box.width&&box.bottom>=0&&box.top<=innerHeight)load(d,true)})},10000);
 })();

@@ -12,6 +12,7 @@ from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
 from .server_names import lookup as server_name
@@ -22,7 +23,7 @@ from .settings_ui import settings_page
 from .events import record
 from .disks import monitored_disks
 from .retention import cleanup
-from .security import client_address, limiter, login_limiter, blocked_seconds, failed_login, account_blocked_seconds, failed_account_login
+from .security import client_address, limiter, asset_limiter, login_limiter, blocked_seconds, failed_login, account_blocked_seconds, failed_account_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 app = FastAPI(title='ServersStatus',docs_url=None,redoc_url=None,openapi_url=None)
@@ -34,80 +35,86 @@ def db():
     connection = sqlite3.connect(DB)
     connection.row_factory = sqlite3.Row
     try:
-        connection.executescript('''
-        CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, salt TEXT, password TEXT);
-        CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, expires REAL);
-        CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY, token TEXT);
-        CREATE TABLE IF NOT EXISTS reports (agent TEXT, received REAL, data TEXT);
-        CREATE TABLE IF NOT EXISTS latest_reports (agent TEXT PRIMARY KEY, received REAL NOT NULL, data TEXT NOT NULL);
-        CREATE VIEW IF NOT EXISTS current_reports AS
-            SELECT agent,received,data FROM latest_reports
-            UNION ALL
-            SELECT a.id AS agent,r.received,r.data FROM agents a
-            JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1)
-            WHERE NOT EXISTS(SELECT 1 FROM latest_reports l WHERE l.agent=a.id);
-        CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
-        CREATE INDEX IF NOT EXISTS reports_time ON reports(received);
-        CREATE INDEX IF NOT EXISTS reports_resource_metrics ON reports(agent,received,json_extract(data,'$.cpu_percent'),json_extract(data,'$.memory_percent'));
-        CREATE TABLE IF NOT EXISTS report_maintenance (name TEXT PRIMARY KEY,next_run REAL NOT NULL);
-        CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS agent_flags (agent TEXT PRIMARY KEY, important INTEGER NOT NULL DEFAULT 1 CHECK(important IN (0,1)), active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)));
-        CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
-        CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT,received REAL,agent TEXT,category TEXT,level TEXT,message TEXT);
-        CREATE INDEX IF NOT EXISTS events_time ON events(received);
-        CREATE INDEX IF NOT EXISTS events_agent_time ON events(agent,received);
-        CREATE TABLE IF NOT EXISTS event_state (key TEXT PRIMARY KEY,agent TEXT,body TEXT,active INTEGER);
-        CREATE TABLE IF NOT EXISTS daily_delivery (day TEXT PRIMARY KEY,chunks TEXT,next_part INTEGER,retry_at REAL,completed INTEGER);
-        CREATE TABLE IF NOT EXISTS auth_guard (address TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS account_auth_guard (name TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
-        ''')
-        from .news import SCHEMA as NEWS_SCHEMA
-        from .observability import SCHEMA as OBSERVABILITY_SCHEMA
-        from .dependencies import SCHEMA as DEPENDENCY_SCHEMA
-        connection.executescript(NEWS_SCHEMA+OBSERVABILITY_SCHEMA+DEPENDENCY_SCHEMA)
-        from .portal_settings import SCHEMA as SETTINGS_SCHEMA
-        connection.executescript(SETTINGS_SCHEMA)
-        from .portal_backup import SCHEMA as PORTAL_SCHEMA
-        connection.executescript(PORTAL_SCHEMA)
-        from .fleet import SCHEMA as FLEET_SCHEMA
-        from .equipment_history import SCHEMA as EQUIPMENT_SCHEMA
-        from .application_checks import SCHEMA as CHECK_SCHEMA
-        connection.executescript(FLEET_SCHEMA+EQUIPMENT_SCHEMA+CHECK_SCHEMA)
-        from .incident_history import SCHEMA as INCIDENT_SCHEMA
-        connection.executescript(INCIDENT_SCHEMA)
-        from .update_diagnostics import SCHEMA as UPDATE_DIAGNOSTICS_SCHEMA
-        connection.executescript(UPDATE_DIAGNOSTICS_SCHEMA)
-        from .updates import SCHEMA
-        connection.executescript(SCHEMA)
-        from .ai_chat import initialize as initialize_ai
-        initialize_ai(connection)
-        from .processes import SCHEMA as PROCESS_SCHEMA
-        connection.executescript(PROCESS_SCHEMA)
-        from .services import SCHEMA as SERVICES_SCHEMA
-        connection.executescript(SERVICES_SCHEMA)
-        from .github_updates import SCHEMA as GITHUB_SCHEMA
-        connection.executescript(GITHUB_SCHEMA)
-        from .windows import SCHEMA as WINDOWS_SCHEMA
-        connection.executescript(WINDOWS_SCHEMA)
-        from .console import SCHEMA as CONSOLE_SCHEMA
-        connection.executescript(CONSOLE_SCHEMA)
-        from .rdp_control import SCHEMA as RDP_SCHEMA
-        connection.executescript(RDP_SCHEMA)
-        from .console import initialize_sequence
-        initialize_sequence(connection)
-        from .update_versions import SCHEMA as VERSION_SCHEMA
-        connection.executescript(VERSION_SCHEMA)
-        from .console_access import SCHEMA as ACCESS_SCHEMA
-        connection.executescript(ACCESS_SCHEMA)
-        from .access import initialize
-        initialize(connection)
+        from .schema_gate import ensure
         from .news import sync as sync_news
-        sync_news(connection)
+        ensure(connection,DB,_initialize_database,sync_news)
         yield connection
         connection.commit()
     finally:
         connection.close()
+
+
+def _initialize_database(connection):
+    connection.executescript('''
+    CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, salt TEXT, password TEXT);
+    CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, expires REAL);
+    CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY, token TEXT);
+    CREATE TABLE IF NOT EXISTS reports (agent TEXT, received REAL, data TEXT);
+    CREATE TABLE IF NOT EXISTS latest_reports (agent TEXT PRIMARY KEY, received REAL NOT NULL, data TEXT NOT NULL);
+    CREATE VIEW IF NOT EXISTS current_reports AS
+        SELECT agent,received,data FROM latest_reports
+        UNION ALL
+        SELECT a.id AS agent,r.received,r.data FROM agents a
+        JOIN reports r ON r.rowid=(SELECT rowid FROM reports WHERE agent=a.id ORDER BY received DESC LIMIT 1)
+        WHERE NOT EXISTS(SELECT 1 FROM latest_reports l WHERE l.agent=a.id);
+    CREATE INDEX IF NOT EXISTS reports_agent_time ON reports(agent, received);
+    CREATE INDEX IF NOT EXISTS reports_time ON reports(received);
+    CREATE INDEX IF NOT EXISTS reports_resource_metrics ON reports(agent,received,json_extract(data,'$.cpu_percent'),json_extract(data,'$.memory_percent'));
+    CREATE TABLE IF NOT EXISTS report_maintenance (name TEXT PRIMARY KEY,next_run REAL NOT NULL);
+    CREATE TABLE IF NOT EXISTS agent_profiles (agent TEXT PRIMARY KEY, display_name TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS agent_flags (agent TEXT PRIMARY KEY, important INTEGER NOT NULL DEFAULT 1 CHECK(important IN (0,1)), active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)));
+    CREATE TABLE IF NOT EXISTS agent_settings (agent TEXT PRIMARY KEY, revision INTEGER, data TEXT);
+    CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT,received REAL,agent TEXT,category TEXT,level TEXT,message TEXT);
+    CREATE INDEX IF NOT EXISTS events_time ON events(received);
+    CREATE INDEX IF NOT EXISTS events_agent_time ON events(agent,received);
+    CREATE TABLE IF NOT EXISTS event_state (key TEXT PRIMARY KEY,agent TEXT,body TEXT,active INTEGER);
+    CREATE TABLE IF NOT EXISTS daily_delivery (day TEXT PRIMARY KEY,chunks TEXT,next_part INTEGER,retry_at REAL,completed INTEGER);
+    CREATE TABLE IF NOT EXISTS auth_guard (address TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS account_auth_guard (name TEXT PRIMARY KEY, failures INTEGER NOT NULL, strikes INTEGER NOT NULL, blocked_until TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS attempts (address TEXT PRIMARY KEY, count INTEGER, since REAL);
+    ''')
+    from .news import SCHEMA as NEWS_SCHEMA
+    from .observability import SCHEMA as OBSERVABILITY_SCHEMA
+    from .dependencies import SCHEMA as DEPENDENCY_SCHEMA
+    connection.executescript(NEWS_SCHEMA+OBSERVABILITY_SCHEMA+DEPENDENCY_SCHEMA)
+    from .portal_settings import SCHEMA as SETTINGS_SCHEMA
+    connection.executescript(SETTINGS_SCHEMA)
+    from .portal_backup import SCHEMA as PORTAL_SCHEMA
+    connection.executescript(PORTAL_SCHEMA)
+    from .fleet import SCHEMA as FLEET_SCHEMA
+    from .equipment_history import SCHEMA as EQUIPMENT_SCHEMA
+    from .application_checks import SCHEMA as CHECK_SCHEMA
+    connection.executescript(FLEET_SCHEMA+EQUIPMENT_SCHEMA+CHECK_SCHEMA)
+    from .incident_history import SCHEMA as INCIDENT_SCHEMA
+    connection.executescript(INCIDENT_SCHEMA)
+    from .update_diagnostics import SCHEMA as UPDATE_DIAGNOSTICS_SCHEMA
+    connection.executescript(UPDATE_DIAGNOSTICS_SCHEMA)
+    from .updates import SCHEMA
+    connection.executescript(SCHEMA)
+    from .ai_chat import initialize as initialize_ai
+    initialize_ai(connection)
+    from .processes import SCHEMA as PROCESS_SCHEMA
+    connection.executescript(PROCESS_SCHEMA)
+    from .services import SCHEMA as SERVICES_SCHEMA
+    connection.executescript(SERVICES_SCHEMA)
+    from .github_updates import SCHEMA as GITHUB_SCHEMA
+    connection.executescript(GITHUB_SCHEMA)
+    from .windows import SCHEMA as WINDOWS_SCHEMA
+    connection.executescript(WINDOWS_SCHEMA)
+    from .console import SCHEMA as CONSOLE_SCHEMA
+    connection.executescript(CONSOLE_SCHEMA)
+    from .rdp_control import SCHEMA as RDP_SCHEMA
+    connection.executescript(RDP_SCHEMA)
+    from .console import initialize_sequence
+    initialize_sequence(connection)
+    from .update_versions import SCHEMA as VERSION_SCHEMA
+    connection.executescript(VERSION_SCHEMA)
+    from .console_access import SCHEMA as ACCESS_SCHEMA
+    connection.executescript(ACCESS_SCHEMA)
+    from .access import initialize
+    initialize(connection)
+    from .news import sync as sync_news
+    sync_news(connection)
 
 
 def digest(value):
@@ -123,11 +130,11 @@ def authenticated(request):
     return principal(request,db) is not None
 
 
-def server_rows():
+def server_rows(agent_id=None):
     now=time.time()
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
-        rows=[dict(row) for row in c.execute("SELECT a.id, p.display_name, r.received, r.data,COALESCE(f.important,1) AS important,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id ORDER BY a.id").fetchall()]
+        rows=[dict(row) for row in c.execute("SELECT a.id, p.display_name, r.received, r.data,COALESCE(f.important,1) AS important,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id WHERE (? IS NULL OR a.id=?) ORDER BY a.id",(agent_id,agent_id)).fetchall()]
         from .problem_acknowledgements import attach
         attach(c,rows,now)
         c.commit()
@@ -138,14 +145,12 @@ def server_rows():
             row['groups']=memberships.get(row['id'],[])
             from .access import can_history
             if not can_history():row['sparkline']=[];continue
-            from .memory import RAM_USED_SQL, RAM_TOTAL_SQL
             from .stability import load as load_stability
-            row['availability']=load_stability(c,row['id'],now-86400,now,details=False)['percent']
+            row['availability']=load_stability(c,row['id'],now-86400,now,details=False,summary_only=True)['percent']
             row['sparkline']=[dict(point) for point in c.execute(f"""SELECT AVG(received) AS timestamp,
                 MIN(received) AS first, MAX(received) AS last, COUNT(*) AS samples,
                 AVG(json_extract(data,'$.cpu_percent')) AS cpu, MIN(json_extract(data,'$.cpu_percent')) AS cpu_min, MAX(json_extract(data,'$.cpu_percent')) AS cpu_peak,
-                AVG(json_extract(data,'$.memory_percent')) AS ram, MIN(json_extract(data,'$.memory_percent')) AS ram_min, MAX(json_extract(data,'$.memory_percent')) AS ram_peak,
-                AVG({RAM_USED_SQL}) AS ram_used_bytes, AVG({RAM_TOTAL_SQL}) AS ram_total_bytes
+                AVG(json_extract(data,'$.memory_percent')) AS ram, MIN(json_extract(data,'$.memory_percent')) AS ram_min, MAX(json_extract(data,'$.memory_percent')) AS ram_peak
                 FROM reports INDEXED BY reports_resource_metrics
                 WHERE agent=? AND received>=? AND received<=?
                 GROUP BY CAST(received/30 AS INTEGER) ORDER BY timestamp""",(row['id'],now-900,now))]
@@ -647,7 +652,7 @@ def server_detail(agent_id: str, request: Request, stability: str = '24h'):
         return RedirectResponse('/', status_code=303)
     from .overview import detail_page
     from .access import can_history
-    row = next((row for row in server_rows() if row['id'] == agent_id), None)
+    row = next((row for row in server_rows(agent_id) if row['id'] == agent_id), None)
     if row is None:
         raise HTTPException(404)
     from .forecast import load_forecasts
@@ -708,7 +713,7 @@ app.middleware('http')(access_middleware(db))
 @app.middleware('http')
 async def request_protection(request: Request, call_next):
     address = client_address(request)
-    allowed, retry = limiter.allow(address)
+    allowed, retry = (asset_limiter if request.url.path.startswith('/assets/') else limiter).allow(address)
     if not allowed:
         return JSONResponse({'detail': 'Слишком много запросов'}, status_code=429, headers={'Retry-After': str(retry), 'Cache-Control': 'no-store'})
     if request.method not in ('GET', 'HEAD', 'POST'):
@@ -722,9 +727,10 @@ async def request_protection(request: Request, call_next):
         except ValueError:
             return JSONResponse({'detail': 'Некорректная длина запроса'}, status_code=400)
     # Do not cut off Windows agents behind the same public NAT as a blocked user.
-    if not request.url.path.startswith(('/api/report/','/api/agent-update/','/api/processes/','/api/windows/','/api/console/')):
-        with db() as c:
-            wait = blocked_seconds(c, address, time.time())
+    if not request.url.path.startswith(('/assets/','/api/report/','/api/agent-update/','/api/processes/','/api/windows/','/api/console/')):
+        def read_wait():
+            with db() as c:return blocked_seconds(c,address,time.time())
+        wait=await run_in_threadpool(read_wait)
         if wait:
             return JSONResponse({'detail': 'Адрес временно заблокирован после ошибок входа'}, status_code=429, headers={'Retry-After': str(wait), 'Cache-Control': 'no-store'})
     if request.url.path == '/login' and request.method == 'POST':
@@ -830,3 +836,8 @@ register_problem_acknowledgements(app,db,authenticated,csrf_token)
 
 from .resource_charts import register as register_resource_charts
 register_resource_charts(app,db,authenticated)
+
+from .assets import register as register_assets
+register_assets(app)
+from .compression import UICompression
+app.add_middleware(UICompression)

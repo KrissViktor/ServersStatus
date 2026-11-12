@@ -11,7 +11,7 @@
       if(panel.dataset.taskReady)return;panel.dataset.taskReady='yes';
       const historical=panel.hasAttribute('data-task-payload');
       const saved=historical?JSON.parse(panel.dataset.taskPayload):null;
-      let active='processes';const loaders={};
+      let active='processes';const loaders={};let visibility=null;
       const tabs=[...panel.querySelectorAll('[data-task-tab]')];
       function activate(kind){active=kind;for(const tab of tabs){const selected=tab.dataset.taskTab===kind;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1}for(const view of panel.querySelectorAll('[data-task-view]'))view.hidden=view.dataset.taskView!==kind;loaders[kind]?.()}
       tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>activate(tab.dataset.taskTab));tab.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[n].focus();activate(tabs[n].dataset.taskTab)}})});
@@ -64,13 +64,15 @@
         view.querySelectorAll('[data-sort]').forEach(button=>button.addEventListener('click',()=>{if(sort.value===button.dataset.sort){descending=!descending;render()}else{sort.value=button.dataset.sort;newSort()}}));
         async function load(){
           if(historical||busy||document.hidden||active!==kind||!panel.isConnected)return;
+          const box=panel.getBoundingClientRect();if(!box.width||box.bottom<0||box.top>innerHeight)return;
           const fold=panel.closest('details.server-fold');if(fold&&!fold.open)return;
           if(Date.now()-lastLoad<1500)return;busy=true;
           try{const response=await fetch('/api/servers/'+panel.dataset.taskAgent+'/'+kind,{credentials:'same-origin',cache:'no-store'});if(!response.ok)throw Error();const result=await response.json(),next=JSON.stringify(result);lastLoad=Date.now();if(next!==signature){signature=next;accept(result)}}catch(_){info.textContent='Не удалось обновить список. Показаны последние полученные данные.'}finally{busy=false}
         }
         loaders[kind]=load;
-        if(historical)accept(saved[kind]);else{render();const timer=setInterval(()=>{if(!panel.isConnected){clearInterval(timer);return}load()},10000);panel.closest('details.server-fold')?.addEventListener('toggle',()=>{if(active===kind)load()})}
+        if(historical)accept(saved[kind]);else{render();const timer=setInterval(()=>{if(!panel.isConnected){clearInterval(timer);visibility?.disconnect();return}load()},10000);panel.closest('details.server-fold')?.addEventListener('toggle',()=>{if(active===kind)load()})}
       }
+      if(!historical&&window.IntersectionObserver){visibility=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))loaders[active]?.()});visibility.observe(panel)}
       activate('processes');
     });
   }

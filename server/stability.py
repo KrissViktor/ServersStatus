@@ -6,7 +6,7 @@ from .windows_ui import stamp
 REPORT_GRACE = 30  # three normal ten-second reporting intervals
 
 
-def load(c, agent, start, end, details=True):
+def load(c, agent, start, end, details=True,summary_only=False):
     first = c.execute('SELECT received FROM reports WHERE agent=? ORDER BY received LIMIT 1', (agent,)).fetchone()
     latest = c.execute('SELECT received FROM current_reports WHERE agent=?', (agent,)).fetchone()
     known = [row[0] for row in (first, latest) if row is not None and row[0] is not None]
@@ -14,6 +14,19 @@ def load(c, agent, start, end, details=True):
         return {'start': start, 'end': end, 'percent': None, 'gaps': [], 'segments': [], 'reboots': [], 'covered': 0, 'missing': 0, 'longest': 0}
     from .portal_settings import retention_days
     start = max(start, min(known), end - retention_days(c)*86400)
+    if summary_only:
+        # A single indexed SQL aggregation avoids building a Python list for every
+        # report of every server on each ten-second overview refresh.
+        row=c.execute("""WITH stamps(t) AS (
+            SELECT received FROM reports WHERE agent=? AND received>=? AND received<=?
+            UNION SELECT ? WHERE ? IS NOT NULL AND ?>=? AND ?<=?
+        ), ordered AS (SELECT t,LAG(t) OVER (ORDER BY t) AS previous FROM stamps)
+        SELECT SUM(MAX(0,MIN(?,t+30)-MAX(?,t,COALESCE(previous+30,?)))) AS covered,
+            MAX(MAX(0,MIN(?,t)-MAX(?,COALESCE(previous+30,?)))) AS longest,MAX(t) AS last
+        FROM ordered""",(agent,start-REPORT_GRACE,end,latest[0] if latest else None,latest[0] if latest else None,latest[0] if latest else None,start-REPORT_GRACE,latest[0] if latest else None,end,end,start,start,end,start,start)).fetchone()
+        seconds=row['covered'] or 0;total=max(0,end-start)
+        tail=max(0,end-max(start,row['last']+REPORT_GRACE)) if row['last'] is not None else total
+        return {'start':start,'end':end,'percent':100*seconds/total if total else None,'covered':seconds,'missing':max(0,total-seconds),'longest':max(tail,row['longest'] or 0),'gaps':[],'segments':[],'reboots':[]}
     previous = c.execute('SELECT received FROM reports WHERE agent=? AND received<? ORDER BY received DESC LIMIT 1', (agent, start)).fetchone()
     timestamps = ([previous[0]] if previous else []) + [r[0] for r in c.execute('SELECT received FROM reports WHERE agent=? AND received>=? AND received<=? ORDER BY received', (agent, start, end))]
     if latest and latest[0] <= end and latest[0] not in timestamps:
@@ -74,7 +87,8 @@ def render(info, agent, period='24h', base='servers'):
             a=info['start']+span*i/96;b=info['start']+span*(i+1)/96
             seconds=sum(max(0,min(b,y)-max(a,x)) for x,y in info['segments'])
             state='normal' if seconds>=b-a-.001 else 'danger' if seconds==0 else 'warning'
-            content+='<span class="'+state+'" title="'+esc(stamp(a)+' — '+stamp(b)+' · отчёты покрывают '+f'{seconds/(b-a)*100:.1f}%')+'"></span>'
+            label=stamp(a)+' — '+stamp(b)+' · отчёты покрывают '+f'{seconds/(b-a)*100:.1f}%'
+            content+='<a class="'+state+'" href="/timeline/'+esc(quote(agent,safe=''))+'?start='+str(max(0,min(a,b-1)))+'&amp;end='+str(max(b,1))+'" title="'+esc(label)+'" aria-label="'+esc(label+' · Открыть события интервала')+'"></a>'
         content+='</div><p class="muted">Учтённый период: '+esc(stamp(info['start']))+' — '+esc(stamp(info['end']))+'</p>'
     content+='<p class="muted legend">Ожидаемый интервал — 10 с. Отчёт подтверждает связь на 30 с вперёд; остальное время снижает процент. Зелёный — есть отчёты, жёлтый — частичный пропуск, красный — нет данных. До первого известного отчёта время не считается. Потеря связи, остановка агента и выключение сервера здесь неразличимы. Системный аптайм — отдельный показатель.</p>'
     if info['gaps']:

@@ -55,6 +55,8 @@ class RequestLimiter:
 
 
 limiter = RequestLimiter()
+# Cached public assets have their own bounded budget; they must not consume login/UI requests.
+asset_limiter = RequestLimiter(capacity=80,refill=20,global_capacity=240,global_refill=80)
 login_limiter = RequestLimiter(capacity=4, refill=1/30, global_capacity=10, global_refill=1)
 
 
