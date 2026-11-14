@@ -672,10 +672,9 @@ def server_detail(agent_id: str, request: Request, stability: str = '24h'):
     row = next((row for row in server_rows(agent_id) if row['id'] == agent_id), None)
     if row is None:
         raise HTTPException(404)
-    from .forecast import load_forecasts
     with db() as c:
-        current_disks = {d.get('path') for d in monitored_disks(json.loads(row['data'] or '{}'))}
-        row['forecasts'] = {path: value for path,value in load_forecasts(c, agent_id, time.time()).items() if path in current_disks}
+        from urllib.parse import quote
+        row['forecast_url'] = '/servers/' + quote(agent_id, safe='') + '/forecast'
         if can_history():
             from .stability import load as load_stability,render as stability_render
             from .incident_history import sync,history_html
@@ -693,6 +692,25 @@ def server_detail(agent_id: str, request: Request, stability: str = '24h'):
         data['features']=[feature for feature in data.get('features',[]) if not feature.startswith('console')]
         row['data']=json.dumps(data)
     return HTMLResponse(detail_page(row, csrf_token(request),console_access=access))
+
+
+@app.get('/servers/{agent_id}/forecast')
+def server_forecast(agent_id: str, request: Request):
+    if not authenticated(request):
+        raise HTTPException(401)
+    from .access import can_history
+    if not can_history():
+        raise HTTPException(403)
+    from .forecast import load_forecasts, forecast_body
+    with db() as c:
+        row = c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id WHERE a.id=?', (agent_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404)
+        disks = monitored_disks(json.loads(row['data'] or '{}'))
+        now = time.time()
+        stale = row['received'] is None or now-row['received'] >= 180
+        forecasts = load_forecasts(c, agent_id, now) if disks and not stale else {}
+    return {'disks': {str(disk.get('path', '')): forecast_body(forecasts.get(disk.get('path'), {'status': 'insufficient'}), disk, stale) for disk in disks}}
 
 
 @app.post('/servers/{agent_id}/name')

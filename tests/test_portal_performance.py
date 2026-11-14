@@ -28,6 +28,36 @@ class PortalPerformanceTest(unittest.TestCase):
                 self.assertEqual(c.execute('PRAGMA journal_mode').fetchone()[0],'wal')
                 self.assertEqual(c.execute('SELECT COUNT(*) FROM agents').fetchone()[0],1)
 
+    def test_server_page_defers_forecast_history_until_requested(self):
+        report={**self.fixture.report,'disks':[{'path':'C:','free_bytes':50,'total_bytes':100,'used_percent':50}]}
+        self.assertEqual(self.client.post('/api/report/pc',headers={'Authorization':'Bearer key'},json=report).status_code,200)
+        with patch('server.forecast.load_forecasts',side_effect=AssertionError('Page must not scan a week of disk history')):
+            response=self.client.get('/servers/pc')
+        self.assertEqual(response.status_code,200)
+        self.assertIn('data-forecast-url="/servers/pc/forecast"',response.text)
+        self.assertIn('data-disk-path="C:"',response.text)
+        self.assertIn('/disk_forecast.js',response.text)
+        with patch('server.forecast.load_forecasts',return_value={'C:':{'status':'stable'},'removed':{'status':'stable'}}) as measured:
+            response=self.client.get('/servers/pc/forecast')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(set(response.json()['disks']),{'C:'})
+        self.assertIn('Устойчивого уменьшения',response.json()['disks']['C:'])
+        self.assertEqual(measured.call_count,1)
+        self.assertEqual(response.headers['cache-control'],'no-store')
+
+    def test_forecast_endpoint_enforces_access_and_skips_stale_reports(self):
+        with patch('server.forecast.load_forecasts',side_effect=AssertionError('Unauthorized or stale requests must not scan history')):
+            self.assertEqual(self.fixture.clients['reader'].get('/servers/pc/forecast').status_code,403)
+            self.assertEqual(self.client.get('/servers/missing/forecast').status_code,404)
+            report={**self.fixture.report,'disks':[{'path':'C:','free_bytes':50,'total_bytes':100,'used_percent':50}]}
+            with a.db() as c:
+                c.execute('UPDATE latest_reports SET received=?,data=? WHERE agent=?',(time.time()-200,json.dumps(report),'pc'))
+            response=self.client.get('/servers/pc/forecast')
+            self.assertEqual(response.status_code,200)
+            self.assertIn('Нет связи с агентом',response.json()['disks']['C:'])
+            self.client.cookies.clear()
+            self.assertEqual(self.client.get('/servers/pc/forecast').status_code,401)
+
     def test_history_reader_does_not_block_report_commit_or_pages(self):
         # Keep a real SQLite read transaction open, as a long history query does.
         reader=sqlite3.connect(a.DB)

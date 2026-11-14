@@ -80,11 +80,13 @@ def forecast_body(forecast,disk,stale=False):
     return content
 
 
-def disk_forecast_html(forecast,disk,stale=False):
+def disk_forecast_html(forecast,disk,stale=False,url=''):
     path=str(disk.get('path',''))
     key='disk-forecast-'+hashlib.sha256(path.encode()).hexdigest()[:16]
     icon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16h16M7 15l4-4 4 2 5-7m-5 0h5v5"/></svg>'
-    return '<details class="disk-forecast" data-fold-key="'+key+'"><summary title="Прогноз заполнения '+esc(path)+'">'+icon+'<span><b>Прогноз заполнения</b><small>Темп роста и сроки · подробнее</small></span><span class="disk-forecast-chevron" aria-hidden="true">›</span></summary><div class="disk-forecast-body">'+forecast_body(forecast,disk,stale)+'<p class="muted legend">Оценка по часовым средним за 7 дней. Удаления, рост БД и очистка бэкапов меняют прогноз.</p></div></details>'
+    attrs=' data-forecast-url="'+esc(url)+'" data-disk-path="'+esc(path)+'"' if url else ''
+    body='<p class="muted">Прогноз загрузится при раскрытии.</p>' if url else forecast_body(forecast,disk,stale)
+    return '<details class="disk-forecast" data-fold-key="'+key+'"'+attrs+'><summary title="Прогноз заполнения '+esc(path)+'">'+icon+'<span><b>Прогноз заполнения</b><small>Темп роста и сроки · подробнее</small></span><span class="disk-forecast-chevron" aria-hidden="true">›</span></summary><div class="disk-forecast-body"><div class="disk-forecast-result">'+body+'</div><p class="muted legend">Оценка по часовым средним за 7 дней. Удаления, рост БД и очистка бэкапов меняют прогноз.</p></div></details>'
 
 
 def forecast_html(forecasts, stale=False, disks=None):

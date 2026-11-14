@@ -67,5 +67,7 @@ jobs:
       - run: python -m compileall -q server agent tests
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m unittest discover -s tests -v
-      - run: node tests/chart_geometry.test.js
+      - run: |
+          node tests/chart_geometry.test.js
+          node tests/disk_forecast.test.js
       - run: bash -n deploy/upgrade-portal-python.sh

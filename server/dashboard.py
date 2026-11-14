@@ -245,7 +245,7 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None, csr
         content += f'<div class="disk"><div class="disk-title"><strong>{esc(disk.get("path", "—"))}</strong><span class="text-{level(percent)}">{percent:.1f}% занято</span></div><progress class="{level(percent)}" value="{percent}" max="100" aria-label="Занято на диске {esc(disk.get("path", ""))}"></progress><p class="muted">{esc(disk.get("filesystem") or "")}</p><p><b>{size(disk.get("free_bytes"))}</b> свободно <span class="muted">из {size(disk.get("total_bytes"))}</span></p>'
         if forecasts is not None and can_history():
             from .forecast import disk_forecast_html
-            content+=disk_forecast_html(forecasts.get(disk.get('path'),{'status':'insufficient'}),disk,not online)
+            content+=disk_forecast_html(forecasts.get(disk.get('path'),{'status':'insufficient'}),disk,not online,url=dict(row).get('forecast_url',''))
         if not historical and percent>=85:content+=control(row,disk_key(row['id'],str(disk.get('path',''))),csrf,return_to)
         content+='</div>'
     content += '</div><p class="muted legend">Жёлтый: занято от 85% · Красный: от 95%</p></section>'
