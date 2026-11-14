@@ -45,6 +45,11 @@ def db():
 
 
 def _initialize_database(connection):
+    # History readers must not prevent report writers from committing. WAL is
+    # persistent for this database and is enabled once by the schema gate.
+    mode = connection.execute('PRAGMA journal_mode=WAL').fetchone()[0]
+    if mode != 'wal':
+        raise RuntimeError('SQLite WAL mode is required for concurrent portal access')
     connection.executescript('''
     CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, salt TEXT, password TEXT);
     CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, expires REAL);

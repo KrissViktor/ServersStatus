@@ -2,6 +2,7 @@
 import asyncio
 import json
 import random
+import sqlite3
 import threading
 import time
 import unittest
@@ -17,6 +18,31 @@ class PortalPerformanceTest(unittest.TestCase):
     def setUp(self):
         self.fixture=fixtures.AccessRolesTest();self.fixture.setUp();self.addCleanup(self.fixture.doCleanups)
         self.client=self.fixture.clients['admin']
+
+    def test_existing_database_switches_to_wal_on_process_initialization(self):
+        from server.schema_gate import _ready
+        with sqlite3.connect(a.DB) as c:
+            self.assertEqual(c.execute('PRAGMA journal_mode=DELETE').fetchone()[0],'delete')
+        with patch.dict(_ready,{},clear=True):
+            with a.db() as c:
+                self.assertEqual(c.execute('PRAGMA journal_mode').fetchone()[0],'wal')
+                self.assertEqual(c.execute('SELECT COUNT(*) FROM agents').fetchone()[0],1)
+
+    def test_history_reader_does_not_block_report_commit_or_pages(self):
+        # Keep a real SQLite read transaction open, as a long history query does.
+        reader=sqlite3.connect(a.DB)
+        try:
+            reader.execute('BEGIN')
+            before=reader.execute('SELECT COUNT(*) FROM reports').fetchone()[0]
+            response=self.client.post('/api/report/pc',headers={'Authorization':'Bearer key'},json=self.fixture.report)
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(self.client.get('/').status_code,200)
+            self.assertEqual(self.client.get('/servers/pc').status_code,200)
+            self.assertEqual(reader.execute('SELECT COUNT(*) FROM reports').fetchone()[0],before)
+        finally:
+            reader.rollback();reader.close()
+        with a.db() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM reports').fetchone()[0],before+1)
 
     def test_slow_report_storage_does_not_freeze_other_http_requests(self):
         entered=threading.Event();release=threading.Event()
