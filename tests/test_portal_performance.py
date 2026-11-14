@@ -1,9 +1,12 @@
 """Caching must not bypass access checks, stale schema detection or exact coverage."""
+import asyncio
 import json
 import random
+import threading
 import time
 import unittest
 from unittest.mock import patch
+import httpx
 import test_access_roles as fixtures
 from server import app as a
 from server.assets import url
@@ -14,6 +17,28 @@ class PortalPerformanceTest(unittest.TestCase):
     def setUp(self):
         self.fixture=fixtures.AccessRolesTest();self.fixture.setUp();self.addCleanup(self.fixture.doCleanups)
         self.client=self.fixture.clients['admin']
+
+    def test_slow_report_storage_does_not_freeze_other_http_requests(self):
+        entered=threading.Event();release=threading.Event()
+        def slow_cleanup(c,now):
+            entered.set()
+            if not release.wait(3):
+                raise RuntimeError('Report storage blocked the HTTP event loop')
+
+        async def check():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=a.app),base_url='https://testserver') as client:
+                report=asyncio.create_task(client.post('/api/report/pc',headers={'Authorization':'Bearer key'},json=self.fixture.report))
+                try:
+                    self.assertTrue(await asyncio.to_thread(entered.wait,2))
+                    health=await asyncio.wait_for(client.get('/health'),1)
+                    self.assertEqual(health.json(),{'status':'ok'})
+                    self.assertFalse(report.done(),'Health must respond while report storage is still pending')
+                finally:
+                    release.set()
+                    result=await report
+                self.assertEqual(result.status_code,200)
+        with patch.object(a,'cleanup',side_effect=slow_cleanup):
+            asyncio.run(check())
 
     def test_assets_are_versioned_cacheable_and_allowlisted(self):
         asset=url('resource_charts.js')

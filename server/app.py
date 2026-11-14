@@ -337,23 +337,35 @@ class Report(BaseModel):
 @app.post('/api/report/{agent_id}')
 async def report(agent_id: str, request: Request):
     authorization = request.headers.get('authorization', '')
+    token = await run_in_threadpool(report_token, agent_id, authorization)
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 65536:
+            raise HTTPException(413)
+    return await run_in_threadpool(store_report, agent_id, token, body)
+
+
+def report_token(agent_id, authorization):
     with db() as c:
         agent = c.execute('SELECT token FROM agents WHERE id=?', (agent_id,)).fetchone()
         if not agent or not hmac.compare_digest(agent['token'], digest(authorization.removeprefix('Bearer '))):
             raise HTTPException(401)
-        body = bytearray()
-        async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > 65536:
-                raise HTTPException(413)
-        try:
-            data = Report.model_validate_json(body)
-            data.disks = monitored_disks(data.model_dump())
-        except ValueError:
-            raise HTTPException(422, 'Некорректный отчёт')
+        return agent['token']
+
+
+def store_report(agent_id, token, body):
+    # SQLite waits and retention work must not block the HTTP event loop.
+    # Each worker owns its connection, including the complete write transaction.
+    try:
+        data = Report.model_validate_json(body)
+        data.disks = monitored_disks(data.model_dump())
+    except ValueError:
+        raise HTTPException(422, 'Некорректный отчёт')
+    with db() as c:
         c.execute('BEGIN IMMEDIATE')
         current = c.execute('SELECT token FROM agents WHERE id=?', (agent_id,)).fetchone()
-        if not current or not hmac.compare_digest(current['token'], agent['token']):
+        if not current or not hmac.compare_digest(current['token'], token):
             raise HTTPException(401)
         received = time.time()
         encoded = data.model_dump_json()
