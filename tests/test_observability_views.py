@@ -94,6 +94,32 @@ class ObservatoryTest(unittest.TestCase):
         edges=[{'dependent':'pc','provider':'sql'},{'dependent':'sql','provider':'pc'}]
         self.assertEqual(impacted(edges,{'sql'}),{'pc'})
 
+    def test_incident_context_and_weekly_plan_link_to_existing_records(self):
+        admin=self.clients['admin']
+        now=time.time()
+        data={**self.fixture.report,'backups':[{
+            'name':'ERP','path':'backups','state':'stale','schedule':'daily',
+            'file':'erp.bak','created_at':now-200000,'age_seconds':200000,'size_bytes':2**31,
+        }]}
+        self.assertEqual(admin.post('/api/report/pc',headers={'Authorization':'Bearer key'},json=data).status_code,200)
+        with a.db() as c:
+            for offset in (7200,3600):
+                identifier=c.execute("""INSERT INTO incident_history
+                    (key,agent,category,opened,last_seen,closed,resolution,message)
+                    VALUES ('test:pc','pc','service',?,?,?,'recovered','ERP service recurrence')""",
+                    (now-offset,now-offset,now-offset+30)).lastrowid
+        plan=admin.get('/weekly-plan')
+        self.assertEqual(plan.status_code,200)
+        self.assertIn('ERP service recurrence',plan.text)
+        self.assertIn('/servers/pc#backups',plan.text)
+        self.assertIn('/timeline/pc?incident='+str(identifier),plan.text)
+        self.assertEqual(self.clients['reader'].get('/weekly-plan').status_code,403)
+        timeline=admin.get('/timeline/pc',params={'incident':identifier})
+        self.assertEqual(timeline.status_code,200)
+        self.assertIn('incident-context',timeline.text)
+        self.assertIn('Графики за этот день',timeline.text)
+        self.assertIn('Копия ожидается к',admin.get('/servers/pc').text)
+
     def test_news_restore_is_idempotent_and_viewer_can_read(self):
         with a.db() as c:
             before=c.execute('SELECT COUNT(*) FROM portal_news').fetchone()[0];self.assertGreaterEqual(before,122)

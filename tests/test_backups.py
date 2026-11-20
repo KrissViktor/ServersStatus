@@ -26,11 +26,15 @@ class BackupScheduleTest(unittest.TestCase):
     def test_month_rollover_and_grace(self):
         self.create('2026_10_01')
         self.assertEqual(self.inspect('2026-11-01T10:00:00')['state'], 'observing')
-        self.assertEqual(self.inspect('2026-11-01T10:00:00')['state'], 'fresh')
+        during_grace = self.inspect('2026-11-01T10:00:00')
+        self.assertEqual(during_grace['state'], 'fresh')
+        self.assertEqual(during_grace['expected_at'], datetime(2026,11,2,12).timestamp())
         self.assertEqual(self.inspect('2026-11-02T12:00:00')['state'], 'stale')
         self.create('2026_11_01')
         self.assertEqual(self.inspect('2026-11-06T10:00:00')['state'], 'observing')
-        self.assertEqual(self.inspect('2026-11-06T10:00:00')['state'], 'fresh')
+        current = self.inspect('2026-11-06T10:00:00')
+        self.assertEqual(current['state'], 'fresh')
+        self.assertEqual(current['expected_at'], datetime(2026,12,2,12).timestamp())
 
     def test_filename_over_mtime_and_daily(self):
         self.rule.update(schedule='daily', max_age_hours=26)

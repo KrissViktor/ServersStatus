@@ -388,6 +388,19 @@ svg[data-resource-metric]{min-width:0;touch-action:pan-y;cursor:crosshair}.histo
 .history-details { margin: 18px 0; }
 .history-details > [data-history-status]:empty { display: none; }
 .history-details > [data-history-retry][hidden] { display: none; }
+.problem-summary-row > span:last-child { white-space: normal; }
+.problem-age { display: block; margin-top: 4px; color: var(--muted); }
+.problem-summary .problem-more > summary { position: static; padding: 8px 0; }
+.problem-summary > header { padding-right: 0; }
+.backup-schedule { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 8px; margin: 10px 0; font-size: 12px; }
+.backup-schedule dt { color: var(--muted); }
+.backup-schedule dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.timeline-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.incident-context { margin-bottom: 20px; overflow-wrap: anywhere; }
+.weekly-plan { margin: 16px 0; }
+.weekly-plan ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.weekly-plan li + li { border-top: 1px solid var(--line); }
+.weekly-plan li a { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 10px 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .history-period .period { min-height: 44px; }
   .history-date-filter > button { width: 100%; }

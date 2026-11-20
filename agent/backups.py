@@ -15,6 +15,13 @@ def inspect_backup(item, previous, now=None):
     result = {'path': folder, 'name': item.get('name', folder), 'schedule': item.get('schedule', 'daily'), 'min_size_bytes': item.get('min_size_bytes', 1024**3)}
     for key, default in [('pattern', '*.bak'), ('recursive', False), ('date_from_filename', False), ('max_age_hours', 30), ('grace_hours', 36)]:
         result[key] = item.get(key, default)
+    if result['schedule'] == 'monthly':
+        current = datetime.fromtimestamp(now)
+        month_start = current.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        grace = timedelta(hours=result['grace_hours'])
+        deadline = month_start + grace
+        required = month_start if current >= deadline else (month_start - timedelta(days=1)).replace(day=1)
+        result.update(expected_since=required.strftime('%Y-%m-%d'), expected_at=(required+grace).timestamp())
     try:
         # scandir raises on a missing/inaccessible root; do not call it "no files".
         with os.scandir(folder):
@@ -56,14 +63,11 @@ def inspect_backup(item, previous, now=None):
         stable = previous.get(key) == signature
         previous[key] = signature
         if result['schedule'] == 'monthly':
-            current = datetime.fromtimestamp(now)
-            month_start = current.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            deadline = month_start + timedelta(hours=item.get('grace_hours', 36))
-            required = month_start if current >= deadline else (month_start - timedelta(days=1)).replace(day=1)
             fresh = datetime.fromtimestamp(timestamp) >= required
-            result['expected_since'] = required.strftime('%Y-%m-%d')
         else:
             fresh = now - timestamp <= item.get('max_age_hours', 30) * 3600
+            if timestamp <= now + 300:
+                result['expected_at'] = timestamp + result['max_age_hours'] * 3600
         state = 'fresh' if fresh else 'stale'
         if timestamp > now + 300:
             state = 'future'
@@ -75,6 +79,9 @@ def inspect_backup(item, previous, now=None):
             state = 'stale'
         elif not stable:
             state = 'observing'
+        if result['schedule'] == 'monthly' and state in ('fresh','observing'):
+            next_month = (month_start + timedelta(days=32)).replace(day=1) if timestamp >= month_start.timestamp() else month_start
+            result['expected_at'] = (next_month + grace).timestamp()
         return dict(result, state=state, created_at=timestamp, file=path.name, relative_path=str(path.relative_to(folder)),
                     size_bytes=stat.st_size, age_seconds=max(0, int(now-timestamp)),
                     backup_date=datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'))

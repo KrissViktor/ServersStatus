@@ -139,9 +139,9 @@ def page(content, refresh=False, protection_entry=False):
             content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
     if '<header class="topbar"' in content:
         links=[('/?reset=1','Серверы'),('/wallboard','Большой экран')]
-        if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/problems?view=active','Проблемы'),('/updates','Обновления'),('/admin','Обслуживание')]
+        if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/problems?view=active','Проблемы'),('/weekly-plan','План на неделю'),('/updates','Обновления'),('/admin','Обслуживание')]
         from .ui_icons import icon
-        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/updates':'update','/admin':'equipment'}
+        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/weekly-plan':'timeline','/updates':'update','/admin':'equipment'}
         navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+icon(navigation_icons[url.split('?')[0]])+esc(label)+'</a>' for url,label in links)
         bar='<nav class="portal-navigation" aria-label="Основные разделы"><div class="portal-navigation-desktop">'+navigation+'</div><details class="portal-navigation-mobile"><summary>Разделы портала <span aria-hidden="true">⌄</span></summary><div>'+navigation+'</div></details></nav><nav class="portal-breadcrumbs" aria-label="Путь страницы" hidden></nav>'
         content=topbar_insert(content,bar,after=True)
@@ -192,7 +192,7 @@ def backup_alerts(rows, now):
             from .incidents import incident_key
             key=incident_key(row['id'],backup.get('path',backup.get('name','')))
             if dict(row).get('problem_states',{}).get(key,{}).get('acknowledged'):continue
-            problems = backup_problems(backup, elapsed)
+            problems = backup_problems(backup, elapsed if elapsed < 180 else 0)
             if not problems:
                 continue
             name = backup.get('name') or backup.get('path', 'Бэкап')
@@ -261,22 +261,31 @@ def server_card(row, now, rdp_access=None, historical=False, forecasts=None, csr
         key=service_key(row['id'],service.get('name',''))
         acknowledged=not historical and dict(row).get('problem_states',{}).get(key,{}).get('acknowledged')
         service_control=control(row,key,csrf,return_to) if not historical and state!='running' else ''
-        content += f'<div class="list-row tracked-service{ " service-acknowledged" if acknowledged else ""}" data-service-name="{esc(service.get("name",""))}"><b>{esc(service.get("display_name") or service.get("name", "—"))}{service_file}</b><div class="service-status"><span class="badge {"normal" if state == "running" else "neutral" if acknowledged else "warning"}">{esc(labels.get(state, state))}</span>'+service_control+'</div></div>'
-    content += '</section><section><h3>Резервные копии</h3>'
+        label = labels.get(state,state)
+        color = 'normal' if state == 'running' else 'neutral' if acknowledged else 'warning'
+        if not historical and not online:
+            label, color = 'Данные устарели · '+label, 'neutral'
+        content += f'<div class="list-row tracked-service{ " service-acknowledged" if acknowledged else ""}" data-service-name="{esc(service.get("name",""))}"><b>{esc(service.get("display_name") or service.get("name", "—"))}{service_file}</b><div class="service-status"><span class="badge {color}">{esc(label)}</span>'+service_control+'</div></div>'
+    content += '</section><section id="backups"><h3>Резервные копии</h3>'
     backups = data.get('backups', [])
     if not backups:
         content += '<p class="empty small">Папки бэкапов не настроены</p>'
     for backup in backups:
         state = backup.get('state', 'error')
-        problems = backup_problems(backup, age)
+        problems = backup_problems(backup, age if online and not historical else 0)
         if problems:
             state = 'alarm'
         elif state == 'stale' and backup.get('schedule', 'daily') == 'daily':
             state = 'fresh'
-        labels = {'alarm': 'Ошибка бэкапа', 'too_small': 'Размер меньше 1 Гб', 'fresh': 'Свежий файл', 'stale': 'Просрочен', 'observing': 'Проверяем стабильность', 'missing': 'Файл не найден', 'error': 'Ошибка чтения', 'future': 'Дата из будущего', 'empty': 'Пустой файл'}
+        labels = {'alarm': 'Ошибка бэкапа', 'too_small': 'Файл меньше минимума', 'fresh': 'Файл обнаружен', 'stale': 'Просрочен', 'observing': 'Проверяем стабильность', 'missing': 'Файл не найден', 'error': 'Ошибка чтения', 'future': 'Дата из будущего', 'empty': 'Пустой файл'}
         color = 'normal' if state == 'fresh' else 'danger' if state in ('alarm', 'too_small', 'stale', 'missing', 'error', 'future', 'empty') else 'warning'
-        content += f'<div class="backup"><div class="list-row"><b>{esc(backup.get("name") or backup.get("path", "—"))}</b><span class="badge {color}">{esc(labels.get(state, state))}</span></div>'
+        label = labels.get(state,state)
+        if not historical and not online:
+            color, label = 'neutral', 'Данные устарели · '+label
+        content += f'<div class="backup"><div class="list-row"><b>{esc(backup.get("name") or backup.get("path", "—"))}</b><span class="badge {color}">{esc(label)}</span></div>'
         content += f'<p>{esc(backup.get("path", ""))}</p>'
+        from .backup_status import schedule_html
+        content += schedule_html(backup,row['received'],row['received'] if historical else now)
         if backup.get('expected_since'):
             content += f'<p>Ожидается копия за 1-е число месяца от {esc(backup["expected_since"])}</p>'
         if backup.get('file'):
@@ -360,4 +369,4 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf=''):
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now,csrf)
     from .drilldown import widget
-    return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+summary+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
+    return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+summary+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')

@@ -174,6 +174,18 @@ def index(request: Request, q: str = '', view: str = 'all', group: str = ''):
     return HTMLResponse(dashboard(server_rows(), q, view, group,news_html=news_html,csrf=csrf_token(request)))
 
 
+@app.get('/weekly-plan', response_class=HTMLResponse)
+def weekly_plan(request: Request, group: str = ''):
+    from .access import can_history
+    if not authenticated(request):
+        return RedirectResponse('/',303)
+    if not can_history():
+        raise HTTPException(403)
+    from .weekly_plan import render
+    with db() as c:
+        return HTMLResponse(render(c,group,time.time()),headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'})
+
+
 @app.post('/login')
 async def login(request: Request):
     from urllib.parse import parse_qs

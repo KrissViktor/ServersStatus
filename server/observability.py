@@ -3,7 +3,7 @@ import json
 import math
 import time
 from datetime import datetime,timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from fastapi import Request,HTTPException
 from fastapi.responses import HTMLResponse,RedirectResponse
 from .dashboard import page,esc,duration
@@ -91,7 +91,7 @@ def register(app,db,authenticated):
         return HTMLResponse(page(content))
 
     @app.get('/timeline/{agent}',response_class=HTMLResponse)
-    def history(agent:str,request:Request,period:str='7d',day:str='',kind:str='',start:float|None=None,end:float|None=None):
+    def history(agent:str,request:Request,period:str='7d',day:str='',kind:str='',start:float|None=None,end:float|None=None,incident:int|None=None):
         if not authenticated(request):return RedirectResponse('/',303)
         types={'connection':'Связь','incident':'Проблемы','reboot':'Перезагрузки','update':'Обновления','equipment':'Комплектация','configuration':'Настройки'}
         if period not in ('24h','7d','30d') or kind not in ('',*types):raise HTTPException(400)
@@ -106,17 +106,61 @@ def register(app,db,authenticated):
             if start>now:raise HTTPException(400,'Дата в будущем')
             end=min(now,start+86400)
         else:end=now;start=end-{'24h':86400,'7d':604800,'30d':2592000}[period]
+        focus = None
+        metrics = None
         with db() as c:
             row=c.execute('SELECT a.id,COALESCE(p.display_name,a.id) AS name FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id WHERE a.id=?',(agent,)).fetchone()
             if not row:raise HTTPException(404)
+            if incident is not None:
+                if not 1<=incident<=9223372036854775807:raise HTTPException(404)
+                focus=c.execute('SELECT * FROM incident_history WHERE id=? AND agent=?',(incident,agent)).fetchone()
+                if not focus:raise HTTPException(404)
+                if not interval:
+                    start=max(0,focus['opened']-1800)
+                    end=min(now,(focus['closed'] or now)+1800,start+86400)
+                    interval=True
+                from .fleet import stats
+                metrics=stats(c,agent,start,end)
             from .portal_settings import retention_days
             if end<now-retention_days(c)*86400:raise HTTPException(400,'Дата вне срока хранения')
-            items=timeline(c,agent,start,end);items=[item for item in items if not kind or item['kind']==kind]
+            items=[item for item in timeline(c,agent,start,end) if not kind or item['kind']==kind][:300]
+            for item in items:
+                at=item['at']
+                previous=c.execute('SELECT rowid,received FROM reports WHERE agent=? AND received BETWEEN ? AND ? ORDER BY received DESC LIMIT 1',(agent,at-300,at)).fetchone()
+                following=c.execute('SELECT rowid,received FROM reports WHERE agent=? AND received BETWEEN ? AND ? ORDER BY received LIMIT 1',(agent,at,at+300)).fetchone()
+                neighbors=[sample for sample in (previous,following) if sample is not None]
+                item['report']=min(neighbors,key=lambda sample:abs(sample['received']-at)) if neighbors else None
         content='<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/servers/'+esc(quote(agent,safe=''))+'">← Сервер</a><a class="nav-link" href="/heatmap">Карта стабильности</a></header><div class="heading"><h1>'+icon('timeline')+' Лента · '+esc(row['name'])+'</h1></div><form class="fleet-filter"><label>Период<select name="period">'+''.join('<option value="'+p+'" '+('selected' if p==period else '')+'>'+label+'</option>' for p,label in [('24h','Сутки'),('7d','Неделя'),('30d','30 дней')])+'</select></label><label>Дата (необязательно)<input type="date" name="day" value="'+esc(day)+'"></label><label>События<select name="kind"><option value="">Все</option>'+''.join('<option value="'+key+'" '+('selected' if key==kind else '')+'>'+label+'</option>' for key,label in types.items())+'</select></label><button>Показать</button></form><p class="muted">'+esc(stamp(start))+' — '+esc(stamp(end))+'</p><div class="server-timeline">'
         if interval:
             form_start=content.index('<label>Период<select');form_end=content.index('<label>События<select',form_start)
-            content=content[:form_start]+'<input type="hidden" name="start" value="'+str(start)+'"><input type="hidden" name="end" value="'+str(end)+'"><a class="nav-link" href="/timeline/'+esc(quote(agent,safe=''))+'">↺ Сбросить интервал</a>'+content[form_end:]
-        for item in items[:300]:
-            content+='<article class="timeline-item timeline-'+item['level']+'"><div class="timeline-symbol">'+icon(item['kind'])+'</div><div><time>'+esc(stamp(item['at']))+'</time><h2>'+esc(item['title'])+'</h2><p>'+esc(item['description'])+'</p>'+('<small>До '+esc(stamp(item['finish']))+'</small>' if item['finish'] else '')+'</div></article>'
+            focus_field = '<input type="hidden" name="incident" value="'+str(incident)+'">' if focus else ''
+            content=content[:form_start]+focus_field+'<input type="hidden" name="start" value="'+str(start)+'"><input type="hidden" name="end" value="'+str(end)+'"><a class="nav-link" href="/timeline/'+esc(quote(agent,safe=''))+'">↺ Сбросить интервал</a>'+content[form_end:]
+        if focus:
+            resolution = {'recovered':'Восстановлено','removed':'Исключено из мониторинга'}.get(focus['resolution'],'Продолжается')
+            finish = ' · '+stamp(focus['closed']) if focus['closed'] else ''
+            usage = ' · '.join(label+' '+f'{metrics[field]:.1f}%' for label,field in [
+                ('Среднее CPU','cpu'),('Пик CPU','cpu_max'),('Среднее RAM','ram'),('Пик RAM','ram_max')
+            ] if metrics[field] is not None)
+            content += '<section class="server incident-context"><h2>'+esc(focus['message'])+'</h2><p>'+esc(stamp(focus['opened'])+' · '+resolution+finish)+'</p><p>'+esc(usage or 'Нет измерений CPU и RAM в этом интервале')+'</p>'
+            if focus['closed'] and focus['closed']>end:
+                closed=focus['closed']
+                recovery=urlencode({'incident':incident,'start':max(0,closed-1800),'end':min(now,closed+1800)})
+                content+='<a class="nav-link" href="?'+esc(recovery)+'">События при завершении</a>'
+            content+='</section>'
+        for item in items:
+            at = item['at']
+            date = datetime.fromtimestamp(at,MSK).date().isoformat()
+            history_url='/history/'+quote(agent,safe='')+'?'+urlencode({'date_from':date,'date_to':date})
+            actions = '<div class="timeline-actions"><a class="nav-link" href="'+esc(history_url)+'">Графики за этот день</a>'
+            if item['report']:
+                report_id, reported = item['report']
+                actions += (
+                    '<button type="button" data-detail-metric="cpu" data-detail-title="Отчёт рядом с событием" '
+                    f'data-detail-report="{report_id}" data-detail-first="{reported}" data-detail-last="{reported}">'
+                    'Отчёт рядом с событием</button>'
+                )
+            actions += '</div>'
+            content+='<article class="timeline-item timeline-'+item['level']+'"><div class="timeline-symbol">'+icon(item['kind'])+'</div><div><time>'+esc(stamp(at))+'</time><h2>'+esc(item['title'])+'</h2><p>'+esc(item['description'])+'</p>'+('<small>До '+esc(stamp(item['finish']))+'</small>' if item['finish'] else '')+actions+'</div></article>'
         if not items:content+='<p class="empty">Событий за этот период не найдено.</p>'
-        return HTMLResponse(page(content+'</div><p class="muted legend">До 300 последних записей. Несколько записей Windows могут относиться к одной перезагрузке; время по аптайму оценочное. История Windows накапливается с обновления, старые записи восстанавливаются из доступных отчётов.</p>'))
+        from .drilldown import widget
+        return HTMLResponse(page(content+'</div><p class="muted legend">До 300 последних записей. Несколько записей Windows могут относиться к одной перезагрузке; время по аптайму оценочное. История Windows накапливается с обновления, старые записи восстанавливаются из доступных отчётов.</p>'+widget(agent)))

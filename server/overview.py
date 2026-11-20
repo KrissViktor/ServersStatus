@@ -21,6 +21,7 @@ def issue_entries(row, now):
             problems.append((key,message))
     if row['received'] is not None and elapsed >= 180:
         add('connection:'+row['id'],'Нет связи с агентом')
+        return problems
     if number(data.get('cpu_percent')) >= 95:
         add('cpu_percent:'+row['id'],'Высокая загрузка CPU')
     if number(data.get('memory_percent')) >= 95:
@@ -116,7 +117,7 @@ def compact_card(row, now, csrf=""):
         if len(problems)>3:
             content+='<details class="card-more-problems"><summary>Ещё проблем: '+str(len(problems)-3)+'</summary><ul class="compact-issues">'+''.join(problem_line(item) for item in problems[3:])+'</ul></details>'
 
-    else:
+    elif age < 180:
         content += '<p class="text-normal compact-ok">Проблем по полученным данным нет</p>'
     if can_history() and 'availability' in dict(row):
         from .stability import percentage

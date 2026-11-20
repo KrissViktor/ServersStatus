@@ -8,7 +8,7 @@ from .incident_history import sync
 
 
 def active(c):
-    return c.execute('''SELECT h.id,h.key,h.agent,a.acknowledged FROM incident_history h
+    return c.execute('''SELECT h.id,h.key,h.agent,h.opened,a.acknowledged FROM incident_history h
         LEFT JOIN incident_acknowledgements a ON a.incident=h.id AND a.problem_key=h.key AND a.episode_opened=h.opened
         WHERE h.closed IS NULL''').fetchall()
 
@@ -17,7 +17,7 @@ def attach(c, rows, now):
     sync(c,rows,now)
     states={}
     for item in active(c):
-        states.setdefault(item['agent'],{})[item['key']]={'id':item['id'],'acknowledged':item['acknowledged'] is not None}
+        states.setdefault(item['agent'],{})[item['key']]={'id':item['id'],'opened':item['opened'],'acknowledged':item['acknowledged'] is not None}
     from .incident_history import current
     for row in rows:
         row['problem_states']=states.get(row['id'],{})
