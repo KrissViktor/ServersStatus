@@ -51,6 +51,8 @@ def cleanup(connection,now):
         )""",(cutoff,)).rowcount
         connection.execute('DELETE FROM report_rollup_jobs WHERE day<?',(cutoff,))
     connection.execute('DELETE FROM events WHERE received<?',(now-days*86400,))
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='site_monitor_runs'").fetchone():
+        connection.execute('DELETE FROM site_monitor_runs WHERE at<?',(now-days*86400,))
     cursor=connection.execute('''DELETE FROM reports WHERE rowid IN (
         SELECT rowid FROM reports WHERE received<? ORDER BY received LIMIT ?
     )''',(now-days*86400,CLEANUP_BATCH))

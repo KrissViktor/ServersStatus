@@ -143,7 +143,8 @@ def page(content, refresh=False, protection_entry=False):
         links=[('/?reset=1','Серверы'),('/wallboard','Большой экран'),('/preferences','Настройки')]
         if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/problems?view=active','Проблемы'),('/weekly-plan','План на неделю'),('/updates','Обновления'),('/admin','Администрирование')]
         from .ui_icons import icon
-        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/weekly-plan':'timeline','/updates':'update','/admin':'equipment','/preferences':'settings'}
+        if can_history():links.insert(1,('/monitors','Мониторы'))
+        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/weekly-plan':'timeline','/updates':'update','/admin':'equipment','/preferences':'settings','/monitors':'wallboard'}
         navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+icon(navigation_icons[url.split('?')[0]])+esc(label)+'</a>' for url,label in links)
         bar='<nav class="portal-navigation" aria-label="Основные разделы"><div class="portal-navigation-desktop">'+navigation+'</div><details class="portal-navigation-mobile"><summary>Разделы портала <span aria-hidden="true">⌄</span></summary><div>'+navigation+'</div></details></nav><nav class="portal-breadcrumbs" aria-label="Путь страницы" hidden></nav>'
         content=topbar_insert(content,bar,after=True)

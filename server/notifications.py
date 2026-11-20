@@ -179,9 +179,11 @@ def main():
             from .daily import deliver_daily
             process_events(db)
             delivered, failed = tick(db, sender)
+            from .site_monitors import deliver as deliver_monitors
+            monitor_sent, monitor_failed = deliver_monitors(db,sender)
             daily_sent, daily_failed = deliver_daily(db, sender)
-            delivered += daily_sent
-            failed += daily_failed
+            delivered += daily_sent+monitor_sent
+            failed += daily_failed+monitor_failed
         from .portal_backup import note
         with db() as c:note(c,'notifications','warning' if failed else 'ok',f'Отправок: {delivered}; ошибок: {failed}')
         print(f'Отправлено: {delivered}; ошибок доставки: {failed}.')

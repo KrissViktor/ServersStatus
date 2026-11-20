@@ -31,7 +31,8 @@ DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 @asynccontextmanager
 async def lifespan(_app):
     from .report_rollup_jobs import worker
-    async with worker(db):
+    from .site_monitors import worker as monitor_worker
+    async with worker(db), monitor_worker(db):
         yield
 
 
@@ -130,6 +131,8 @@ def _initialize_database(connection):
     initialize(connection)
     from .portal_sessions import initialize as initialize_sessions
     initialize_sessions(connection)
+    from .site_monitors import SCHEMA as MONITOR_SCHEMA
+    connection.executescript(MONITOR_SCHEMA)
     from .news import sync as sync_news
     sync_news(connection)
 
@@ -916,6 +919,8 @@ register_checks(app,db,authenticated,csrf_token)
 
 from .report_exports import register as register_exports
 register_exports(app,db,authenticated)
+from .site_monitors import register as register_site_monitors
+register_site_monitors(app,db,authenticated,csrf_token)
 from .password_reset import register as register_password_reset
 register_password_reset(app,db,password_hash,login_slots)
 from .report_rollup_jobs import register as register_rollups
