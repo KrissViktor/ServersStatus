@@ -117,7 +117,36 @@ class BotTest(unittest.TestCase):
         chat,text,keyboard=self.sent[0]
         self.assertEqual(chat,'5')
         self.assertIn('/portal_end ID',text)
-        self.assertIn(['/portal_users','/portal_sessions'],keyboard['keyboard'])
+        self.assertIn(['Портал'],keyboard['keyboard'])
+
+    def test_private_portal_submenu_and_password_prompt(self):
+        from unittest.mock import patch
+        with application.db() as c:
+            c.execute('INSERT INTO users VALUES (?,?,?)',('alice','salt','hash'))
+        with patch.dict('os.environ',{'STATUS_TELEGRAM_PORTAL_ADMINS':'5','STATUS_PANEL_URL':'https://portal.test'}):
+            for index,text in enumerate(('Портал','Ссылка','Сессии','Поменять пароль','alice','Назад'),1):
+                now=1000+index*5
+                update=self.update(index,chat=5,text=text,date=now)
+                update['message']['chat']['type']='private'
+                queue_update(application.db,update,123,set(),self.limiter,now)
+                self.assertTrue(flush(application.db,lambda *args:self.sent.append(args),now))
+        self.assertEqual(self.sent[0][2]['keyboard'],[['Ссылка','Сессии'],['Поменять пароль'],['Назад']])
+        self.assertIn('https://portal.test',self.sent[1][1])
+        self.assertIn('Активных сеансов нет',self.sent[2][1])
+        self.assertIn('/portal_end ID',self.sent[3][1])
+        self.assertIn('Отправьте логин',self.sent[4][1])
+        self.assertIn('https://portal.test/password-reset?',self.sent[5][1])
+        self.assertIn(['Портал'],self.sent[6][2]['keyboard'])
+
+    def test_private_reports_help_shows_own_id_without_portal_access(self):
+        from unittest.mock import patch
+        update=self.update(chat=5,text='/start')
+        update['message']['chat']['type']='private'
+        with patch.dict('os.environ',{'STATUS_TELEGRAM_PORTAL_ADMINS':'17'}):
+            queue_update(application.db,update,5,{'5'},self.limiter,1000)
+            self.assertTrue(flush(application.db,lambda *args:self.sent.append(args),1000))
+        self.assertIn('Ваш Telegram ID: 5',self.sent[-1][1])
+        self.assertEqual(self.sent[-1][2],KEYBOARD)
 
     def test_antiflood_and_expired_outbox(self):
         for identifier in range(1,8):

@@ -2,6 +2,7 @@
 from collections import OrderedDict
 import json
 import os
+import re
 import signal
 import socket
 import threading
@@ -14,7 +15,11 @@ from .notification_types import DeliveryError
 
 PORTAL_KEYBOARD = {
     **KEYBOARD,
-    'keyboard': [['/portal_users','/portal_sessions'], ['/help']],
+    'keyboard': [['Портал'], ['/help']],
+}
+PORTAL_SUBMENU = {
+    **KEYBOARD,
+    'keyboard': [['Ссылка','Сессии'], ['Поменять пароль'], ['Назад']],
 }
 PORTAL_HELP = (
     'Управление порталом\n'
@@ -50,6 +55,29 @@ def offset(connection):
     return int(row[0]) if row else 0
 
 
+def portal_reply(c, action, argument, sender, now):
+    prompt = 'portal_password_prompt:'+sender
+    c.execute('DELETE FROM bot_state WHERE name=?',(prompt,))
+    if action in ('home','help'):
+        return [PORTAL_HELP],1
+    if action == 'menu':
+        return ['Портал. Выберите действие.'],2
+    if action == 'link':
+        return render(c,'panel',now),2
+    if action == 'portal_password' and not argument:
+        state(c,prompt,now+300)
+        return ['Отправьте логин пользователя. Я пришлю одноразовую ссылку для смены пароля.'],2
+    if action == 'password_login':
+        if not re.fullmatch(r'[A-Za-zА-Яа-яЁё0-9_.-]{1,64}',argument):
+            state(c,prompt,now+300)
+            return ['Укажите логин пользователя или нажмите «Назад».'],2
+        action = 'portal_password'
+    parts = render_portal(c,action,argument,sender,now)
+    if action == 'portal_sessions':
+        parts.append('Завершить один сеанс: /portal_end ID\nЗавершить все сеансы пользователя: /portal_kick логин')
+    return parts,2
+
+
 class CommandLimiter:
     def __init__(self):
         self.users=OrderedDict()
@@ -79,19 +107,35 @@ def queue_update(db,update,chat_id,allowed_users,limiter,now):
         parts_text = text.strip().split(maxsplit=1) if isinstance(text,str) else []
         portal_command = parts_text[0].split('@',1)[0].removeprefix('/').casefold() if parts_text and parts_text[0].startswith('/') else ''
         sender_id = str(sender.get('id',''))
-        private_admin = (message_chat.get('type')=='private' and str(message_chat.get('id',''))==sender_id
-                         and sender_id in portal_admins() and not sender.get('is_bot'))
+        private_chat = (message_chat.get('type')=='private' and str(message_chat.get('id',''))==sender_id
+                        and not sender.get('is_bot'))
+        private_admin = private_chat and sender_id in portal_admins()
         fresh=isinstance(date,(int,float)) and now-600<=date<=now+60
         pending=c.execute('SELECT COUNT(*) FROM bot_replies WHERE completed=0').fetchone()[0]
-        if private_admin and fresh and command=='help' and pending<20 and limiter.allow(sender_id,now):
-            parts = [PORTAL_HELP]
-            c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,1)',(identifier,sender_id,json.dumps(parts,ensure_ascii=False),now))
-        elif private_admin and fresh and portal_command in PORTAL_COMMANDS and pending<20 and limiter.allow(sender_id,now):
-            argument = parts_text[1].strip() if len(parts_text)>1 else ''
-            parts = render_portal(c,portal_command,argument,sender_id,now)
-            c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,1)',(identifier,sender_id,json.dumps(parts,ensure_ascii=False),now))
+        action = None
+        argument = parts_text[1].strip() if portal_command and len(parts_text)>1 else ''
+        if private_admin and fresh and parts_text:
+            label = text.strip().casefold()
+            if portal_command in PORTAL_COMMANDS:
+                action = portal_command
+            else:
+                buttons = {'портал':'menu','ссылка':'link','сессии':'portal_sessions',
+                           'поменять пароль':'portal_password','назад':'home'}
+                action = 'help' if command=='help' else buttons.get(label)
+                if not action and not command and not portal_command:
+                    prompt = c.execute('SELECT value FROM bot_state WHERE name=?',('portal_password_prompt:'+sender_id,)).fetchone()
+                    if prompt and float(prompt[0])>now:
+                        action,argument = 'password_login',text.strip()
+        if action and pending<20 and limiter.allow(sender_id,now):
+            parts,keyboard = portal_reply(c,action,argument,sender_id,now)
+            c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,?)',(identifier,sender_id,json.dumps(parts,ensure_ascii=False),now,keyboard))
         elif authorized and fresh and command and pending<20 and limiter.allow(sender_id,now):
             parts=render(c,command,now)
+            if private_chat and command=='help':
+                parts.append(
+                    'Ваш Telegram ID: '+sender_id+'\n'
+                    'Для управления порталом добавьте этот ID в STATUS_TELEGRAM_PORTAL_ADMINS в настройках бота на сервере.'
+                )
             c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,0)',(identifier,str(chat_id),json.dumps(parts,ensure_ascii=False),now))
         state(c,'offset',identifier+1)
         c.execute('DELETE FROM bot_replies WHERE completed=1 AND created<?',(now-86400,))
@@ -106,10 +150,11 @@ def flush(db,sender,now,heartbeat=lambda:None):
             return False
     if not pending:return False
     parts=json.loads(pending['parts'])
+    keyboard = PORTAL_SUBMENU if pending['portal']==2 else PORTAL_KEYBOARD if pending['chat_id'] in portal_admins() else KEYBOARD
     for index in range(pending['next_part'],min(len(parts),pending['next_part']+3)):
         heartbeat()
         try:
-            sender(pending['chat_id'],parts[index],PORTAL_KEYBOARD if pending['chat_id'] in portal_admins() else KEYBOARD)
+            sender(pending['chat_id'],parts[index],keyboard)
         except DeliveryError as error:
             with db() as c:
                 c.execute('UPDATE bot_replies SET retry_at=? WHERE update_id=?',(now+error.retry_after,pending['update_id']))
@@ -192,7 +237,7 @@ def main():
                     if stop.is_set():raise StopRequested()
                     telegram_request(token,'sendMessage',{'chat_id':chat,'text':text,
                         'reply_markup':keyboard,'disable_web_page_preview':True})
-                    if keyboard is PORTAL_KEYBOARD:
+                    if keyboard is PORTAL_KEYBOARD or keyboard is PORTAL_SUBMENU:
                         register_admin(chat)
                     pause(stop,1.1,heartbeat)
                 flushed=flush(db,sender,time.time(),heartbeat)
