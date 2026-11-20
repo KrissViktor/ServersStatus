@@ -1,5 +1,6 @@
 """Per-interface and per-device historical charts; no double counting of NICs."""
 from urllib.parse import quote, urlencode
+import json
 import math
 from .dashboard import esc, size
 from .history import stamp
@@ -79,7 +80,13 @@ def chart(rows,title,start,end,iops=False,key=None,metric=None,name='',percent=F
         if metric:attributes=f'data-detail-metric="{esc(metric)}" data-detail-name="{esc(name)}" data-detail-first="{row["first"]}" data-detail-last="{row["last"]}" data-detail-count="{row.get("samples",30)}" data-detail-title="{esc(title)}" tabindex="0" role="button" aria-label="Открыть исходные отчёты: {esc(tooltip)}"'
         drawing+=f'<circle {attributes} class="chart-point" fill="#83c4ff" r="3" cx="{x(row["timestamp"])}" cy="{y(row["value"])}"><title>{esc(tooltip)}</title></circle>'
         previous=row
-    return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245">'+drawing+'</svg></div></section>'
+    timeline = ''
+    if percent:
+        points = [[row['timestamp'],row['first'],row['last'],row['value'],row['has_gap']] for row in rows]
+        timeline = (f' preserveAspectRatio="none" data-capacity-points="{esc(json.dumps(points,separators=(",",":")))}"'
+                    f' data-chart-start="{start}" data-chart-end="{end}" data-chart-left="130" data-chart-right="980"'
+                    ' data-chart-top="20" data-chart-bottom="200"')
+    return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245"'+timeline+'>'+drawing+'</svg></div></section>'
 
 
 def capacity_section(connection, agent, start, end, bucket, selected, params):

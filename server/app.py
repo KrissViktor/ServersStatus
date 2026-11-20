@@ -147,7 +147,7 @@ def authenticated(request):
     return principal(request,db) is not None
 
 
-def server_rows(agent_id=None):
+def server_rows(agent_id=None, sparklines=True):
     now=time.time()
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
@@ -164,6 +164,9 @@ def server_rows(agent_id=None):
             if not can_history():row['sparkline']=[];continue
             from .stability import load as load_stability
             row['availability']=load_stability(c,row['id'],now-86400,now,details=False,summary_only=True)['percent']
+            if not sparklines:
+                row['sparkline']=[]
+                continue
             row['sparkline']=[dict(point) for point in c.execute(f"""SELECT AVG(received) AS timestamp,
                 MIN(received) AS first, MAX(received) AS last, COUNT(*) AS samples,
                 AVG(json_extract(data,'$.cpu_percent')) AS cpu, MIN(json_extract(data,'$.cpu_percent')) AS cpu_min, MAX(json_extract(data,'$.cpu_percent')) AS cpu_peak,
@@ -175,7 +178,7 @@ def server_rows(agent_id=None):
 
 
 @app.get('/', response_class=HTMLResponse)
-def index(request: Request, q: str = '', view: str = 'all', group: str = ''):
+def index(request: Request, q: str = '', view: str = 'all', group: str = '', layout: str = 'table'):
     if not authenticated(request):
         return HTMLResponse(login_page())
     if view not in ('all', 'online', 'problems', 'offline', 'disks') or len(q) > 200 or len(group)>20:
@@ -183,7 +186,8 @@ def index(request: Request, q: str = '', view: str = 'all', group: str = ''):
     from .news import banner
     from .access import current_user
     with db() as c:news_html=banner(c,current_user().get('name') or '')
-    return HTMLResponse(dashboard(server_rows(), q, view, group,news_html=news_html,csrf=csrf_token(request)))
+    layout = 'cards' if layout=='cards' else 'table'
+    return HTMLResponse(dashboard(server_rows(sparklines=layout=='cards'), q, view, group,news_html=news_html,csrf=csrf_token(request),layout=layout))
 
 
 @app.get('/weekly-plan', response_class=HTMLResponse)

@@ -17,7 +17,8 @@
   let density='normal';try{density=localStorage.getItem(scope+'density')==='compact'?'compact':'normal'}catch(_){}
   let sortKey='name',sortDescending=false;
   try{layout=layout||localStorage.getItem(scope+'layout');const saved=JSON.parse(localStorage.getItem(scope+'sort')||'null');if(saved && keys.includes(saved.key)){sortKey=saved.key;sortDescending=!!saved.descending}}catch(_){}
-  layout=layout==='table'?'table':'cards';
+  layout=layout==='cards'?'cards':'table';
+  const needsLayoutFetch=layout!==results.dataset.layout;
   function presentation(){
     results.dataset.layout=layout;results.dataset.density=density;
     document.querySelectorAll('[data-density]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.density===density)));
@@ -49,7 +50,7 @@
     if(pin){const id=pin.dataset.pinServer;if(pins.has(id))pins.delete(id);else pins.add(id);try{localStorage.setItem(scope+'pins',JSON.stringify([...pins]))}catch(_){}presentation();return}
     if(event.target.closest('[data-overview-direction]')){sortDescending=!sortDescending;saveSort();return}
     const toggle=event.target.closest('[data-server-layout]'),sort=event.target.closest('[data-server-sort]');
-    if(toggle){layout=toggle.dataset.serverLayout;try{localStorage.setItem(scope+'layout',layout)}catch(_){}const url=new URL(location.href);if(layout==='table')url.searchParams.set('layout','table');else url.searchParams.delete('layout');history.replaceState(null,'',url.pathname+url.search);presentation()}
+    if(toggle){layout=toggle.dataset.serverLayout;try{localStorage.setItem(scope+'layout',layout)}catch(_){}const url=new URL(location.href);if(layout==='cards')url.searchParams.set('layout','cards');else url.searchParams.delete('layout');history.replaceState(null,'',url.pathname+url.search);presentation();search(false)}
     if(sort){const key=sort.dataset.serverSort;sortDescending=sortKey===key?!sortDescending:false;sortKey=key;try{localStorage.setItem(scope+'sort',JSON.stringify({key:sortKey,descending:sortDescending}))}catch(_){}presentation()}
   });
   document.querySelector('[data-overview-sort]')?.addEventListener('change',event=>{if(keys.includes(event.target.value)){sortKey=event.target.value;sortDescending=['cpu','ram','disk','problems','age'].includes(sortKey);saveSort()}});
@@ -91,7 +92,7 @@
     const controller = new AbortController();
     pending = controller;
     const url = new URL('/', window.location.origin);
-    if(layout==='table')url.searchParams.set('layout','table');
+    if(layout==='cards')url.searchParams.set('layout','cards');
     if (input.value) url.searchParams.set('q', input.value);
     if (form.elements.group?.value) url.searchParams.set('group',form.elements.group.value);
     if (view.value !== 'all') url.searchParams.set('view', view.value);
@@ -164,5 +165,6 @@
     if(form.elements.group && [...form.elements.group.options].some(option=>option.value===savedFilters.group))form.elements.group.value=savedFilters.group;
     if(input.value||view.value!=='all'||form.elements.group?.value)search(false);
   }
+  if(needsLayoutFetch&&!pending)search(false);
   setInterval(() => search(true), Number(results.dataset.refreshInterval)||10000);
 })();

@@ -331,7 +331,7 @@ def overview_shortcuts():
     return result+'</nav><a class="overview-groups" href="/groups">'+groups+'<span>Группы</span></a></div>'
 
 
-def dashboard(rows, q='', view='all', group='', news_html='', csrf=''):
+def dashboard(rows, q='', view='all', group='', news_html='', csrf='', layout='table'):
     all_rows=rows
     if group:rows=[row for row in rows if group in [item['id'] for item in dict(row).get('groups',[])]]
     now = time.time()
@@ -365,7 +365,7 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf=''):
     cards+=table_render(selected,now)
     cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'
     from .overview import LIVE_SCRIPT
-    cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results" data-refresh-interval="10000">' + cards + '</div>'+ui_script('overview.js')
+    cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results" data-layout="'+esc(layout)+'" data-refresh-interval="10000">' + cards + '</div>'+ui_script('overview.js')
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now,csrf)
     from .drilldown import widget
