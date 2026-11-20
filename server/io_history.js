@@ -31,7 +31,7 @@
     const fragment = new URL(url);
     fragment.searchParams.set('details', 'fragment');
     retry.hidden = true;
-    status.textContent = panels.childElementCount ? 'Обновляем дополнительные графики…' : 'Загружаем сеть, дисковые операции и доступность…';
+    status.textContent = panels.childElementCount ? 'Обновляем дополнительные графики…' : 'Загружаем историю дисков, сети и доступности…';
     panels.setAttribute('aria-busy', 'true');
     try {
       const response = await fetch(fragment, {signal: controller.signal, credentials: 'same-origin', cache: 'no-store'});
@@ -49,7 +49,7 @@
         }
         for (const link of root.querySelectorAll('.periods a')) {
           const target = new URL(link.href);
-          for (const key of ['nic', 'disk']) target.searchParams.set(key, url.searchParams.get(key) || '');
+          for (const key of ['nic', 'disk', 'capacity_disk']) target.searchParams.set(key, url.searchParams.get(key) || '');
           link.href = target;
         }
         history.replaceState(null, '', url.pathname + url.search + url.hash);

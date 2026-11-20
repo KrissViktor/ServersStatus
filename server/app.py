@@ -564,7 +564,7 @@ async def change_agent(action: str, request: Request):
 
 
 @app.get('/history/{agent_id}', response_class=HTMLResponse)
-def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str = '', disk: str = '', date_from: str = '', date_to: str = '', details: str = ''):
+def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str = '', disk: str = '', date_from: str = '', date_to: str = '', details: str = '', capacity_disk: str = ''):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
     now = time.time()
@@ -574,14 +574,18 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
     with db() as c:
         if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
             raise HTTPException(404, 'Агент не найден')
-        selected_io = {'nic':nic,'disk':disk}
+        selected_io = {'nic':nic,'disk':disk,'capacity_disk':capacity_disk}
         if details in ('fragment','full'):
-            from .io_history import sections
-            io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk, date_from, date_to)
+            from .io_history import capacity_section, sections
+            capacity, capacity_disk = capacity_section(c,agent_id,start,end,bucket,capacity_disk,{
+                'period':period,'date_from':date_from,'date_to':date_to,'nic':nic,'disk':disk,'details':'full',
+            })
+            io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk, date_from, date_to, capacity_disk)
+            selected_io['capacity_disk'] = capacity_disk
             from .report_rollups import availability as load_stability
             from .stability import render as stability_render
             from .incident_history import history_html
-            io = stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
+            io = capacity+stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
             if details == 'fragment':
                 return HTMLResponse(io, headers={'Cache-Control':'no-store'})
         else:

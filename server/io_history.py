@@ -53,15 +53,15 @@ def samples(connection,agent,group,name,field,start,end,bucket):
     return metric_series(connection,agent,group,name,start,end,bucket)[field]
 
 
-def chart(rows,title,start,end,iops=False,key=None,metric=None,name=''):
+def chart(rows,title,start,end,iops=False,key=None,metric=None,name='',percent=False):
     heading='<header class="io-chart-heading"><h3>'+esc(title)+'</h3>'
     if key:heading+='<button type="button" class="chart-expand" aria-expanded="false">Расширить</button>'
     heading+='</header>'
     opening='<section class="server io-chart" data-chart-key="'+esc(key or title)+'">'+heading
     if not rows:
         return opening+'<p class="muted">Измерений пока нет.</p></section>'
-    maximum=max(1,max(row['peak'] for row in rows)*1.1)
-    fmt=lambda value: f'{value:.1f} оп/с' if iops else size(value)+'/с'
+    maximum=100 if percent else max(1,max(row['peak'] for row in rows)*1.1)
+    fmt=lambda value: f'{value:g}%' if percent else f'{value:.1f} оп/с' if iops else size(value)+'/с'
     x=lambda t: 130+(t-start)/(end-start)*850
     y=lambda value: 200-value/maximum*180
     drawing=''
@@ -82,14 +82,47 @@ def chart(rows,title,start,end,iops=False,key=None,metric=None,name=''):
     return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245">'+drawing+'</svg></div></section>'
 
 
-def sections(connection, agent, period, start,end,bucket,nic=None,disk=None,date_from='',date_to=''):
+def capacity_section(connection, agent, start, end, bucket, selected, params):
+    source = """FROM reports r, json_each(r.data,'$.disks') d
+        WHERE r.agent=? AND r.received BETWEEN ? AND ?
+        AND (LOWER(COALESCE(json_extract(r.data,'$.system.os'),''))<>'linux' OR json_extract(d.value,'$.path')='/')
+        AND json_type(d.value,'$.used_percent') IN ('integer','real')
+        AND json_extract(d.value,'$.used_percent') BETWEEN 0 AND 100"""
+    bounds = (agent,start,end)
+    paths = [row[0] for row in connection.execute(
+        "SELECT DISTINCT json_extract(d.value,'$.path') "+source+" ORDER BY 1",bounds
+    ) if row[0]]
+    title = 'Заполненность дисков'
+    if not paths:
+        return '<section class="server"><h2>'+title+'</h2><p class="empty">Нет измерений за выбранный период.</p></section>', ''
+    selected = selected if selected in paths else paths[0]
+    rows = connection.execute("""
+        WITH samples AS (
+            SELECT r.received, json_extract(d.value,'$.used_percent') AS value,
+                r.received-LAG(r.received) OVER (ORDER BY r.received) AS gap
+    """+source+""" AND json_extract(d.value,'$.path')=?
+        )
+        SELECT AVG(received) AS timestamp, MIN(received) AS first, MAX(received) AS last,
+            AVG(value) AS value, MAX(value) AS peak, MAX(COALESCE(gap>180,0)) AS has_gap
+        FROM samples GROUP BY CAST(received/? AS INTEGER) ORDER BY first
+    """,(*bounds,selected,bucket)).fetchall()
+    controls = ''
+    if len(paths)>1:
+        hidden = ''.join(f'<input type="hidden" name="{key}" value="{esc(value)}">' for key,value in params.items() if value)
+        options = ''.join(f'<option value="{esc(path)}"'+(' selected' if path==selected else '')+'>'+esc(path)+'</option>' for path in paths)
+        controls = '<form class="searchbar io-selector" method="get">'+hidden+'<label>Диск<select name="capacity_disk">'+options+'</select></label><noscript><button>Показать</button></noscript></form>'
+    rendered = chart(rows,title+' · '+selected,start,end,key='disk-capacity',percent=True)
+    return rendered.replace('</header>','</header>'+controls,1), selected
+
+
+def sections(connection, agent, period, start,end,bucket,nic=None,disk=None,date_from='',date_to='',capacity_disk=''):
     options={group:names(connection,agent,group,start,end) for group in FIELDS}
     nic=nic if nic in options['network'] else next(iter(options['network']), '')
     disk=disk if disk in options['disk_io'] else next(iter(options['disk_io']), '')
     content='<p class="muted history-note">Скорости — секундные снимки перед отчётом. Каждый интерфейс и устройство показаны отдельно. Пропуски не считаются нулями.</p>'
     series={group:metric_series(connection,agent,group,name,start,end,bucket) for group,name in [('network',nic),('disk_io',disk)] if name}
     date_fields = ''.join(f'<input type="hidden" name="{key}" value="{esc(value)}">' for key,value in (
-        ('date_from',date_from), ('date_to',date_to), ('details','full'),
+        ('date_from',date_from), ('date_to',date_to), ('capacity_disk',capacity_disk), ('details','full'),
     ) if value)
     for group,key,selected,label,title in [('network','nic',nic,'Сетевой интерфейс','Сеть'),('disk_io','disk',disk,'Дисковое устройство','Дисковые операции')]:
         other_key,other_value=('disk',disk) if key=='nic' else ('nic',nic)
