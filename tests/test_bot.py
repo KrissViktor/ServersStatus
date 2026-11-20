@@ -107,6 +107,18 @@ class BotTest(unittest.TestCase):
         self.assertEqual(web.post('/login',data={**credentials,'password':form['password']},follow_redirects=False).status_code,303)
         self.assertIn('Audit proof',web.get('/users/sessions?view=history').text)
 
+    def test_portal_admin_start_in_separate_private_chat(self):
+        from unittest.mock import patch
+        update=self.update(chat=5,text='/start')
+        update['message']['chat']['type']='private'
+        with patch.dict('os.environ',{'STATUS_TELEGRAM_PORTAL_ADMINS':'5'}):
+            queue_update(application.db,update,123,{'17'},self.limiter,1000)
+            self.assertTrue(flush(application.db,lambda *args:self.sent.append(args),1000))
+        chat,text,keyboard=self.sent[0]
+        self.assertEqual(chat,'5')
+        self.assertIn('/portal_end ID',text)
+        self.assertIn(['/portal_users','/portal_sessions'],keyboard['keyboard'])
+
     def test_antiflood_and_expired_outbox(self):
         for identifier in range(1,8):
             queue_update(application.db,self.update(identifier),123,set(),self.limiter,1000)

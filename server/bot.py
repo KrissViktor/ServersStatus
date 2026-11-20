@@ -12,6 +12,19 @@ from .bot_portal import COMMANDS as PORTAL_COMMANDS, admins as portal_admins, re
 from .notifications import telegram_request
 from .notification_types import DeliveryError
 
+PORTAL_KEYBOARD = {
+    **KEYBOARD,
+    'keyboard': [['/portal_users','/portal_sessions'], ['/help']],
+}
+PORTAL_HELP = (
+    'Управление порталом\n'
+    '/portal_users — пользователи и роли\n'
+    '/portal_sessions [логин] — активные сеансы и их ID\n'
+    '/portal_end ID — завершить один сеанс\n'
+    '/portal_kick логин — завершить все сеансы пользователя\n'
+    '/portal_password логин — ссылка для смены пароля'
+)
+
 
 class StopRequested(Exception):
     pass
@@ -70,7 +83,10 @@ def queue_update(db,update,chat_id,allowed_users,limiter,now):
                          and sender_id in portal_admins() and not sender.get('is_bot'))
         fresh=isinstance(date,(int,float)) and now-600<=date<=now+60
         pending=c.execute('SELECT COUNT(*) FROM bot_replies WHERE completed=0').fetchone()[0]
-        if private_admin and fresh and portal_command in PORTAL_COMMANDS and pending<20 and limiter.allow(sender_id,now):
+        if private_admin and fresh and command=='help' and pending<20 and limiter.allow(sender_id,now):
+            parts = [PORTAL_HELP]
+            c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,1)',(identifier,sender_id,json.dumps(parts,ensure_ascii=False),now))
+        elif private_admin and fresh and portal_command in PORTAL_COMMANDS and pending<20 and limiter.allow(sender_id,now):
             argument = parts_text[1].strip() if len(parts_text)>1 else ''
             parts = render_portal(c,portal_command,argument,sender_id,now)
             c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,1)',(identifier,sender_id,json.dumps(parts,ensure_ascii=False),now))
@@ -93,7 +109,7 @@ def flush(db,sender,now,heartbeat=lambda:None):
     for index in range(pending['next_part'],min(len(parts),pending['next_part']+3)):
         heartbeat()
         try:
-            sender(pending['chat_id'],parts[index],KEYBOARD)
+            sender(pending['chat_id'],parts[index],PORTAL_KEYBOARD if pending['chat_id'] in portal_admins() else KEYBOARD)
         except DeliveryError as error:
             with db() as c:
                 c.execute('UPDATE bot_replies SET retry_at=? WHERE update_id=?',(now+error.retry_after,pending['update_id']))
@@ -150,24 +166,34 @@ def main():
           ('status','Статус серверов'),('report','Отчёт за 24 часа'),('rdp','RDP-пользователи'),
           ('backup','Свежесть и файлы бэкапов'),('warnings','Предупреждения'),('panel','Открыть панель'),('help','Кнопки и помощь')]]
         registered=False
+        registered_admins=set()
+        def register_admin(chat):
+            if chat in registered_admins:
+                return
+            base = commands if chat==chat_id and (not allowed_users or chat in allowed_users) else [
+                {'command':'help','description':'Команды управления порталом'}
+            ]
+            try:
+                telegram_request(token,'setMyCommands',{'scope':{'type':'chat','chat_id':int(chat)},'commands':base+[
+                    {'command':name,'description':description} for name,description in PORTAL_COMMANDS.items()
+                ]})
+            except DeliveryError:
+                return
+            registered_admins.add(chat)
         while not stop.is_set():
             heartbeat()
             try:
                 if not registered:
                     telegram_request(token,'setMyCommands',{'commands':commands})
                     for admin in portal_admins():
-                        try:
-                            telegram_request(token,'setMyCommands',{'scope':{'type':'chat','chat_id':int(admin)},'commands':commands+[
-                                {'command':name,'description':description} for name,description in PORTAL_COMMANDS.items()
-                            ]})
-                        except DeliveryError:
-                            # A private chat may not exist until the operator messages the bot.
-                            continue
+                        register_admin(admin)
                     registered=True
                 def sender(chat,text,keyboard):
                     if stop.is_set():raise StopRequested()
                     telegram_request(token,'sendMessage',{'chat_id':chat,'text':text,
                         'reply_markup':keyboard,'disable_web_page_preview':True})
+                    if keyboard is PORTAL_KEYBOARD:
+                        register_admin(chat)
                     pause(stop,1.1,heartbeat)
                 flushed=flush(db,sender,time.time(),heartbeat)
                 if stop.is_set():break
