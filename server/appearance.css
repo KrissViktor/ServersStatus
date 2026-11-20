@@ -127,7 +127,7 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 }
 .monitoring-workspace [data-resource-metric="cpu"] .resource-line { stroke:var(--accent); }
 .monitoring-workspace [data-resource-metric="ram"] .resource-line { stroke:var(--violet); }
-.monitoring-workspace [data-capacity-points] line:not(.chart-grid):not(.resource-cursor) { stroke:var(--green); }
+.monitoring-workspace [data-resource-metric="capacity"] .resource-line { stroke:var(--green); }
 .monitoring-workspace .resource-cursor { stroke:var(--muted); }
 .monitoring-workspace :is(.resource-inspector,.resource-tooltip,#detail-chart-tooltip,#detail-point-info,#chart-detail,.news-popover) {
   background:var(--panel); color:var(--text); border-color:var(--line);

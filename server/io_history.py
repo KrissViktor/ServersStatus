@@ -1,6 +1,5 @@
 """Per-interface and per-device historical charts; no double counting of NICs."""
 from urllib.parse import quote, urlencode
-import json
 import math
 from .dashboard import esc, size
 from .history import stamp
@@ -54,15 +53,15 @@ def samples(connection,agent,group,name,field,start,end,bucket):
     return metric_series(connection,agent,group,name,start,end,bucket)[field]
 
 
-def chart(rows,title,start,end,iops=False,key=None,metric=None,name='',percent=False):
+def chart(rows,title,start,end,iops=False,key=None,metric=None,name=''):
     heading='<header class="io-chart-heading"><h3>'+esc(title)+'</h3>'
     if key:heading+='<button type="button" class="chart-expand" aria-expanded="false">Расширить</button>'
     heading+='</header>'
     opening='<section class="server io-chart" data-chart-key="'+esc(key or title)+'">'+heading
     if not rows:
         return opening+'<p class="muted">Измерений пока нет.</p></section>'
-    maximum=100 if percent else max(1,max(row['peak'] for row in rows)*1.1)
-    fmt=lambda value: f'{value:g}%' if percent else f'{value:.1f} оп/с' if iops else size(value)+'/с'
+    maximum=max(1,max(row['peak'] for row in rows)*1.1)
+    fmt=lambda value: f'{value:.1f} оп/с' if iops else size(value)+'/с'
     x=lambda t: 130+(t-start)/(end-start)*850
     y=lambda value: 200-value/maximum*180
     drawing=''
@@ -80,13 +79,7 @@ def chart(rows,title,start,end,iops=False,key=None,metric=None,name='',percent=F
         if metric:attributes=f'data-detail-metric="{esc(metric)}" data-detail-name="{esc(name)}" data-detail-first="{row["first"]}" data-detail-last="{row["last"]}" data-detail-count="{row.get("samples",30)}" data-detail-title="{esc(title)}" tabindex="0" role="button" aria-label="Открыть исходные отчёты: {esc(tooltip)}"'
         drawing+=f'<circle {attributes} class="chart-point" fill="#83c4ff" r="3" cx="{x(row["timestamp"])}" cy="{y(row["value"])}"><title>{esc(tooltip)}</title></circle>'
         previous=row
-    timeline = ''
-    if percent:
-        points = [[row['timestamp'],row['first'],row['last'],row['value'],row['has_gap']] for row in rows]
-        timeline = (f' preserveAspectRatio="none" data-capacity-points="{esc(json.dumps(points,separators=(",",":")))}"'
-                    f' data-chart-start="{start}" data-chart-end="{end}" data-chart-left="130" data-chart-right="980"'
-                    ' data-chart-top="20" data-chart-bottom="200"')
-    return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245"'+timeline+'>'+drawing+'</svg></div></section>'
+    return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245">'+drawing+'</svg></div></section>'
 
 
 def capacity_section(connection, agent, start, end, bucket, selected, params):
@@ -105,12 +98,13 @@ def capacity_section(connection, agent, start, end, bucket, selected, params):
     selected = selected if selected in paths else paths[0]
     rows = connection.execute("""
         WITH samples AS (
-            SELECT r.received, json_extract(d.value,'$.used_percent') AS value,
+            SELECT r.received, r.rowid AS report_id, json_extract(d.value,'$.used_percent') AS value,
                 r.received-LAG(r.received) OVER (ORDER BY r.received) AS gap
     """+source+""" AND json_extract(d.value,'$.path')=?
         )
         SELECT AVG(received) AS timestamp, MIN(received) AS first, MAX(received) AS last,
-            AVG(value) AS value, MAX(value) AS peak, MAX(COALESCE(gap>180,0)) AS has_gap
+            AVG(value) AS capacity, MIN(value) AS capacity_min, MAX(value) AS capacity_peak,
+            COUNT(*) AS samples, MIN(report_id) AS report_id, MAX(COALESCE(gap>180,0)) AS has_gap
         FROM samples GROUP BY CAST(received/? AS INTEGER) ORDER BY first
     """,(*bounds,selected,bucket)).fetchall()
     controls = ''
@@ -118,8 +112,8 @@ def capacity_section(connection, agent, start, end, bucket, selected, params):
         hidden = ''.join(f'<input type="hidden" name="{key}" value="{esc(value)}">' for key,value in params.items() if value)
         options = ''.join(f'<option value="{esc(path)}"'+(' selected' if path==selected else '')+'>'+esc(path)+'</option>' for path in paths)
         controls = '<form class="searchbar io-selector" method="get">'+hidden+'<label>Диск<select name="capacity_disk">'+options+'</select></label><noscript><button>Показать</button></noscript></form>'
-    rendered = chart(rows,title+' · '+selected,start,end,key='disk-capacity',percent=True)
-    return rendered.replace('</header>','</header>'+controls,1), selected
+    from .history import chart as resource_chart
+    return resource_chart(rows,'capacity',title+' · '+selected,start,end,'#5ec6a8',controls), selected
 
 
 def sections(connection, agent, period, start,end,bucket,nic=None,disk=None,date_from='',date_to='',capacity_disk=''):

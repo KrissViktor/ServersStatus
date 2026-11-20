@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 PERIODS={'15m':900,'1h':3600,'6h':21600,'24h':86400,'7d':604800,'30d':2592000}
 CPU='#7dbbff'
 RAM='#b9a0ff'
+CAPACITY='#5ec6a8'
 
 
 def metadata(points,metric,start,end):
@@ -15,7 +16,7 @@ def metadata(points,metric,start,end):
     safe=[]
     for raw in points:
         p=dict(raw)
-        safe.append({k:v for k,v in p.items() if k in {'timestamp','first','last','samples','cpu','ram','cpu_min','ram_min','cpu_peak','ram_peak','has_gap','ram_used_bytes','ram_total_bytes','report_id'} and (v is None or isinstance(v,(int,float)) and math.isfinite(v))})
+        safe.append({k:v for k,v in p.items() if k in {'timestamp','first','last','samples','cpu','ram','capacity','cpu_min','ram_min','capacity_min','cpu_peak','ram_peak','capacity_peak','has_gap','ram_used_bytes','ram_total_bytes','report_id'} and (v is None or isinstance(v,(int,float)) and math.isfinite(v))})
     return ' data-resource-metric="'+metric+'" data-resource-points="'+esc(json.dumps(safe,separators=(',',':'),allow_nan=False))+'"'
 
 

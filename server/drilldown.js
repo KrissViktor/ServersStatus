@@ -54,7 +54,8 @@
     plot.replaceChildren(svg);
     if(selected){for(const circle of plot.querySelectorAll('.detail-report-point'))if(circle.dataset.reportId===String(selected.report_id)){circle.classList.add('is-selected');circle.setAttribute('r','5')}}
   }
-  async function load(first=null,last=null){
+  async function load(first=null,last=null,openSnapshot=false){
+    const requestedCenter=center;
     if(pending)pending.abort();const controller=new AbortController();pending=controller;const current=++version;
     const url=new URL(dialog.dataset.url,location.origin);for(const [key,value] of Object.entries({center,count,metric,name}))url.searchParams.set(key,value);
     if(first!=null && last!=null){url.searchParams.set('first',first);url.searchParams.set('last',last)}
@@ -73,9 +74,11 @@
       countLabel.textContent=`Показано ${data.count} · масштаб ${count} отчётов · максимум 900`;
       dialog.querySelector('[data-zoom="out"]').disabled=count>=900;dialog.querySelector('[data-zoom="in"]').disabled=count<=3;
       const available=points.filter(p=>p.value!=null);
-      const target=points.find(p=>p.report_id===wanted)||available.reduce((best,p)=>!best||Math.abs(p.timestamp-center)<Math.abs(best.timestamp-center)?p:best,null);
+      const candidates=openSnapshot&&first!==null&&last!==null ? points.filter(p=>p.timestamp>=first&&p.timestamp<=last) : available;
+      const target=points.find(p=>p.report_id===wanted)||candidates.reduce((best,p)=>!best||Math.abs(p.timestamp-requestedCenter)<Math.abs(best.timestamp-requestedCenter)?p:best,null);
       if(target)selectPoint(target);else{selected=null;wanted=null;info.textContent='Нет измерений выбранной метрики.';snapshotContent.hidden=true}
       for(const kind of ['min','max']){const button=dialog.querySelector('[data-view-extreme="'+kind+'"]');button.disabled=!available.length;if(available.length){const p=available.reduce((a,b)=>(kind==='min'?b.value<a.value:b.value>a.value)?b:a);button.textContent=(kind==='min'?'Минимум: ':'Максимум: ')+format(p.value)}}
+      if(openSnapshot&&target)await showSnapshot();
     }catch(error){if(error.name!=='AbortError' && current===version)status.textContent='Не удалось загрузить отчёты. Повторите изменение масштаба.'}
     finally{if(current===version){pending=null;plot.removeAttribute('aria-busy');plot.classList.remove('plot-working');activate(false)}}
   }
@@ -98,8 +101,9 @@
     metric=point.dataset.detailMetric;name=point.dataset.detailName||'';
     const first=Number(point.dataset.detailFirst),last=Number(point.dataset.detailLast);
     wanted=point.dataset.detailReport?Number(point.dataset.detailReport):null;selected=null;tooltip.hidden=true;snapshotContent.hidden=true;delete snapshotContent.dataset.reportId;snapshotContent.replaceChildren();snapshotPending?.abort();
-    center=(first+last)/2;count=Math.min(900,Math.max(30,Number(point.dataset.detailCount)||30));points=[];
-    dialog.querySelector('h2').textContent=point.dataset.detailTitle||'Подробный график';plot.replaceChildren();plot.style.height='';plot.style.flex='';if(!dialog.open)dialog.showModal();activate(false);load(first,last);
+    const chosen=Number(point.dataset.detailCenter);
+    center=Number.isFinite(chosen)?Math.max(first,Math.min(last,chosen)):(first+last)/2;count=Math.min(900,Math.max(30,Number(point.dataset.detailCount)||30));points=[];
+    dialog.querySelector('h2').textContent=point.dataset.detailTitle||'Подробный график';plot.replaceChildren();plot.style.height='';plot.style.flex='';if(!dialog.open)dialog.showModal();activate(false);load(first,last,point.dataset.openSnapshot==='true');
   });
   document.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ') && event.target.matches('[data-detail-metric]')){event.preventDefault();event.target.dispatchEvent(new MouseEvent('click',{bubbles:true}))}});
   dialog.querySelector('[data-detail-close]').addEventListener('click',()=>dialog.close());

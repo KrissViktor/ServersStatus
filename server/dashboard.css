@@ -413,7 +413,6 @@ svg[data-resource-metric]{min-width:0;touch-action:pan-y;cursor:crosshair}.histo
 .overview-page .portal-navigation a[aria-current="page"] { background: #82ade518; color: #b9d7fa; box-shadow: inset 0 -2px #82ade5; }
 .fleet-table tbody tr:hover { background: #82ade510; }
 .fleet-table .fleet-primary-issue { color: var(--yellow); font-size: 11px; }
-svg[data-capacity-points] { cursor: crosshair; touch-action: pan-y; }
 @media (max-width: 680px) {
   .server-table-view > .table-scroll { border: 0; overflow: visible; }
   .fleet-table { min-width: 0; display: block; }
