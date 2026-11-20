@@ -14,7 +14,7 @@ def client_address(request):
         loopback = False
     # Uvicorn is bound to loopback. Only the local Caddy may supply client IP.
     if loopback:
-        for header in ('x-forwarded-for', 'x-status-client-ip'):
+        for header in ('x-status-client-ip', 'x-forwarded-for'):
             value = request.headers.get(header, '').strip()
             try:
                 return str(ipaddress.ip_address(value))

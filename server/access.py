@@ -54,6 +54,13 @@ def revoke(c,name):
         c.execute("UPDATE ai_turns SET status='cancelled',updated=? WHERE owner=? AND status IN ('queued','running')",(time.time(),name))
     for table in ('console_grants','console_grant_tokens','console_challenges'):
         c.execute('DELETE FROM '+table+' WHERE session IN (SELECT token FROM session_users WHERE name=?)',(name,))
+    now = time.time()
+    c.execute("""UPDATE portal_login_audit SET ended=? WHERE id IN (
+        SELECT i.login FROM portal_session_info i JOIN session_users u ON u.token=i.token
+        JOIN sessions s ON s.token=i.token WHERE u.name=? AND s.expires>?
+    )""",(now,name,now))
+    c.execute('DELETE FROM portal_session_info WHERE token IN (SELECT token FROM session_users WHERE name=?)',(name,))
+    c.execute('DELETE FROM portal_password_resets WHERE account=?',(name,))
     c.execute('DELETE FROM sessions WHERE token IN (SELECT token FROM session_users WHERE name=?)',(name,))
     c.execute('DELETE FROM session_users WHERE name=?',(name,))
 
@@ -71,8 +78,12 @@ def middleware(db):
                 if hidden and ((path.startswith('/users') and not can_users()) or (not path.startswith('/users') and not can_console())):
                     return JSONResponse({'detail':'Not Found'},status_code=404,headers={'Cache-Control':'no-store'})
                 current=(path in ('/','/news','/wallboard','/api/wallboard') and request.method=='GET') or path=='/logout' or (path.startswith('/servers/') and len(path.split('/'))==3 and request.method=='GET') or (path.startswith('/api/servers/') and path.endswith(('/processes','/services')) and request.method=='GET')
-                infrastructure=path in ('/health','/login') or path.startswith(('/api/report/','/api/processes/','/api/agent-update/','/api/windows/','/api/console/'))
+                infrastructure=path in ('/health','/login','/password-reset') or path.startswith(('/api/report/','/api/processes/','/api/agent-update/','/api/windows/','/api/console/'))
                 if not current and not infrastructure and not can_history():return JSONResponse({'detail':'Доступ закрыт'},status_code=403,headers={'Cache-Control':'no-store'})
+                if request.method=='GET' and not infrastructure and not path.startswith('/api/'):
+                    from .portal_sessions import touch
+                    from .security import client_address
+                    await run_in_threadpool(touch,db,request.cookies.get('session',''),time.time(),client_address(request))
             elif path.startswith('/users'):
                 return JSONResponse({'detail':'Not Found'},status_code=404,headers={'Cache-Control':'no-store'})
             return await call_next(request)

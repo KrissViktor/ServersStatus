@@ -8,6 +8,7 @@ import threading
 import time
 
 from .bot_reports import KEYBOARD,command_name,render
+from .bot_portal import COMMANDS as PORTAL_COMMANDS, admins as portal_admins, render as render_portal
 from .notifications import telegram_request
 from .notification_types import DeliveryError
 
@@ -21,8 +22,10 @@ def initialize(connection):
       CREATE TABLE IF NOT EXISTS bot_state(name TEXT PRIMARY KEY,value TEXT);
       CREATE TABLE IF NOT EXISTS bot_replies(
         update_id INTEGER PRIMARY KEY,chat_id TEXT,parts TEXT,next_part INTEGER,
-        retry_at REAL,created REAL,completed INTEGER DEFAULT 0);
+        retry_at REAL,created REAL,completed INTEGER DEFAULT 0,portal INTEGER NOT NULL DEFAULT 0);
     ''')
+    if not any(row[1]=='portal' for row in connection.execute('PRAGMA table_info(bot_replies)')):
+        connection.execute('ALTER TABLE bot_replies ADD COLUMN portal INTEGER NOT NULL DEFAULT 0')
 
 
 def state(connection,name,value):
@@ -60,19 +63,31 @@ def queue_update(db,update,chat_id,allowed_users,limiter,now):
         authorized=str(message_chat.get('id',''))==str(chat_id) and not sender.get('is_bot')
         if allowed_users and str(sender.get('id','')) not in allowed_users:authorized=False
         command=command_name(text) if isinstance(text,str) else None
+        parts_text = text.strip().split(maxsplit=1) if isinstance(text,str) else []
+        portal_command = parts_text[0].split('@',1)[0].removeprefix('/').casefold() if parts_text and parts_text[0].startswith('/') else ''
+        sender_id = str(sender.get('id',''))
+        private_admin = (message_chat.get('type')=='private' and str(message_chat.get('id',''))==sender_id
+                         and sender_id in portal_admins() and not sender.get('is_bot'))
         fresh=isinstance(date,(int,float)) and now-600<=date<=now+60
         pending=c.execute('SELECT COUNT(*) FROM bot_replies WHERE completed=0').fetchone()[0]
-        if authorized and fresh and command and pending<20 and limiter.allow(str(sender.get('id','')),now):
+        if private_admin and fresh and portal_command in PORTAL_COMMANDS and pending<20 and limiter.allow(sender_id,now):
+            argument = parts_text[1].strip() if len(parts_text)>1 else ''
+            parts = render_portal(c,portal_command,argument,sender_id,now)
+            c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,1)',(identifier,sender_id,json.dumps(parts,ensure_ascii=False),now))
+        elif authorized and fresh and command and pending<20 and limiter.allow(sender_id,now):
             parts=render(c,command,now)
-            c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0)',(identifier,str(chat_id),json.dumps(parts,ensure_ascii=False),now))
+            c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,0)',(identifier,str(chat_id),json.dumps(parts,ensure_ascii=False),now))
         state(c,'offset',identifier+1)
         c.execute('DELETE FROM bot_replies WHERE completed=1 AND created<?',(now-86400,))
 
 
 def flush(db,sender,now,heartbeat=lambda:None):
     with db() as c:
-        c.execute('UPDATE bot_replies SET completed=1 WHERE completed=0 AND created<?',(now-600,))
+        c.execute("UPDATE bot_replies SET completed=1,parts='[]' WHERE completed=0 AND created<?",(now-600,))
         pending=c.execute('SELECT * FROM bot_replies WHERE completed=0 AND retry_at<=? ORDER BY update_id LIMIT 1',(now,)).fetchone()
+        if pending and pending['portal'] and pending['chat_id'] not in portal_admins():
+            c.execute("UPDATE bot_replies SET completed=1,parts='[]' WHERE update_id=?",(pending['update_id'],))
+            return False
     if not pending:return False
     parts=json.loads(pending['parts'])
     for index in range(pending['next_part'],min(len(parts),pending['next_part']+3)):
@@ -85,7 +100,8 @@ def flush(db,sender,now,heartbeat=lambda:None):
                 state(c,'send_error',error.status or 'delivery')
             return False
         with db() as c:
-            c.execute('UPDATE bot_replies SET next_part=?,completed=? WHERE update_id=?',(index+1,int(index+1==len(parts)),pending['update_id']))
+            completed = int(index+1==len(parts))
+            c.execute("UPDATE bot_replies SET next_part=?,completed=?,parts=CASE WHEN ? THEN '[]' ELSE parts END WHERE update_id=?",(index+1,completed,completed,pending['update_id']))
             state(c,'last_delivery',time.time())
             state(c,'send_error','')
         heartbeat()
@@ -139,6 +155,14 @@ def main():
             try:
                 if not registered:
                     telegram_request(token,'setMyCommands',{'commands':commands})
+                    for admin in portal_admins():
+                        try:
+                            telegram_request(token,'setMyCommands',{'scope':{'type':'chat','chat_id':int(admin)},'commands':commands+[
+                                {'command':name,'description':description} for name,description in PORTAL_COMMANDS.items()
+                            ]})
+                        except DeliveryError:
+                            # A private chat may not exist until the operator messages the bot.
+                            continue
                     registered=True
                 def sender(chat,text,keyboard):
                     if stop.is_set():raise StopRequested()

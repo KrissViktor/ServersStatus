@@ -39,6 +39,9 @@ def cleanup(connection,now):
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='equipment_history'").fetchone():
         connection.execute('DELETE FROM equipment_history WHERE id IN (SELECT h.id FROM equipment_history h WHERE h.received<? AND h.id<>(SELECT p.id FROM equipment_history p WHERE p.agent=h.agent AND p.received<? ORDER BY p.received DESC,p.id DESC LIMIT 1) LIMIT ?)',(now-days*86400,now-days*86400,CLEANUP_BATCH))
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='server_boot_events'").fetchone():connection.execute('DELETE FROM server_boot_events WHERE at<?',(now-days*86400,))
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='portal_login_audit'").fetchone():
+        from .portal_sessions import cleanup as cleanup_sessions
+        cleanup_sessions(connection,now,now-days*86400)
     removed_rollups = 0
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='report_rollups'").fetchone():
         from .report_rollups import DAY, midnight

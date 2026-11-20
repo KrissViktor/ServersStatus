@@ -404,6 +404,8 @@ svg[data-resource-metric]{min-width:0;touch-action:pan-y;cursor:crosshair}.histo
 .history-details { margin: 18px 0; }
 .history-details > [data-history-status]:empty { display: none; }
 .history-details > [data-history-retry][hidden] { display: none; }
+.session-browser dt { color: var(--muted); margin-top: 8px; }
+.session-browser dd { margin: 3px 0 0; overflow-wrap: anywhere; }
 .problem-summary-row > span:last-child { white-space: normal; }
 .problem-age { display: block; margin-top: 4px; color: var(--muted); }
 .problem-summary .problem-more > summary { position: static; padding: 8px 0; }

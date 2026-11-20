@@ -34,6 +34,7 @@ class SecurityTest(unittest.TestCase):
         self.assertEqual(client_address(request('198.51.100.1', {'x-status-client-ip':'203.0.113.2'})), '198.51.100.1')
         self.assertEqual(client_address(request('127.0.0.1', {'x-status-client-ip':'203.0.113.2'})), '203.0.113.2')
         self.assertEqual(client_address(request('127.0.0.1', {'x-forwarded-for':'203.0.113.3'})), '203.0.113.3')
+        self.assertEqual(client_address(request('127.0.0.1', {'x-status-client-ip':'203.0.113.2','x-forwarded-for':'203.0.113.3'})), '203.0.113.2')
         self.assertEqual(client_address(request('127.0.0.1', {'x-forwarded-for':'spoof, 203.0.113.3'})), '127.0.0.1')
 
     def test_flood_limit_refill_and_bounded_memory(self):

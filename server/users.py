@@ -1,6 +1,7 @@
 """Account management visible only to privileged owners."""
 import asyncio
 import hmac
+import json
 import re
 import secrets
 import time
@@ -24,7 +25,7 @@ def render(rows,csrf,actor,message='',draft=None,ip_blocks=None):
     draft=draft or {}
     hidden='<input type="hidden" name="csrf" value="'+esc(csrf)+'">'
     def choices(selected):return ''.join('<option value="'+key+'" '+('selected' if key==selected else '')+'>'+value+'</option>' for key,value in ROLES.items())
-    content='<header class="topbar"><a href="/admin">← Администрирование</a></header><div class="heading"><h1>Пользователи</h1></div>'
+    content='<header class="topbar"><a href="/admin">← Администрирование</a><a class="nav-link" href="/users/sessions">Сеансы портала</a></header><div class="heading"><h1>Пользователи</h1></div>'
     if message:content+='<p class="notice" role="alert">'+esc(message)+'</p>'
     content+='<details class="server user-create" '+('open' if creating else '')+'><summary>Добавить пользователя</summary><form method="post" action="/users/create">'+hidden+'<label>Логин<input name="name" required pattern="[A-Za-zА-Яа-яЁё0-9_.\\-]{1,64}" maxlength="64" autocomplete="off" value="'+esc(draft.get('name',''))+'"> <small>Латиница, кириллица, цифры и _.-, без пробелов; до 64 символов.</small></label><label>Пароль (от 12 символов)<input type="password" name="password" required minlength="12" maxlength="256" autocomplete="new-password"></label><label>Доступ<select name="role">'+choices(draft.get('role') if draft.get('role') in ROLES else 'viewer')+'</select></label><button>Создать пользователя</button></form></details><div class="user-grid">'
     for row in rows:
@@ -64,6 +65,80 @@ def register(app,db,csrf_token,digest,password_hash):
         actor=owner(request)
         with db() as c:rows=account_rows(c);blocks=ip_rows(c)
         return HTMLResponse(render(rows,csrf_token(request),actor['name'],ip_blocks=blocks),headers={'Cache-Control':'no-store'})
+
+    @app.get('/users/sessions',response_class=HTMLResponse)
+    def sessions(request:Request, view:str='active', before:int=9223372036854775807):
+        owner(request)
+        if view not in ('active','history','failed') or not 1<=before<=9223372036854775807:
+            raise HTTPException(400)
+        from .portal_sessions import current, history
+        from .windows_ui import stamp as time_label
+        now = time.time()
+        with db() as c:
+            rows = current(c,now,limit=-1) if view=='active' else history(c,now,view=='failed',before)
+        content = '<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/users">Учётные записи</a></header><div class="heading"><h1>Сеансы портала</h1></div><nav class="periods" aria-label="Сеансы">'
+        for value,label in [('active','Текущие'),('history','Завершённые'),('failed','Неудачные входы')]:
+            selected = ' class="period selected" aria-current="page"' if value==view else ' class="period"'
+            content += '<a'+selected+' href="/users/sessions?view='+value+'">'+label+'</a>'
+        content += '</nav><div class="user-grid">'
+        for row in (rows if view=='active' else rows[:50]):
+            badge = ('<span class="badge danger">'+('Вход заблокирован' if row['accepted']==2 else 'Неудачный вход')+'</span>') if view=='failed' else ''
+            content += '<article class="server"><h2>'+esc(row['name'] or 'Логин не указан')+'</h2>'+badge
+            content += '<p>IP '+esc(row['ip'] or 'неизвестен')+' · '+esc(row['country'] or 'страна неизвестна')+'</p>'
+            content += '<p>'+('Попытка: ' if view=='failed' else 'Вход: ')+esc(time_label(row['at']))+'</p>'
+            if row['last_ip'] and row['last_ip']!=row['ip']:
+                content += '<p>Последний IP '+esc(row['last_ip'])+' · '+esc(row['last_country'] or 'страна неизвестна')+'</p>'
+            if view=='active':
+                content += '<p>Последняя активность: '+esc(time_label(row['last_seen']))+' · Истекает: '+esc(time_label(row['expires']))+'</p>'
+                identifier=row['public_id']
+                if identifier:
+                    content += (
+                        '<p>ID сеанса: <code>'+esc(identifier)+'</code></p><form action="/users/sessions/end" method="post">'
+                        '<input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
+                        '<input type="hidden" name="id" value="'+esc(identifier)+'"><button>Завершить сеанс</button></form>'
+                    )
+            elif view=='history':
+                content += '<p>Последняя активность: '+esc(time_label(row['last_seen']))+' · Завершение: '+esc(time_label(row['ended']))+'</p>'
+            browser = json.loads(row['browser'] or '{}')
+            if browser:
+                content += '<details><summary>Данные браузера</summary><dl class="session-browser">'+''.join(
+                    '<dt>'+esc(key)+'</dt><dd>'+esc(value)+'</dd>' for key,value in browser.items()
+                )+'</dl></details>'
+            content += '</article>'
+        if not rows:
+            content += '<p class="empty">Записей пока нет.</p>'
+        content += '</div>'
+        if view!='active' and len(rows)>50:
+            content += '<a class="nav-link" href="/users/sessions?view='+view+'&amp;before='+str(rows[49]['id'])+'">Более ранние записи →</a>'
+        return HTMLResponse(page(content),headers={'Cache-Control':'no-store'})
+
+    @app.post('/users/sessions/end')
+    async def end_session(request:Request):
+        owner(request)
+        try:
+            form=parse_qs((await read_body(request,4096)).decode())
+        except UnicodeDecodeError:
+            raise HTTPException(400) from None
+        if not hmac.compare_digest(form.get('csrf',[''])[0].encode(),csrf_token(request).encode()):
+            raise HTTPException(403)
+        identifier=form.get('id',[''])[0]
+        if not re.fullmatch(r'[0-9a-f]{16}',identifier):
+            raise HTTPException(400)
+        from .portal_sessions import end
+        with db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            actor=owner(request)
+            row=c.execute("""SELECT i.token,u.name FROM portal_session_info i JOIN session_users u ON u.token=i.token
+                JOIN sessions s ON s.token=i.token WHERE i.public_id=? AND s.expires>?""",(identifier,time.time())).fetchone()
+            if not row:
+                raise HTTPException(404,'Активный сеанс не найден')
+            end(c,row['token'])
+            record(c,'','users',actor['name']+' завершил сеанс '+identifier+' пользователя '+row['name'])
+        own=row['token']==digest(request.cookies.get('session',''))
+        result=RedirectResponse('/' if own else '/users/sessions',303)
+        if own:
+            result.delete_cookie('session')
+        return result
 
     async def apply(action:str,request:Request):
         actor=owner(request)

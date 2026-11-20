@@ -69,6 +69,44 @@ class BotTest(unittest.TestCase):
         flush(application.db,lambda *args:sent.append(args[1]),1121)
         self.assertEqual(sent,['one','two'])
 
+    def test_private_portal_commands_and_password_link(self):
+        import re
+        import time
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+        now=time.time()
+        with application.db() as c:
+            admin_password='initial-test-password'
+            salt='ab'*16
+            c.execute('INSERT INTO users VALUES (?,?,?)',('admin',salt,application.password_hash(admin_password,salt)))
+        web=TestClient(application.app,base_url='https://portal.test')
+        admin=TestClient(application.app,base_url='https://portal.test')
+        credentials={'username':'admin','password':admin_password}
+        headers={'User-Agent':'Audit proof','X-Status-Client-IP':'8.8.8.8'}
+        self.assertEqual(admin.post('/login',data=credentials,headers=headers,follow_redirects=False).status_code,303)
+        self.assertEqual(web.post('/login',data={**credentials,'password':'wrong'},headers=headers,follow_redirects=False).status_code,401)
+        self.assertIn('Audit proof',admin.get('/users/sessions?view=failed').text)
+        self.assertIn('Audit proof',admin.get('/users/sessions').text)
+        def message(identifier, text, kind):
+            update=self.update(identifier,chat=5,text=text,date=now)
+            update['message']['chat']['type']=kind
+            return update
+        with patch.dict('os.environ',{'STATUS_TELEGRAM_PORTAL_ADMINS':'5','STATUS_PANEL_URL':'https://portal.test'}):
+            for identifier,kind in [(1,'group'),(2,'private')]:
+                queue_update(application.db,message(identifier,'/portal_password admin',kind),5,set(),self.limiter,now)
+            flush(application.db,lambda *args:self.sent.append(args),now)
+        self.assertEqual(len(self.sent),1)
+        link=re.search(r'https://portal.test/password-reset\?token=([\w-]+)',self.sent[0][1])
+        self.assertIsNotNone(link)
+        token=link[1]
+        self.assertEqual(web.get('/password-reset',params={'token':token}).status_code,200)
+        form={'token':token,'password':'replacement-test-password'}
+        self.assertEqual(web.post('/password-reset',data=form,follow_redirects=False).status_code,303)
+        self.assertEqual(web.post('/password-reset',data=form,follow_redirects=False).status_code,404)
+        self.assertEqual(admin.get('/users/sessions').status_code,404)
+        self.assertEqual(web.post('/login',data={**credentials,'password':form['password']},follow_redirects=False).status_code,303)
+        self.assertIn('Audit proof',web.get('/users/sessions?view=history').text)
+
     def test_antiflood_and_expired_outbox(self):
         for identifier in range(1,8):
             queue_update(application.db,self.update(identifier),123,set(),self.limiter,1000)

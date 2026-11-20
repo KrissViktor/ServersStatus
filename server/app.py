@@ -128,6 +128,8 @@ def _initialize_database(connection):
     connection.executescript(ACCESS_SCHEMA)
     from .access import initialize
     initialize(connection)
+    from .portal_sessions import initialize as initialize_sessions
+    initialize_sessions(connection)
     from .news import sync as sync_news
     sync_news(connection)
 
@@ -210,10 +212,14 @@ async def login(request: Request):
         raise HTTPException(400)
     name, password = form.get('username', [''])[0], form.get('password', [''])[0]
     address = client_address(request)
+    from .portal_sessions import audit_blocked, audit_login, browser_info, country_for
+    browser = browser_info(request)
     now = time.time()
     with db() as c:
         wait = max(blocked_seconds(c, address, now),account_blocked_seconds(c,name,now))
         if wait:
+            audit_blocked(c,name,now,address,browser)
+            c.commit()
             raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
         user = c.execute('SELECT * FROM users WHERE name=?', (name,)).fetchone()
     salt = user['salt'] if user else '00' * 16
@@ -222,12 +228,16 @@ async def login(request: Request):
     with db() as c:
         enabled=c.execute('SELECT enabled FROM user_roles WHERE name=?',(name,)).fetchone()
     valid = user is not None and (not enabled or enabled[0]) and hmac.compare_digest(calculated, user['password'])
+    country = await run_in_threadpool(country_for,address)
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
         wait = max(blocked_seconds(c, address, now),account_blocked_seconds(c,name,now))
         if wait:
+            audit_blocked(c,name,now,address,browser)
+            c.commit()
             raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
         if not valid:
+            audit_login(c,name,now,False,address,country,browser)
             wait = failed_login(c, address, now)
             if user is not None and (not enabled or enabled[0]):
                 account_wait=failed_account_login(c,name,now)
@@ -244,8 +254,10 @@ async def login(request: Request):
             current=c.execute('SELECT password FROM users WHERE name=?',(name,)).fetchone()
             enabled=c.execute('SELECT enabled FROM user_roles WHERE name=?',(name,)).fetchone()
             if not current or current['password']!=user['password'] or (enabled and not enabled[0]):raise HTTPException(401,'Неверный логин или пароль')
-            c.execute('INSERT INTO sessions VALUES (?,?)', (digest(token), now + 28800))
-            c.execute('INSERT INTO session_users VALUES (?,?)',(digest(token),name))
+            key = digest(token)
+            c.execute('INSERT INTO sessions VALUES (?,?)', (key, now + 28800))
+            c.execute('INSERT INTO session_users VALUES (?,?)',(key,name))
+            audit_login(c,name,now,True,address,country,browser,key,now+28800)
             c.execute('DELETE FROM session_users WHERE token NOT IN (SELECT token FROM sessions)')
     if not valid:
         if wait:
@@ -258,12 +270,9 @@ async def login(request: Request):
 
 @app.post('/logout')
 def logout(request: Request):
+    from .portal_sessions import end
     with db() as c:
-        key=digest(request.cookies.get('session',''))
-        for table in ('console_grants','console_grant_tokens','console_challenges'):
-            c.execute('DELETE FROM '+table+' WHERE session=?',(key,))
-        c.execute('DELETE FROM sessions WHERE token=?', (key,))
-        c.execute('DELETE FROM session_users WHERE token=?',(key,))
+        end(c,digest(request.cookies.get('session','')))
     response = RedirectResponse('/', status_code=303)
     response.delete_cookie('session')
     return response
@@ -428,6 +437,11 @@ def health():
 @app.middleware('http')
 async def private_pages(request: Request, call_next):
     response = await call_next(request)
+    if request.url.path=='/' and response.headers.get('content-type','').startswith('text/html'):
+        response.headers['Accept-CH']='Sec-CH-UA-Platform-Version, Sec-CH-UA-Full-Version-List, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Model'
+    if request.url.path=='/password-reset':
+        response.headers['Cache-Control']='no-store'
+        response.headers['Referrer-Policy']='no-referrer'
     if request.url.path == '/' or request.url.path.startswith(('/agents', '/history', '/settings', '/servers', '/events', '/bot', '/admin', '/users', '/host', '/updates', '/windows', '/console-access', '/compare', '/groups', '/daily', '/checks', '/export', '/portal-health', '/portal-settings', '/news', '/heatmap', '/timeline', '/wallboard', '/api/wallboard', '/dependencies', '/login', '/logout')):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
@@ -883,6 +897,8 @@ register_checks(app,db,authenticated,csrf_token)
 
 from .report_exports import register as register_exports
 register_exports(app,db,authenticated)
+from .password_reset import register as register_password_reset
+register_password_reset(app,db,password_hash,login_slots)
 from .report_rollup_jobs import register as register_rollups
 register_rollups(app,db,authenticated,csrf_token)
 from .portal_health import register as register_portal_health
