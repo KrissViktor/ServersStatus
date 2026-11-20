@@ -76,7 +76,7 @@
   }
   function showInspector(group,svg){
     const {inspector}=stateFor(group);
-    if(matchMedia('(pointer: coarse) and (max-width: 760px)').matches){
+    if(group.dataset.resourceMode!=='compact'&&matchMedia('(pointer: coarse) and (max-width: 760px)').matches){
       let chart=svg;
       while(chart.parentElement!==group)chart=chart.parentElement;
       chart.after(inspector);
