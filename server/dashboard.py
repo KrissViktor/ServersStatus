@@ -120,7 +120,7 @@ def topbar_insert(content,addition,after=False):
     return content[:index]+addition+content[index:]
 
 
-def page(content, refresh=False, protection_entry=False, workspace=False):
+def page(content, refresh=False, protection_entry=False):
     # Every section uses the same brand markup, including older page templates.
     def unify_header(body):
         brand='<a class="brand" href="/?reset=1" aria-label="ServersStatus — обзор серверов">S<span>●</span> <b>ServersStatus</b></a>'
@@ -152,8 +152,14 @@ def page(content, refresh=False, protection_entry=False, workspace=False):
     shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')
     if refresh:shared+=ui_script('refresh.js')
     shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js'))
-    theme = ' class="monitoring-workspace"' if workspace else ''
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Статус серверов</title>'+ui_styles()+'</head><body'+theme+'><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
+    theme_control = ('<label class="theme-picker"><span>Тема</span><select data-theme-choice aria-label="Тема сайта">'
+                     '<option value="system">Системная</option><option value="light">Светлая</option>'
+                     '<option value="dark">Тёмная</option></select></label>')
+    if '<header class="topbar"' in content:
+        content = topbar_insert(content,theme_control)
+    else:
+        content += '<div class="theme-picker-footer">'+theme_control+'</div>'
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Статус серверов</title>'+ui_script('theme.js')+ui_styles()+'</head><body class="monitoring-workspace"><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 
 
@@ -370,4 +376,4 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf='', layout='t
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now,csrf)
     from .drilldown import widget
-    return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+summary+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>',workspace=True)
+    return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+summary+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')

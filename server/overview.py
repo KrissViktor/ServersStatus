@@ -155,4 +155,4 @@ def detail_page(row, csrf,console_access=False):
     from .drilldown import widget
     from .rdp_control import widget as rdp_widget
     from .assets import script
-    return page(fold_sections(content)+(widget(row['id']) if can_history() else '')+(rdp_widget() if can_console() else '')+script('disk_forecast.js'), refresh=True,workspace=True)
+    return page(fold_sections(content)+(widget(row['id']) if can_history() else '')+(rdp_widget() if can_console() else '')+script('disk_forecast.js'), refresh=True)

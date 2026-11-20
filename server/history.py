@@ -172,4 +172,4 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
     from .drilldown import widget
     refresh = '' if date_from else ' data-refresh data-refresh-interval="30000"'
     refresh += ' data-resource-events="'+esc(json.dumps(events,ensure_ascii=False))+'"'
-    return page('<div id="history-content" data-resource-agent="'+esc(agent_id)+'" data-resource-period="'+period+'"'+refresh+'>' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится '+str(retention_days)+' дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True,workspace=True)
+    return page('<div id="history-content" data-resource-agent="'+esc(agent_id)+'" data-resource-period="'+period+'"'+refresh+'>' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится '+str(retention_days)+' дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
