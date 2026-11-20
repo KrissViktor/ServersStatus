@@ -527,7 +527,7 @@ async def change_agent(action: str, request: Request):
 
 
 @app.get('/history/{agent_id}', response_class=HTMLResponse)
-def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str = '', disk: str = '', date_from: str = '', date_to: str = ''):
+def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str = '', disk: str = '', date_from: str = '', date_to: str = '', details: str = ''):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
     now = time.time()
@@ -535,19 +535,26 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
     with db() as c:
         if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
             raise HTTPException(404, 'Агент не найден')
+        selected_io = {'nic':nic,'disk':disk}
+        if details in ('fragment','full'):
+            from .io_history import sections
+            io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk, date_from, date_to)
+            from .stability import load as load_stability, render as stability_render
+            from .incident_history import history_html
+            io = stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
+            if details == 'fragment':
+                return HTMLResponse(io, headers={'Cache-Control':'no-store'})
+        else:
+            io = None
         points = load_history(c, agent_id, start, end, bucket)
-        from .io_history import sections
-        io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk, date_from, date_to)
         from .snapshots import extrema
         extremes=extrema(c,agent_id,start,end,points)
         from .portal_settings import retention_days
         days=retention_days(c)
         title=server_name(c,agent_id)
-        from .stability import load as load_stability, render as stability_render
-        from .incident_history import sync,history_html
+        from .incident_history import sync
         latest=c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id WHERE a.id=?',(agent_id,)).fetchone()
         sync(c,[latest],now)
-        io=stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
         from .resource_charts import markers
         events = markers(c,agent_id,start,end)
     return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes,retention_days=days,display_name=title,date_from=date_from,date_to=date_to,bucket=bucket,events=events))

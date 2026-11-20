@@ -112,12 +112,13 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
     bucket = bucket or PERIODS[period][2]
     bucket_label=str(bucket)+' с' if bucket<60 else str(bucket//60)+' мин'
     url = '/history/' + quote(agent_id, safe='')
-    links = ''.join(f'<a class="period {"selected" if key == period and not date_from else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{label}</a>' for key, (label, _, _) in PERIODS.items())
+    links = ''.join(f'<a class="period {"selected" if key == period and not date_from else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{"Последние сутки" if key == "24h" else label}</a>' for key, (label, _, _) in PERIODS.items())
     content = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/">← Обзор серверов</a></header>'
     refresh_note = '' if date_from else ' · обновление каждые 30 с'
-    content += f'<div class="heading"><div><p class="eyebrow">ИСТОРИЯ НАГРУЗКИ</p><h1>{esc(display_name or agent_id)}</h1><p class="muted">{stamp(start)} — {stamp(end)}{refresh_note}</p></div></div><nav class="periods" aria-label="Период истории">{links}</nav>'
+    content += f'<div class="heading"><div><p class="eyebrow">ИСТОРИЯ НАГРУЗКИ</p><h1>{esc(display_name or agent_id)}</h1></div></div>'
+    content += f'<section class="server history-period"><h2>Период истории</h2><p class="muted">{stamp(start)} — {stamp(end)}{refresh_note}</p><nav class="periods" aria-label="Период истории">{links}</nav>'
     hidden = ''.join(f'<input type="hidden" name="{esc(key)}" value="{esc(value)}">' for key,value in {'period':period, **(selectors or {})}.items())
-    content += '<form class="fleet-filter history-date-filter" method="get" action="'+esc(url)+'">'+hidden+date_controls(date_from,date_to)+'<button>Показать по датам</button></form>'
+    content += '<form class="fleet-filter history-date-filter" method="get" action="'+esc(url)+'">'+hidden+date_controls(date_from,date_to)+'<button>Показать по датам</button></form></section>'
     if not points:
         content += '<div class="empty">За выбранный период отчётов нет. История появится после получения данных агента.</div>'
     else:
@@ -148,7 +149,19 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         content += f'<p class="muted history-note">Отчётов: {total} · Точки — средние за {bucket_label}. Наведите на точку, чтобы увидеть пик и время. Нажмите на точку для просмотра исходных отчётов и масштаба до 900 отчётов. Разрывы означают отсутствие отчётов более 3 минут; интервалы с пропусками показаны отдельными точками. Время — московское (МСК).</p>'
         content += chart(points, 'cpu', 'Процессор · CPU', start, end, '#4adeab')
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
-    content += extra_html
+    if extra_html is None:
+        params = {'period':period, **(selectors or {}), 'date_from':date_from, 'date_to':date_to}
+        fallback = esc(url+'?'+urlencode({**params,'details':'full'}))
+        content += (
+            '<div class="history-details" data-history-details>'
+            '<p class="muted" role="status" data-history-status></p>'
+            '<button type="button" data-history-retry hidden>Повторить загрузку</button>'
+            '<div data-history-panels></div>'
+            '<noscript><a href="'+fallback+'">Показать сеть, дисковые операции и доступность</a></noscript>'
+            '</div>'
+        )
+    else:
+        content += extra_html
     from .drilldown import widget
     refresh = '' if date_from else ' data-refresh data-refresh-interval="30000"'
     refresh += ' data-resource-events="'+esc(json.dumps(events,ensure_ascii=False))+'"'

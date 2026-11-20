@@ -89,7 +89,7 @@ def sections(connection, agent, period, start,end,bucket,nic=None,disk=None,date
     content='<p class="muted history-note">Скорости — секундные снимки перед отчётом. Каждый интерфейс и устройство показаны отдельно. Пропуски не считаются нулями.</p>'
     series={group:metric_series(connection,agent,group,name,start,end,bucket) for group,name in [('network',nic),('disk_io',disk)] if name}
     date_fields = ''.join(f'<input type="hidden" name="{key}" value="{esc(value)}">' for key,value in (
-        ('date_from',date_from), ('date_to',date_to),
+        ('date_from',date_from), ('date_to',date_to), ('details','full'),
     ) if value)
     for group,key,selected,label,title in [('network','nic',nic,'Сетевой интерфейс','Сеть'),('disk_io','disk',disk,'Дисковое устройство','Дисковые операции')]:
         other_key,other_value=('disk',disk) if key=='nic' else ('nic',nic)

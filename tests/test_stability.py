@@ -105,7 +105,11 @@ class StabilityRoutesTest(unittest.TestCase):
         try:
             case.data['reboot_history']={'status':'available','events':[{'event_id':41,'record_id':3,'at':100,'source':'Microsoft-Windows-Kernel-Power','kind':'unexpected','message':'Power loss'}]}
             saved=case.report()
-            for path in ['/servers/pc?stability=7d','/history/pc?period=7d']:
+            history=case.client.get('/history/pc?period=7d')
+            self.assertEqual(history.status_code,200)
+            self.assertIn('data-history-details',history.text)
+            self.assertNotIn('Доступность по отчётам',history.text)
+            for path in ['/servers/pc?stability=7d','/history/pc?period=7d&details=fragment','/history/pc?period=7d&details=full']:
                 response=case.client.get(path);self.assertEqual(response.status_code,200)
                 self.assertIn('Доступность по отчётам',response.text)
                 self.assertIn('История инцидентов',response.text)
