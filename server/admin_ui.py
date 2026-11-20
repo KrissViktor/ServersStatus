@@ -4,6 +4,21 @@ from .ui_icons import icon
 from .access import can_console,can_users
 
 
+def appearance_settings():
+    return (
+        '<section class="server appearance-settings"><h2>Внешний вид</h2>'
+        '<label class="theme-picker"><span>Тема сайта</span><select data-theme-choice>'
+        '<option value="system">Системная</option><option value="light">Светлая</option>'
+        '<option value="dark">Тёмная</option></select></label>'
+        '<p class="muted">Тема сохраняется в этом браузере.</p></section>'
+    )
+
+
+def preferences_page():
+    return page('<header class="topbar"><a class="brand" href="/">ServersStatus</a></header>'
+                '<div class="heading"><h1>Настройки</h1></div>'+appearance_settings())
+
+
 def administration_page():
     sections = [
         ('/problems','Отмеченные проблемы','Кто отметил «Всё окей», комментарии и возврат предупреждений.'),
@@ -26,6 +41,7 @@ def administration_page():
     icons={'/problems':'incident','/groups':'layers','/agents':'server','/updates':'update','/portal-health':'heatmap','/host':'wallboard','/bot':'message','/ai':'sparkles','/events':'timeline','/portal-settings':'settings','/report-rollups':'chart','/users':'users'}
     categories=[('Мониторинг',{'/problems','/groups','/agents','/events','/ai'}),('Обслуживание',{'/updates','/portal-health','/host','/bot','/portal-settings','/report-rollups'}),('Доступ',{'/users'})]
     content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Все серверы</a></header><div class="heading"><div><h1>Администрирование</h1><p class="muted">Настройки и обслуживание портала</p></div></div>'
+    content+=appearance_settings()
     icons['/users/sessions']='users'
     categories[-1][1].add('/users/sessions')
     for heading,paths in categories:

@@ -34,6 +34,12 @@ class AccessRolesTest(unittest.TestCase):
     def test_viewer_is_current_only_and_cannot_discover_accounts_or_console(self):
         client=self.clients['reader'];html=client.get('/').text
         self.assertNotIn('href="/admin"',html);self.assertNotIn('href="/history/',html)
+        self.assertIn('href="/preferences"',html)
+        self.assertNotIn('data-theme-choice',html)
+        settings=client.get('/preferences')
+        self.assertEqual(settings.status_code,200)
+        self.assertIn('data-theme-choice',settings.text)
+        self.assertIn('data-theme-choice',self.clients['admin'].get('/admin').text)
         self.assertNotIn('class="task-graph"',html);self.assertNotIn('id="chart-detail"',html)
         for path in ('/admin','/agents','/updates','/settings/pc','/history/pc','/events','/bot','/host','/windows/pc','/api/history/pc/detail?center='+str(self.now),'/api/history/pc/snapshot?report_id=1'):
             self.assertEqual(client.get(path).status_code,403,path)

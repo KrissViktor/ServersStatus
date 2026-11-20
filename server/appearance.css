@@ -166,13 +166,10 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .monitoring-workspace button.delete-button { --control-text:var(--red); --control-line:var(--red); }
 .monitoring-workspace :is(input,select,textarea) { background-color:var(--field); color:var(--text); border-color:var(--line); }
 .monitoring-workspace input:is([type="checkbox"],[type="radio"]),.monitoring-workspace progress { accent-color:var(--accent); }
-.theme-picker { display:inline-flex; flex:0 0 auto; align-items:center; gap:6px; margin:0; color:var(--muted); font-size:12px; }
-.theme-picker select { width:auto; max-width:100%; min-height:34px; margin:0; padding:5px 8px; font-size:12px; }
-.theme-picker-footer { display:flex; justify-content:center; margin:16px 0; }
-@media(max-width:600px) {
-  .theme-picker>span { display:none; }
-  .theme-picker select { max-width:110px; }
-}
+.monitoring-workspace .overview-order-controls > .overview-problem-shortcut { background:var(--field); color:var(--accent); border-color:var(--line); }
+.monitoring-workspace .overview-order-controls > .overview-problem-shortcut:hover { background:var(--accent-soft); border-color:var(--accent-line); }
+.appearance-settings .theme-picker { display:grid; gap:6px; width:min(100%,240px); margin:12px 0; color:var(--muted); }
+.appearance-settings .theme-picker select { margin:0; min-height:40px; }
 @media(max-width:680px) {
   .monitoring-workspace .fleet-table tbody tr { background:var(--panel); border-radius:12px; box-shadow:var(--soft-shadow); }
   .monitoring-workspace .fleet-table td[data-metric-label] { background:var(--subtle); }

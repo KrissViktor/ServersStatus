@@ -133,15 +133,17 @@ def page(content, refresh=False, protection_entry=False):
     if '<header class="topbar"' in content:
         if can_history() and 'href="/admin"' not in content:
             content=topbar_insert(content,'<a class="nav-link" href="/admin">Администрирование</a>')
+        if not can_history() and 'href="/preferences"' not in content:
+            content=topbar_insert(content,'<a class="nav-link" href="/preferences">Настройки</a>')
         if can_console():
             visibility='data-protection-entry="true"' if protection_entry else 'hidden'
             content=topbar_insert(content,f'<button {visibility} type="button" id="protection-toggle" aria-haspopup="dialog" aria-controls="protection-dialog" class="protection-toggle" aria-label="Снять защиту" title="Снять защиту"><svg viewBox="0 0 24 24" aria-hidden="true"><path data-lock-shackle d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M12 14v3"/></svg></button>')
             content+='<dialog id="protection-dialog" aria-labelledby="protection-title"><button type="button" id="protection-close" aria-label="Закрыть окно">×</button><div id="protection-content"></div></dialog><script>'+PROTECTION_SCRIPT+'</script>'
     if '<header class="topbar"' in content:
-        links=[('/?reset=1','Серверы'),('/wallboard','Большой экран')]
-        if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/problems?view=active','Проблемы'),('/weekly-plan','План на неделю'),('/updates','Обновления'),('/admin','Обслуживание')]
+        links=[('/?reset=1','Серверы'),('/wallboard','Большой экран'),('/preferences','Настройки')]
+        if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/problems?view=active','Проблемы'),('/weekly-plan','План на неделю'),('/updates','Обновления'),('/admin','Администрирование')]
         from .ui_icons import icon
-        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/weekly-plan':'timeline','/updates':'update','/admin':'equipment'}
+        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/weekly-plan':'timeline','/updates':'update','/admin':'equipment','/preferences':'settings'}
         navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+icon(navigation_icons[url.split('?')[0]])+esc(label)+'</a>' for url,label in links)
         bar='<nav class="portal-navigation" aria-label="Основные разделы"><div class="portal-navigation-desktop">'+navigation+'</div><details class="portal-navigation-mobile"><summary>Разделы портала <span aria-hidden="true">⌄</span></summary><div>'+navigation+'</div></details></nav><nav class="portal-breadcrumbs" aria-label="Путь страницы" hidden></nav>'
         content=topbar_insert(content,bar,after=True)
@@ -152,13 +154,6 @@ def page(content, refresh=False, protection_entry=False):
     shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')
     if refresh:shared+=ui_script('refresh.js')
     shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js'))
-    theme_control = ('<label class="theme-picker"><span>Тема</span><select data-theme-choice aria-label="Тема сайта">'
-                     '<option value="system">Системная</option><option value="light">Светлая</option>'
-                     '<option value="dark">Тёмная</option></select></label>')
-    if '<header class="topbar"' in content:
-        content = topbar_insert(content,theme_control)
-    else:
-        content += '<div class="theme-picker-footer">'+theme_control+'</div>'
     return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Статус серверов</title>'+ui_script('theme.js')+ui_styles()+'</head><body class="monitoring-workspace"><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 

@@ -469,6 +469,17 @@ def administration(request: Request):
     return HTMLResponse(administration_page())
 
 
+@app.get('/preferences', response_class=HTMLResponse)
+def preferences(request: Request):
+    if not authenticated(request):
+        return RedirectResponse('/',303)
+    from .access import can_history
+    if can_history():
+        return RedirectResponse('/admin',303)
+    from .admin_ui import preferences_page
+    return HTMLResponse(preferences_page(),headers={'Cache-Control':'no-store'})
+
+
 @app.get('/agents', response_class=HTMLResponse)
 def manage_agents(request: Request):
     if not authenticated(request):
