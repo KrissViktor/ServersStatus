@@ -385,6 +385,22 @@ svg[data-resource-metric]{min-width:0;touch-action:pan-y;cursor:crosshair}.histo
 .history-period > .muted { margin: 6px 0 12px; }
 .history-period .periods { flex-wrap: wrap; }
 .history-period .period { display: inline-flex; align-items: center; }
+.history-period .history-date-filter {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr)) max-content;
+  align-items: end;
+  gap: 10px 12px;
+  max-width: 540px;
+}
+.history-period .history-date-filter > label { min-width: 0; margin: 0; }
+.history-period .history-date-filter > label input[type="date"],
+.history-period .history-date-filter > button {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+}
 .history-details { margin: 18px 0; }
 .history-details > [data-history-status]:empty { display: none; }
 .history-details > [data-history-retry][hidden] { display: none; }
@@ -403,7 +419,10 @@ svg[data-resource-metric]{min-width:0;touch-action:pan-y;cursor:crosshair}.histo
 .weekly-plan li a { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 10px 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .history-period .period { min-height: 44px; }
-  .history-date-filter > button { width: 100%; }
+}
+@media (max-width: 480px) {
+  .history-period .history-date-filter { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .history-period .history-date-filter > button { grid-column: 1/-1; }
 }
 #detail-point-info{padding:12px 15px;border:1px solid #7dbbff33;border-radius:10px;background:#18212a66;white-space:pre-line;line-height:1.7;font-size:13px;color:var(--text)}.detail-chart-controls button,.detail-snapshot-actions button,.detail-chart-toolbar button{height:32px;min-height:32px;padding:0 10px;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}.detail-snapshot-actions{gap:6px}.detail-report-point{stroke-width:1;stroke:var(--panel);transition:r .12s,stroke .12s}.detail-report-point.is-selected{fill:#fff;stroke:#7dbbff;stroke-width:3}#detail-chart-plot .chart-grid{stroke:#ffffff0c}#detail-chart-plot line{vector-effect:non-scaling-stroke}#detail-chart-plot{background:linear-gradient(150deg,#19222a55,#141719)}
 #server-results[data-density=compact] .resource-trend,#server-results[data-density=compact] .resource-inspector{display:none}

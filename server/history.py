@@ -38,8 +38,8 @@ def history_bounds(period, now, date_from='', date_to=''):
 
 def date_controls(date_from='', date_to=''):
     return (
-        '<label>С (МСК)<input type="date" name="date_from" value="'+esc(date_from)+'"></label>'
-        '<label>По (МСК)<input type="date" name="date_to" value="'+esc(date_to)+'"></label>'
+        '<label>С<input type="date" name="date_from" value="'+esc(date_from)+'"></label>'
+        '<label>По<input type="date" name="date_to" value="'+esc(date_to)+'"></label>'
     )
 
 
