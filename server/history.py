@@ -43,10 +43,17 @@ def date_controls(date_from='', date_to=''):
     )
 
 
-def load_history(connection, agent_id, start, end, bucket, *, memory_sizes=True):
+def load_history(connection, agent_id, start, end, bucket, *, memory_sizes=True, totals=False):
     # Filter by indexed agent/time before extracting metrics. Grouping returns
     # at most one point per time bucket, independent of reporting frequency.
     used, total = (RAM_USED_SQL, RAM_TOTAL_SQL) if memory_sizes else ('NULL', 'NULL')
+    aggregates = """,
+               SUM(received) AS timestamp_sum,
+               SUM(cpu) AS cpu_sum, COUNT(cpu) AS cpu_count,
+               SUM(ram) AS ram_sum, COUNT(ram) AS ram_count,
+               TOTAL(ram_used_bytes) AS ram_used_bytes_sum,
+               TOTAL(ram_total_bytes) AS ram_total_bytes_sum, COUNT(ram_total_bytes) AS ram_total_bytes_count
+    """ if totals else ''
     return connection.execute(f'''
         WITH samples AS (
             SELECT received,
@@ -63,7 +70,7 @@ def load_history(connection, agent_id, start, end, bucket, *, memory_sizes=True)
                AVG(ram) AS ram, MIN(ram) AS ram_min, MAX(ram) AS ram_peak,
                AVG(ram_used_bytes) AS ram_used_bytes, MAX(ram_used_bytes) AS ram_used_peak_bytes,
                AVG(ram_total_bytes) AS ram_total_bytes, COUNT(ram_used_bytes) AS ram_size_samples,
-               MAX(CASE WHEN gap>180 THEN 1 ELSE 0 END) AS has_gap
+               MAX(CASE WHEN gap>180 THEN 1 ELSE 0 END) AS has_gap {aggregates}
         FROM samples GROUP BY bucket ORDER BY bucket
     ''', (agent_id, start, end, bucket)).fetchall()
 

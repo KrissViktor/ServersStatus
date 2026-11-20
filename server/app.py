@@ -7,7 +7,7 @@ import re
 import secrets
 import sqlite3
 import time
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
 from .server_names import lookup as server_name
 from .agents_ui import agents_page
-from .history import PERIODS, load_history, history_page, history_bounds
+from .history import PERIODS, history_page, history_bounds
 from .configuration import MonitoringSettings
 from .settings_ui import settings_page
 from .events import record
@@ -26,7 +26,16 @@ from .retention import cleanup
 from .security import client_address, limiter, asset_limiter, login_limiter, blocked_seconds, failed_login, account_blocked_seconds, failed_account_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
-app = FastAPI(title='ServersStatus',docs_url=None,redoc_url=None,openapi_url=None)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    from .report_rollup_jobs import worker
+    async with worker(db):
+        yield
+
+
+app = FastAPI(title='ServersStatus',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
 login_slots = asyncio.Semaphore(2)
 
 
@@ -87,9 +96,10 @@ def _initialize_database(connection):
     from .portal_backup import SCHEMA as PORTAL_SCHEMA
     connection.executescript(PORTAL_SCHEMA)
     from .fleet import SCHEMA as FLEET_SCHEMA
+    from .report_rollups import SCHEMA as ROLLUP_SCHEMA
     from .equipment_history import SCHEMA as EQUIPMENT_SCHEMA
     from .application_checks import SCHEMA as CHECK_SCHEMA
-    connection.executescript(FLEET_SCHEMA+EQUIPMENT_SCHEMA+CHECK_SCHEMA)
+    connection.executescript(FLEET_SCHEMA+EQUIPMENT_SCHEMA+CHECK_SCHEMA+ROLLUP_SCHEMA)
     from .incident_history import SCHEMA as INCIDENT_SCHEMA
     connection.executescript(INCIDENT_SCHEMA)
     from .update_diagnostics import SCHEMA as UPDATE_DIAGNOSTICS_SCHEMA
@@ -533,6 +543,7 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM agent_settings WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_profiles WHERE agent=?', (name,))
                 c.execute('DELETE FROM agent_flags WHERE agent=?', (name,))
+                c.execute('DELETE FROM report_rollups WHERE agent=?', (name,))
     if action == 'delete' and not error:
         return RedirectResponse('/agents', status_code=303)
     return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name), status_code=status)
@@ -544,6 +555,8 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
         return RedirectResponse('/', status_code=303)
     now = time.time()
     start, end, bucket = history_bounds(period, now, date_from, date_to)
+    from .report_rollups import chart_bucket, history_points
+    bucket = chart_bucket(bucket)
     with db() as c:
         if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
             raise HTTPException(404, 'Агент не найден')
@@ -551,14 +564,15 @@ def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str
         if details in ('fragment','full'):
             from .io_history import sections
             io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk, date_from, date_to)
-            from .stability import load as load_stability, render as stability_render
+            from .report_rollups import availability as load_stability
+            from .stability import render as stability_render
             from .incident_history import history_html
             io = stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
             if details == 'fragment':
                 return HTMLResponse(io, headers={'Cache-Control':'no-store'})
         else:
             io = None
-        points = load_history(c, agent_id, start, end, bucket)
+        points = history_points(c, agent_id, start, end, bucket)
         from .snapshots import extrema
         extremes=extrema(c,agent_id,start,end,points)
         from .portal_settings import retention_days
@@ -869,6 +883,8 @@ register_checks(app,db,authenticated,csrf_token)
 
 from .report_exports import register as register_exports
 register_exports(app,db,authenticated)
+from .report_rollup_jobs import register as register_rollups
+register_rollups(app,db,authenticated,csrf_token)
 from .portal_health import register as register_portal_health
 register_portal_health(app,db,authenticated,csrf_token)
 

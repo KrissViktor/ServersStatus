@@ -12,9 +12,10 @@ from urllib.parse import urlencode
 import xml.etree.ElementTree as ET
 from fastapi import HTTPException,Request,Query
 from fastapi.responses import Response
-from .fleet import MSK,members,stats
-from .history import PERIODS,load_history,history_bounds
-from .stability import load as availability,percentage
+from .fleet import MSK,members,stats,comparison_bounds
+from .history import PERIODS
+from .report_rollups import availability,history_points
+from .stability import percentage
 from .disks import monitored_disks
 
 NOTES=['Доступность подтверждается отчётами с допуском 30 секунд; отсутствие данных не доказывает выключение сервера.',
@@ -32,7 +33,7 @@ def dataset(c,kind,now,agents=None,period='24h',day='',group='',date_from='',dat
         names={row['id']:row['name'] for row in rows};chosen=list(dict.fromkeys(agents or [])) if agents else [row['id'] for row in rows[:2]]
         if any(agent not in names for agent in chosen):raise HTTPException(400,'Сервер вне выбранной группы')
         rows=[{'id':agent,'name':names[agent]} for agent in chosen]
-        start,end,bucket=history_bounds(period,now,date_from,date_to);title='Сравнение серверов'
+        start,end,bucket=comparison_bounds(period,now,date_from,date_to);title='Сравнение серверов'
     elif kind=='daily':
         today=datetime.fromtimestamp(now,MSK).date()
         try:date=datetime.strptime(day,'%Y-%m-%d').date() if day else today-timedelta(days=1)
@@ -77,7 +78,7 @@ def dataset(c,kind,now,agents=None,period='24h',day='',group='',date_from='',dat
             'disks':[{key:disk.get(key) for key in ('path','used_percent','free_bytes','total_bytes')} for disk in monitored_disks(data)],
             'application_checks':{'checked_at':iso(checks.get('checked_at')),'items':[{key:item.get(key) for key in ('id','name','kind','status','message','latency_ms')} for item in checks.get('items',[])]},
             'incidents':incidents,'incidents_truncated':incident_truncated,'equipment_changes':equipment[:100],'equipment_changes_truncated':len(equipment)>100,
-            'chart_points':[dict(point) for point in load_history(c,agent,start,end,bucket)] if kind=='compare' else []})
+            'chart_points':[dict(point) for point in history_points(c,agent,start,end,bucket)] if kind=='compare' else []})
     return result
 
 

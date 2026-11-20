@@ -7,14 +7,39 @@ from .windows_ui import stamp
 REPORT_GRACE = 30  # three normal ten-second reporting intervals
 
 
-def load(c, agent, start, end, details=True,summary_only=False):
+def observation_start(c, agent, start, end):
     first = c.execute('SELECT received FROM reports WHERE agent=? ORDER BY received LIMIT 1', (agent,)).fetchone()
     latest = c.execute('SELECT received FROM current_reports WHERE agent=?', (agent,)).fetchone()
     known = [row[0] for row in (first, latest) if row is not None and row[0] is not None]
     if not known or min(known) > end:
-        return {'start': start, 'end': end, 'percent': None, 'gaps': [], 'segments': [], 'reboots': [], 'covered': 0, 'missing': 0, 'longest': 0}
+        return None, latest
     from .portal_settings import retention_days
-    start = max(start, min(known), end - retention_days(c)*86400)
+    return max(start, min(known), end - retention_days(c)*86400), latest
+
+
+def rollup_result(start, end, segments, reboots):
+    if start is None:
+        return {'start':end,'end':end,'percent':None,'gaps':[],'segments':[],'reboots':[],'covered':0,'missing':0,'longest':0}
+    gaps = []
+    cursor = start
+    for a, b in segments:
+        if a > cursor:
+            gaps.append([cursor, a])
+        cursor = b
+    if cursor < end:
+        gaps.append([cursor, end])
+    seconds = sum(b-a for a,b in segments)
+    total = max(0, end-start)
+    return {'start':start, 'end':end, 'percent':100*seconds/total if total else None,
+            'covered':seconds, 'missing':max(0,total-seconds), 'longest':max((b-a for a,b in gaps),default=0),
+            'gaps':gaps, 'segments':segments, 'reboots':reboots}
+
+
+def load(c, agent, start, end, details=True,summary_only=False):
+    observed, latest = observation_start(c,agent,start,end)
+    if observed is None:
+        return {**rollup_result(None,end,[],[]),'start':start}
+    start = observed
     if summary_only:
         # A single indexed SQL aggregation avoids building a Python list for every
         # report of every server on each ten-second overview refresh.
@@ -54,18 +79,7 @@ def load(c, agent, start, end, details=True,summary_only=False):
             covered[-1][1] = max(b, covered[-1][1])
         else:
             covered.append([a, b])
-    gaps = []; cursor = start
-    for a, b in covered:
-        if a > cursor:
-            gaps.append([cursor, a])
-        cursor = b
-    if cursor < end:
-        gaps.append([cursor, end])
-    seconds = sum(b-a for a,b in covered)
-    total = max(0, end-start)
-    return {'start':start, 'end':end, 'percent':100*seconds/total if total else None,
-            'covered':seconds, 'missing':max(0,total-seconds), 'longest':max((b-a for a,b in gaps),default=0),
-            'gaps':gaps, 'segments':covered, 'reboots':reboots}
+    return rollup_result(start,end,covered,reboots)
 
 
 def percentage(value):

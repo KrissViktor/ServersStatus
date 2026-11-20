@@ -8,8 +8,9 @@ from fastapi import HTTPException,Request,Query
 from fastapi.responses import HTMLResponse,RedirectResponse
 from .dashboard import page,esc,duration,size,number
 from .disks import monitored_disks
-from .history import PERIODS,load_history,history_bounds,date_controls
-from .stability import load as availability,percentage
+from .history import PERIODS,history_bounds,date_controls
+from .report_rollups import availability, chart_bucket, history_points, metrics as stats
+from .stability import percentage
 from .windows_ui import stamp
 
 SCHEMA='''CREATE TABLE IF NOT EXISTS server_groups(id INTEGER PRIMARY KEY,name TEXT NOT NULL UNIQUE);
@@ -37,8 +38,9 @@ def group_select(c,selected=''):
     return '<label>Группа<select name="group" data-auto-group><option value="">Все серверы</option>'+''.join('<option value="'+str(row['id'])+'" '+('selected' if str(row['id'])==str(selected) else '')+'>'+esc(row['name'])+'</option>' for row in groups(c))+'</select></label>'
 
 
-def stats(c,agent,start,end):
-    return dict(c.execute("SELECT COUNT(*) AS n,AVG(json_extract(data,'$.cpu_percent')) AS cpu,MAX(json_extract(data,'$.cpu_percent')) AS cpu_max,AVG(json_extract(data,'$.memory_percent')) AS ram,MAX(json_extract(data,'$.memory_percent')) AS ram_max FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<?",(agent,start,end)).fetchone())
+def comparison_bounds(period, now, date_from, date_to):
+    start,end,bucket = history_bounds(period,now,date_from,date_to)
+    return start,end,chart_bucket(bucket)
 
 
 def multi_chart(series,field,title,start,end):
@@ -50,7 +52,10 @@ def multi_chart(series,field,title,start,end):
         color=colors[i];previous=None
         result+='<g data-server-id="'+esc(agent)+'">'
         for row in points:
-            x=45+935*(row['timestamp']-start)/(end-start);y=215-min(100,max(0,row[field] or 0))*1.9
+            if row[field] is None:
+                previous=None
+                continue
+            x=45+935*(row['timestamp']-start)/(end-start);y=215-min(100,max(0,row[field]))*1.9
             if previous and not row['has_gap'] and not previous[2]:result+=f'<path d="M{previous[0]:.2f} {previous[1]:.2f}L{x:.2f} {y:.2f}" stroke="{color}" stroke-width="1.7"/>'
             tip=name+' · '+stamp(row['timestamp'])+' · '+f'{row[field]:.1f}%'
             result+=f'<circle cx="{x:.2f}" cy="{y:.2f}" r="2.5" fill="{color}" data-detail-metric="{field}" data-detail-first="{row["first"]}" data-detail-last="{row["last"]}" data-detail-count="{row["samples"]}" tabindex="0" role="button" aria-label="{esc(tip)}"><title>{esc(tip)}</title></circle>'
@@ -67,7 +72,7 @@ def register(app,db,authenticated,csrf_token):
         if not authenticated(request):return RedirectResponse('/',303)
         if period not in PERIODS or len(agents)>6:raise HTTPException(400,'Выберите до 6 серверов и допустимый период')
         now=time.time()
-        start,end,bucket=history_bounds(period,now,date_from,date_to)
+        start,end,bucket=comparison_bounds(period,now,date_from,date_to)
         with db() as c:
             all_rows=members(c,group);available={r['id'] for r in all_rows}
             chosen=list(dict.fromkeys(agents)) if agents else [r['id'] for r in all_rows[:2]]
@@ -86,7 +91,7 @@ def register(app,db,authenticated,csrf_token):
                 summary['memory_total']=size((data.get('system') or {}).get('memory_total_bytes')) if (data.get('system') or {}).get('memory_total_bytes') else 'Не сообщается'
                 summary['disks']='; '.join(str(d.get('path',''))+': '+f'{number(d.get("used_percent")):.1f}%'+', '+size(d.get('free_bytes'))+' свободно' for d in monitored_disks(data)) or 'Нет данных'
                 if latest and now-latest['received']>=180:summary['disks']+=' · устаревший отчёт '+stamp(latest['received'])
-                results.append((agent,summary,up));series.append((agent,names[agent],load_history(c,agent,start,end,bucket,memory_sizes=False)))
+                results.append((agent,summary,up));series.append((agent,names[agent],history_points(c,agent,start,end,bucket,memory_sizes=False)))
             if not results:content+='<p class="empty">В этой группе пока нет серверов.</p>'
             else:
                 content+='<section class="server"><div class="table-scroll"><table class="metric-table compare-table"><tr><th>Показатель</th>'+''.join('<th><a class="nav-link" href="/servers/'+esc(quote(agent,safe=''))+'">'+esc(names[agent])+'</a></th>' for agent,_,_ in results)+'</tr>'

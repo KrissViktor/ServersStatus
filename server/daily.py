@@ -7,6 +7,7 @@ import time
 from .dashboard import backup_problems,size
 from .notification_types import DeliveryError
 from .delivery_policy import delivery_window
+from .report_rollups import availability as load_availability, metrics
 
 MSK=timezone(timedelta(hours=3))
 
@@ -19,18 +20,16 @@ def build_summary(connection,start,end,now):
     servers=connection.execute('SELECT a.id,p.display_name FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id ORDER BY a.id').fetchall()
     for server in servers:
         agent=server['id']
-        stats=connection.execute('''SELECT COUNT(*) AS count,AVG(json_extract(data,'$.cpu_percent')) AS cpu,
-             MAX(json_extract(data,'$.cpu_percent')) AS cpu_peak,AVG(json_extract(data,'$.memory_percent')) AS ram
-             FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<?''',(agent,start,end)).fetchone()
+        stats=metrics(connection,agent,start,end)
         latest=connection.execute('SELECT data,received FROM current_reports WHERE agent=?',(agent,)).fetchone()
         lines.append('\n'+(server['display_name'] or agent))
-        if stats['count']:
-            lines.append(f'За сутки: отчётов {stats["count"]}; CPU ср. {stats["cpu"]:.1f}%, пик {stats["cpu_peak"]:.1f}%; RAM ср. {stats["ram"]:.1f}%.')
+        if stats['n']:
+            lines.append(f'За сутки: отчётов {stats["n"]}; CPU ср. {stats["cpu"]:.1f}%, пик {stats["cpu_max"]:.1f}%; RAM ср. {stats["ram"]:.1f}%.')
         else:
             lines.append('За сутки нет измерений.')
         count=connection.execute("SELECT COUNT(*) FROM events WHERE agent=? AND level='warning' AND received>=? AND received<?",(agent,start,end)).fetchone()[0]
         lines.append(f'Проблем за сутки: {count}.')
-        from .stability import load as load_availability,percentage
+        from .stability import percentage
         from .dashboard import duration
         availability=load_availability(connection,agent,start,end)
         lines.append('Доступность: '+percentage(availability['percent'])+'; без данных '+duration(availability['missing'])+'; перезагрузок по аптайму '+str(len(availability['reboots']))+'.')

@@ -120,6 +120,19 @@ class ObservatoryTest(unittest.TestCase):
         self.assertIn('Графики за этот день',timeline.text)
         self.assertIn('Копия ожидается к',admin.get('/servers/pc').text)
 
+    def test_manual_rollup_enqueue_requires_superadmin_and_csrf(self):
+        from server.report_rollups import DAY,day_text,midnight
+        day=midnight(time.time())-DAY
+        form={'date_from':day_text(day),'date_to':day_text(day),'csrf':self.csrf}
+        self.assertEqual(self.clients['operator'].post('/report-rollups',data=form).status_code,403)
+        admin=self.clients['admin']
+        self.assertEqual(admin.post('/report-rollups',data={**form,'csrf':'bad'}).status_code,403)
+        self.assertEqual(admin.post('/report-rollups',data=form,follow_redirects=False).status_code,303)
+        with a.db() as c:
+            row=c.execute('SELECT manual,finished FROM report_rollup_jobs WHERE day=?',(day,)).fetchone()
+            self.assertEqual(tuple(row),(1,None))
+        self.assertIn('В очереди: 1',admin.get('/report-rollups').text)
+
     def test_news_restore_is_idempotent_and_viewer_can_read(self):
         with a.db() as c:
             before=c.execute('SELECT COUNT(*) FROM portal_news').fetchone()[0];self.assertGreaterEqual(before,122)

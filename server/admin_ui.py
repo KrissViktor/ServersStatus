@@ -16,11 +16,13 @@ def administration_page():
         ('/ai','ИИ-помощник','Локальный чат на сервере Backup и личная история диалогов.'),
         ('/events', 'Журнал событий', 'Проблемы серверов, изменения состояния и события портала.'),
     ]
-    if can_console():sections.append(('/portal-settings','Настройки хранения','Срок хранения истории; доступ только суперадминистратору.'))
+    if can_console():
+        sections.append(('/portal-settings','Настройки хранения','Срок хранения истории; доступ только суперадминистратору.'))
+        sections.append(('/report-rollups','Суточные сводки','Состояние фонового расчёта и ручной пересчёт по датам.'))
     if can_users():sections.append(('/users','Пользователи','Создание учётных записей, доступ и управление пользователями.'))
     if not can_console():sections=[('/agents','Управление агентами','Добавление серверов и управление доступом агентов.') if entry[0]=='/agents' else entry for entry in sections]
-    icons={'/problems':'incident','/groups':'layers','/agents':'server','/updates':'update','/portal-health':'heatmap','/host':'wallboard','/bot':'message','/ai':'sparkles','/events':'timeline','/portal-settings':'settings','/users':'users'}
-    categories=[('Мониторинг',{'/problems','/groups','/agents','/events','/ai'}),('Обслуживание',{'/updates','/portal-health','/host','/bot','/portal-settings'}),('Доступ',{'/users'})]
+    icons={'/problems':'incident','/groups':'layers','/agents':'server','/updates':'update','/portal-health':'heatmap','/host':'wallboard','/bot':'message','/ai':'sparkles','/events':'timeline','/portal-settings':'settings','/report-rollups':'chart','/users':'users'}
+    categories=[('Мониторинг',{'/problems','/groups','/agents','/events','/ai'}),('Обслуживание',{'/updates','/portal-health','/host','/bot','/portal-settings','/report-rollups'}),('Доступ',{'/users'})]
     content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Все серверы</a></header><div class="heading"><div><h1>Администрирование</h1><p class="muted">Настройки и обслуживание портала</p></div></div>'
     for heading,paths in categories:
         visible=[section for section in sections if section[0] in paths]

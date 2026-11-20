@@ -39,12 +39,20 @@ def cleanup(connection,now):
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='equipment_history'").fetchone():
         connection.execute('DELETE FROM equipment_history WHERE id IN (SELECT h.id FROM equipment_history h WHERE h.received<? AND h.id<>(SELECT p.id FROM equipment_history p WHERE p.agent=h.agent AND p.received<? ORDER BY p.received DESC,p.id DESC LIMIT 1) LIMIT ?)',(now-days*86400,now-days*86400,CLEANUP_BATCH))
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='server_boot_events'").fetchone():connection.execute('DELETE FROM server_boot_events WHERE at<?',(now-days*86400,))
+    removed_rollups = 0
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='report_rollups'").fetchone():
+        from .report_rollups import DAY, midnight
+        cutoff = midnight(now)-(days-1)*DAY
+        removed_rollups = connection.execute("""DELETE FROM report_rollups WHERE (agent,day) IN (
+            SELECT agent,day FROM report_rollups WHERE day<? ORDER BY day LIMIT 256
+        )""",(cutoff,)).rowcount
+        connection.execute('DELETE FROM report_rollup_jobs WHERE day<?',(cutoff,))
     connection.execute('DELETE FROM events WHERE received<?',(now-days*86400,))
     cursor=connection.execute('''DELETE FROM reports WHERE rowid IN (
         SELECT rowid FROM reports WHERE received<? ORDER BY received LIMIT ?
     )''',(now-days*86400,CLEANUP_BATCH))
     removed=cursor.rowcount
-    delay=60 if removed==CLEANUP_BATCH else 3600
+    delay=60 if removed==CLEANUP_BATCH or removed_rollups==256 else 3600
     connection.execute("INSERT INTO report_maintenance VALUES ('retention',?) ON CONFLICT(name) DO UPDATE SET next_run=excluded.next_run",(now+delay,))
     from .portal_backup import note
     note(connection,'retention',detail='Удалено отчётов: '+str(removed),now=now)
