@@ -48,15 +48,16 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 #chart-detail> :not(#detail-chart-plot){flex-shrink:0}
 
 /* The chosen colour scheme also controls native date fields and scrollbars. */
-:root { color-scheme:light dark; background:light-dark(#f4f7fb,#0e1727); scrollbar-color:light-dark(#a3b4ca,#526784) transparent; }
+:root { color-scheme:light dark; background:light-dark(#f4f7fb,#101113); scrollbar-color:light-dark(#a3b4ca,#565960) transparent; }
 :root[data-theme="light"] { color-scheme:light; }
 :root[data-theme="dark"] { color-scheme:dark; }
 .monitoring-workspace {
-  --bg:light-dark(#f4f7fb,#0e1727); --panel:light-dark(#fff,#172338);
+  --bg:light-dark(#f4f7fb,#101113); --panel:light-dark(#fff,#1b1d21);
   --surface:var(--panel); --surface-raised:var(--panel);
-  --line:light-dark(#dce4ee,#31435e); --text:light-dark(#18263c,#e5edfc);
-  --muted:light-dark(#51637c,#a5b6d0); --field:light-dark(#fff,#1d2b43);
-  --subtle:light-dark(#f6f8fc,#131e30);
+  --line:light-dark(#dce4ee,#34373e); --text:light-dark(#18263c,#edf0f5);
+  --muted:light-dark(#51637c,#b0b4bf); --field:light-dark(#fff,#23252a);
+  --subtle:light-dark(#f6f8fc,#202226);
+  --plot-surface:light-dark(#f6f8fc,#181a1e);
   --accent:light-dark(#285acc,#9cbcff); --accent-soft:light-dark(#eaf1ff,#233c67);
   --accent-line:light-dark(#c6d7f8,#45699e);
   --primary-bg:light-dark(#285acc,#80a8fa); --primary-text:light-dark(#fff,#101b30);
@@ -121,11 +122,14 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .monitoring-workspace .fleet-table tbody tr:hover>td { background:var(--accent-soft); }
 .monitoring-workspace :is(.chart-label,.task-axis text,.resource-empty,.resource-threshold-label) { fill:var(--muted); }
 .monitoring-workspace :is(.chart-grid,.resource-grid,.task-grid) { stroke:var(--line); }
+.monitoring-workspace :is(.task-plot,svg.history-chart,.comparison-chart,#detail-chart-plot) {
+  background:var(--plot-surface); border-radius:8px;
+}
 .monitoring-workspace [data-resource-metric="cpu"] .resource-line { stroke:var(--accent); }
 .monitoring-workspace [data-resource-metric="ram"] .resource-line { stroke:var(--violet); }
 .monitoring-workspace [data-capacity-points] line:not(.chart-grid):not(.resource-cursor) { stroke:var(--green); }
 .monitoring-workspace .resource-cursor { stroke:var(--muted); }
-.monitoring-workspace :is(.resource-inspector,.resource-tooltip,#detail-chart-tooltip,#detail-point-info,#chart-detail,#detail-chart-plot,.news-popover) {
+.monitoring-workspace :is(.resource-inspector,.resource-tooltip,#detail-chart-tooltip,#detail-point-info,#chart-detail,.news-popover) {
   background:var(--panel); color:var(--text); border-color:var(--line);
 }
 .monitoring-workspace :is(.resource-tooltip,#detail-chart-tooltip,#chart-detail) { box-shadow:var(--float-shadow); }
