@@ -40,6 +40,7 @@
       if (controller.signal.aborted || !details.isConnected) return;
       if (!next.querySelector('.io-selector')) throw new Error('History details are missing');
       panels.replaceChildren(...next.body.childNodes);
+      if(updateSelection)window.portalMotion?.reveal(panels);
       status.textContent = '';
       if (updateSelection) {
         for (const select of details.querySelectorAll('.io-selector select')) {

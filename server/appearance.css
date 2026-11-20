@@ -46,3 +46,87 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .status-note.normal{border-color:#7adba747}.status-note.warning{border-color:#edc77e55}.status-note.danger{color:var(--red);border-color:#ff96a355}.overview-page .stat-filter[data-overview-view=offline] strong{color:var(--red)}.overview-page .stat-filter[data-overview-view=disks] strong{color:var(--yellow)}
 .dependency-node.node-danger rect{stroke:var(--red)}.dependency-node.node-warning rect{stroke:var(--yellow)}.delete-button{color:var(--red);border-color:#ff96a355;background:#ff96a30a}.delete-button:hover{background:#ff96a318;border-color:var(--red)}.backup-alarm{border-color:#edc77e66}.backup-alarm h2{color:var(--yellow)}
 #chart-detail> :not(#detail-chart-plot){flex-shrink:0}
+
+/* Light monitoring workspace. Semantic colours are shared across lists and charts. */
+.monitoring-workspace {
+  color-scheme: light;
+  --bg:#f4f7fb; --panel:#fff; --surface:#fff; --surface-raised:#fff;
+  --line:#dce4ee; --text:#18263c; --muted:#51637c; --field:#fff;
+  --accent:#285acc; --accent-soft:#eaf1ff;
+  --green:#116346; --yellow:#8b4c08; --red:#a92946; --violet:#6553b3;
+  --soft-shadow:0 2px 5px #23406808; --float-shadow:0 16px 44px #1a336529;
+  --glass:none;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--text);
+}
+.monitoring-workspace .topbar { border-bottom-color:var(--line); }
+.monitoring-workspace :is(h1,h2,h3,.brand) { color:var(--text); }
+.monitoring-workspace .brand>span { color:var(--accent); }
+.monitoring-workspace :is(.eyebrow,.portal-breadcrumbs,.portal-breadcrumbs a,.credits,.table-hint,.overview-order-hint,.portal-navigation-mobile>summary) { color:var(--muted); }
+.monitoring-workspace :is(.nav-link,.topbar>.nav-link,.portal-breadcrumbs [aria-current=page]) { color:var(--accent); }
+.monitoring-workspace .portal-navigation { background:var(--panel); box-shadow:var(--soft-shadow); }
+.monitoring-workspace .portal-navigation a,
+.monitoring-workspace .portal-navigation a .portal-icon { color:var(--muted); }
+.monitoring-workspace .portal-navigation a[aria-current=page],
+.monitoring-workspace .portal-navigation a[aria-current=page] .portal-icon { color:var(--accent); }
+.monitoring-workspace .portal-navigation a:hover,
+.monitoring-workspace .portal-navigation a[aria-current=page] { background:var(--accent-soft); }
+.monitoring-workspace .overview-commandbar { margin:22px 0 16px; }
+.monitoring-workspace .overview-commandbar h1,
+.monitoring-workspace #history-content .heading h1 { font-size:clamp(24px,3vw,34px); letter-spacing:-.04em; }
+.monitoring-workspace .server { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--soft-shadow); }
+.monitoring-workspace .server.problem-server { border-color:#e8c6cb; }
+.monitoring-workspace :is(.overview-page .stats,.server-table-view>.table-scroll,.history-period) { background:var(--panel); border-radius:14px; box-shadow:var(--soft-shadow); }
+.monitoring-workspace .overview-page .stat-filter { border-color:var(--line); }
+.monitoring-workspace .overview-page .stat-filter strong { color:var(--text); font-variant-numeric:tabular-nums; }
+.monitoring-workspace .overview-page .stat-filter[data-overview-view=offline] strong { color:var(--red); }
+.monitoring-workspace .overview-page .stat-filter[data-overview-view=disks] strong { color:var(--yellow); }
+.monitoring-workspace .overview-page .stat-filter:is(:hover,[aria-current=true]) { background:var(--accent-soft); box-shadow:inset 0 -2px var(--accent); }
+.monitoring-workspace :is(.problem-summary,.notice,.backup-alarm) { background:#fff8ec; border-color:#eed7b9; color:var(--yellow); }
+.monitoring-workspace .backup-alarm h2 { color:var(--yellow); }
+.monitoring-workspace .problem-summary:has(.text-normal) { background:#edf8f3; border-color:#cce5d8; }
+.monitoring-workspace :is(.task-metric,.server.problem-server .task-metric,.metric,.disk,.backup-rule,.stability-stats>div,.status-note,.empty,.cpu-core,.server-information.section-browser .section-fold>section) {
+  background:#f6f8fc; border-color:var(--line); box-shadow:none;
+}
+.monitoring-workspace :is(.overview-shortcut,.overview-view-link,.overview-resultbar .layout-switch,.overview-resultbar .density-switch,.detail-tabs,.section-browser>.section-picker) {
+  background:var(--panel); color:var(--muted); border-color:var(--line); box-shadow:none;
+}
+.monitoring-workspace :is(.shortcut-icon,.overview-view-link .portal-icon,.server-pin,.cpu-breakdown>summary,.section-picker button,.section-browser-title .section-icon) { color:var(--accent); }
+.monitoring-workspace :is(.overview-resultbar [aria-pressed=true],.period.selected,.detail-tabs [aria-selected=true],.section-picker button[aria-pressed=true]) {
+  background:var(--accent-soft)!important; color:var(--accent)!important; border-color:#c6d7f8; box-shadow:none!important;
+}
+.monitoring-workspace .selection-indicator { background:var(--accent-soft); border-color:#c6d7f8; }
+.monitoring-workspace :is(button,.resource-toolbar button,.resource-toolbar select,input,select,textarea) { background:var(--field); color:var(--text); border-color:var(--line); box-shadow:none; }
+.monitoring-workspace :is(button:hover,.period:hover,.overview-view-link:hover,.overview-shortcut:hover) { background:var(--accent-soft); color:var(--accent); border-color:#c6d7f8; }
+.monitoring-workspace :is(.primary,.history-date-filter>button) { background:var(--accent); color:white; border-color:var(--accent); }
+.monitoring-workspace :is(.primary,.history-date-filter>button):hover { background:#2149a4; color:white; }
+.monitoring-workspace select option { background:var(--panel); color:var(--text); }
+.monitoring-workspace :is(input,textarea)::placeholder { color:var(--muted); }
+.monitoring-workspace :is(.count,.badge.neutral) { background:#edf2f8; color:var(--muted); border-color:var(--line); }
+.monitoring-workspace .badge.normal { background:#e6f6ef; border-color:#c9e7d9; }
+.monitoring-workspace .badge.warning { background:#fff3dc; border-color:#f4d9ad; }
+.monitoring-workspace .badge.danger { background:#fcebf0; border-color:#efc7d2; }
+.monitoring-workspace .fleet-table th { background:#f0f4fa; }
+.monitoring-workspace :is(.fleet-table th button,.fleet-table small,.fleet-table .table-row-stale td) { color:var(--muted); }
+.monitoring-workspace .fleet-table tbody tr:hover>td { background:#f0f5ff; }
+.monitoring-workspace :is(.chart-label,.task-axis text,.resource-empty,.resource-threshold-label) { fill:var(--muted); }
+.monitoring-workspace :is(.chart-grid,.resource-grid,.task-grid) { stroke:#dbe4f1; }
+.monitoring-workspace [data-resource-metric="cpu"] .resource-line { stroke:#285acc; }
+.monitoring-workspace [data-resource-metric="ram"] .resource-line { stroke:#7058bf; }
+.monitoring-workspace [data-capacity-points] line:not(.chart-grid):not(.resource-cursor) { stroke:#227a73; }
+.monitoring-workspace .resource-cursor { stroke:#4e688f; }
+.monitoring-workspace :is(.resource-inspector,.resource-tooltip,#detail-chart-tooltip,#detail-point-info,#chart-detail,#detail-chart-plot,.news-popover) {
+  background:var(--panel); color:var(--text); border-color:var(--line);
+}
+.monitoring-workspace :is(.resource-tooltip,#detail-chart-tooltip,#chart-detail) { box-shadow:var(--float-shadow); }
+.monitoring-workspace #chart-detail::backdrop { background:#192b5070; backdrop-filter:none; }
+@media(max-width:680px) {
+  .monitoring-workspace .fleet-table tbody tr { background:var(--panel); border-radius:12px; box-shadow:var(--soft-shadow); }
+  .monitoring-workspace .fleet-table td[data-metric-label] { background:#eef3fa; }
+  .monitoring-workspace .overview-commandbar { margin:14px 0; }
+  .monitoring-workspace .overview-page .stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .monitoring-workspace .overview-page .stat-filter { min-height:42px; padding:7px 12px; }
+  .monitoring-workspace .overview-page .stat-filter:nth-child(2n) { border-right:0; }
+  .monitoring-workspace .overview-page .stat-filter:nth-child(-n+2) { border-bottom:1px solid var(--line); }
+}

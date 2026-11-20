@@ -13,7 +13,16 @@
       const saved=historical?JSON.parse(panel.dataset.taskPayload):null;
       let active='processes';const loaders={};let visibility=null;
       const tabs=[...panel.querySelectorAll('[data-task-tab]')];
-      function activate(kind){active=kind;for(const tab of tabs){const selected=tab.dataset.taskTab===kind;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1}for(const view of panel.querySelectorAll('[data-task-view]'))view.hidden=view.dataset.taskView!==kind;loaders[kind]?.()}
+      function activate(kind){
+        const changed=active!==kind;
+        active=kind;
+        for(const tab of tabs){const selected=tab.dataset.taskTab===kind;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1}
+        for(const view of panel.querySelectorAll('[data-task-view]')){
+          view.hidden=view.dataset.taskView!==kind;
+          if(changed&&!view.hidden)window.portalMotion?.reveal(view);
+        }
+        loaders[kind]?.();
+      }
       tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>activate(tab.dataset.taskTab));tab.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[n].focus();activate(tabs[n].dataset.taskTab)}})});
       for(const kind of ['processes','services']){
         const view=panel.querySelector('[data-task-view='+kind+']'),search=view.querySelector('.task-search'),filter=view.querySelector('.task-state'),sort=view.querySelector('.task-sort'),direction=view.querySelector('.task-direction'),body=view.querySelector('tbody'),info=view.querySelector('.task-info'),scroll=view.querySelector('.task-table-scroll');
