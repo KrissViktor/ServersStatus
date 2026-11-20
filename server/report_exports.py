@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from fastapi import HTTPException,Request,Query
 from fastapi.responses import Response
 from .fleet import MSK,members,stats
-from .history import PERIODS,load_history
+from .history import PERIODS,load_history,history_bounds
 from .stability import load as availability,percentage
 from .disks import monitored_disks
 
@@ -25,14 +25,14 @@ NOTES=['Доступность подтверждается отчётами с 
 def iso(value):return datetime.fromtimestamp(value,MSK).isoformat(timespec='seconds') if value is not None else None
 
 
-def dataset(c,kind,now,agents=None,period='24h',day='',group=''):
+def dataset(c,kind,now,agents=None,period='24h',day='',group='',date_from='',date_to=''):
     rows=members(c,group)
     if kind=='compare':
         if period not in PERIODS or len(agents or [])>6:raise HTTPException(400,'Выберите до 6 серверов и допустимый период')
         names={row['id']:row['name'] for row in rows};chosen=list(dict.fromkeys(agents or [])) if agents else [row['id'] for row in rows[:2]]
         if any(agent not in names for agent in chosen):raise HTTPException(400,'Сервер вне выбранной группы')
         rows=[{'id':agent,'name':names[agent]} for agent in chosen]
-        end=now;start=end-PERIODS[period][1];title='Сравнение серверов';bucket=PERIODS[period][2]
+        start,end,bucket=history_bounds(period,now,date_from,date_to);title='Сравнение серверов'
     elif kind=='daily':
         today=datetime.fromtimestamp(now,MSK).date()
         try:date=datetime.strptime(day,'%Y-%m-%d').date() if day else today-timedelta(days=1)
@@ -51,7 +51,7 @@ def dataset(c,kind,now,agents=None,period='24h',day='',group=''):
         # For comparison include current telemetry retained outside the raw-history table.
         if kind=='compare':
             current=c.execute('SELECT received,data FROM current_reports WHERE agent=?',(agent,)).fetchone()
-            if current and (latest is None or current['received']>latest['received']):latest=current
+            if current and (not date_from or current['received']<=end) and (latest is None or current['received']>latest['received']):latest=current
         data=json.loads(latest['data']) if latest else {}
         incidents=[dict(item) for item in c.execute('SELECT category,opened,closed,resolution,message FROM incident_history WHERE agent=? AND opened<? AND (closed IS NULL OR closed>=?) ORDER BY opened DESC LIMIT 201',(agent,end,start))]
         incident_truncated=len(incidents)>200;incidents=incidents[:200]
@@ -203,12 +203,12 @@ def export_links(kind,params):
 
 def register(app,db,authenticated):
     @app.get('/export/{kind}')
-    def download(kind:str,request:Request,format:str='csv',agents:list[str]=Query(default=[]),period:str='24h',day:str='',group:str=''):
+    def download(kind:str,request:Request,format:str='csv',agents:list[str]=Query(default=[]),period:str='24h',day:str='',group:str='',date_from:str='',date_to:str=''):
         if not authenticated(request):raise HTTPException(401)
         if format not in ('csv','pdf','xml','json'):raise HTTPException(400,'Неизвестный формат')
         if kind not in ('compare','daily'):raise HTTPException(404)
         now=time.time()
-        with db() as c:report=dataset(c,kind,now,agents,period,day,group)
+        with db() as c:report=dataset(c,kind,now,agents,period,day,group,date_from,date_to)
         try:
             if format=='csv':data=csv_bytes(report);media='text/csv'
             elif format=='json':data=json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False).encode('utf-8');media='application/json'

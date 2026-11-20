@@ -8,7 +8,7 @@ from fastapi import HTTPException,Request,Query
 from fastapi.responses import HTMLResponse,RedirectResponse
 from .dashboard import page,esc,duration,size,number
 from .disks import monitored_disks
-from .history import PERIODS,load_history
+from .history import PERIODS,load_history,history_bounds,date_controls
 from .stability import load as availability,percentage
 from .windows_ui import stamp
 
@@ -63,29 +63,30 @@ def multi_chart(series,field,title,start,end):
 
 def register(app,db,authenticated,csrf_token):
     @app.get('/compare',response_class=HTMLResponse)
-    def compare(request:Request,agents:list[str]=Query(default=[]),period:str='24h',group:str=''):
+    def compare(request:Request,agents:list[str]=Query(default=[]),period:str='24h',group:str='',date_from:str='',date_to:str=''):
         if not authenticated(request):return RedirectResponse('/',303)
         if period not in PERIODS or len(agents)>6:raise HTTPException(400,'Выберите до 6 серверов и допустимый период')
-        end=time.time();start=end-PERIODS[period][1]
+        now=time.time()
+        start,end,bucket=history_bounds(period,now,date_from,date_to)
         with db() as c:
             all_rows=members(c,group);available={r['id'] for r in all_rows}
             chosen=list(dict.fromkeys(agents)) if agents else [r['id'] for r in all_rows[:2]]
             if any(agent not in available for agent in chosen):raise HTTPException(400,'Сервер отсутствует в выбранной группе')
             content=header('Сравнение серверов')+'<form id="compare-filter" class="fleet-filter">'+group_select(c,group)+'<label>Период<select name="period">'+''.join('<option value="'+p+'" '+('selected' if p==period else '')+'>'+label+'</option>' for p,(label,_,_) in PERIODS.items())+'</select></label><fieldset class="fleet-selection"><legend>Серверы · до 6</legend>'
-            content+=''.join('<label class="check"><input type="checkbox" name="agents" value="'+esc(r['id'])+'" '+('checked' if r['id'] in chosen else '')+'>'+esc(r['name'])+'</label>' for r in all_rows)+'</fieldset><button>Сравнить</button></form>'
+            content+=''.join('<label class="check"><input type="checkbox" name="agents" value="'+esc(r['id'])+'" '+('checked' if r['id'] in chosen else '')+'>'+esc(r['name'])+'</label>' for r in all_rows)+'</fieldset>'+date_controls(date_from,date_to)+'<button>Сравнить</button></form>'
             from .report_exports import export_links
-            content+=export_links('compare',{'agents':chosen,'period':period,'group':group})
+            content+=export_links('compare',{'agents':chosen,'period':period,'group':group,'date_from':date_from,'date_to':date_to})
             names={r['id']:r['name'] for r in all_rows};results=[];series=[]
             for agent in chosen:
                 summary=stats(c,agent,start,end);up=availability(c,agent,start,end,details=False)
                 latest=c.execute('SELECT received,data FROM current_reports WHERE agent=?',(agent,)).fetchone()
                 data=json.loads(latest['data']) if latest else {}
-                summary['state']='Нет данных' if not latest else 'На связи' if end-latest['received']<180 else 'Нет связи'
+                summary['state']='Нет данных' if not latest else 'На связи' if now-latest['received']<180 else 'Нет связи'
                 summary['processor']=(data.get('system') or {}).get('processor') or 'Не сообщается'
                 summary['memory_total']=size((data.get('system') or {}).get('memory_total_bytes')) if (data.get('system') or {}).get('memory_total_bytes') else 'Не сообщается'
                 summary['disks']='; '.join(str(d.get('path',''))+': '+f'{number(d.get("used_percent")):.1f}%'+', '+size(d.get('free_bytes'))+' свободно' for d in monitored_disks(data)) or 'Нет данных'
-                if latest and end-latest['received']>=180:summary['disks']+=' · устаревший отчёт '+stamp(latest['received'])
-                results.append((agent,summary,up));series.append((agent,names[agent],load_history(c,agent,start,end,PERIODS[period][2])))
+                if latest and now-latest['received']>=180:summary['disks']+=' · устаревший отчёт '+stamp(latest['received'])
+                results.append((agent,summary,up));series.append((agent,names[agent],load_history(c,agent,start,end,bucket,memory_sizes=False)))
             if not results:content+='<p class="empty">В этой группе пока нет серверов.</p>'
             else:
                 content+='<section class="server"><div class="table-scroll"><table class="metric-table compare-table"><tr><th>Показатель</th>'+''.join('<th><a class="nav-link" href="/servers/'+esc(quote(agent,safe=''))+'">'+esc(names[agent])+'</a></th>' for agent,_,_ in results)+'</tr>'

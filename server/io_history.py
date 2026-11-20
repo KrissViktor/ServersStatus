@@ -82,15 +82,18 @@ def chart(rows,title,start,end,iops=False,key=None,metric=None,name=''):
     return opening+'<div class="chart-scroll"><svg class="history-chart" role="img" aria-label="'+esc(title)+'" viewBox="0 0 1000 245">'+drawing+'</svg></div></section>'
 
 
-def sections(connection, agent, period, start,end,bucket,nic=None,disk=None):
+def sections(connection, agent, period, start,end,bucket,nic=None,disk=None,date_from='',date_to=''):
     options={group:names(connection,agent,group,start,end) for group in FIELDS}
     nic=nic if nic in options['network'] else next(iter(options['network']), '')
     disk=disk if disk in options['disk_io'] else next(iter(options['disk_io']), '')
     content='<p class="muted history-note">Скорости — секундные снимки перед отчётом. Каждый интерфейс и устройство показаны отдельно. Пропуски не считаются нулями.</p>'
     series={group:metric_series(connection,agent,group,name,start,end,bucket) for group,name in [('network',nic),('disk_io',disk)] if name}
+    date_fields = ''.join(f'<input type="hidden" name="{key}" value="{esc(value)}">' for key,value in (
+        ('date_from',date_from), ('date_to',date_to),
+    ) if value)
     for group,key,selected,label,title in [('network','nic',nic,'Сетевой интерфейс','Сеть'),('disk_io','disk',disk,'Дисковое устройство','Дисковые операции')]:
         other_key,other_value=('disk',disk) if key=='nic' else ('nic',nic)
-        content+='<section class="server io-section" data-io-section="'+group+'"><h2>'+title+'</h2><form class="searchbar io-selector" method="get" action="/history/'+esc(quote(agent,safe=''))+'"><input type="hidden" name="period" value="'+esc(period)+'"><input type="hidden" name="'+other_key+'" value="'+esc(other_value)+'"><label>'+label+'<select name="'+key+'">'+''.join('<option '+('selected ' if name==selected else '')+'value="'+esc(name)+'">'+esc(name)+'</option>' for name in options[group])+'</select></label><noscript><button>Показать графики</button></noscript></form><p class="muted io-status" role="status" aria-live="polite"></p><div class="io-plots">'
+        content+='<section class="server io-section" data-io-section="'+group+'"><h2>'+title+'</h2><form class="searchbar io-selector" method="get" action="/history/'+esc(quote(agent,safe=''))+'"><input type="hidden" name="period" value="'+esc(period)+'"><input type="hidden" name="'+other_key+'" value="'+esc(other_value)+'"><label>'+label+'<select name="'+key+'">'+''.join('<option '+('selected ' if name==selected else '')+'value="'+esc(name)+'">'+esc(name)+'</option>' for name in options[group])+'</select></label>'+date_fields+'<noscript><button>Показать графики</button></noscript></form><p class="muted io-status" role="status" aria-live="polite"></p><div class="io-plots">'
         fields=[('receive_bytes_per_second','Приём',False),('send_bytes_per_second','Передача',False)] if group=='network' else [('read_bytes_per_second','Чтение',False),('write_bytes_per_second','Запись',False),('read_iops','Чтение IOPS',True),('write_iops','Запись IOPS',True)]
         if selected:
             for field,caption,iops in fields:

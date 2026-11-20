@@ -8,14 +8,27 @@ from .dashboard import esc,size,server_card,resource_points
 from .memory import RAM_USED_SQL,RAM_TOTAL_SQL
 
 
-def extrema(c,agent,start,end):
+def extrema(c,agent,start,end,points=None):
     result={}
     for metric,path in [('cpu','$.cpu_percent'),('ram','$.memory_percent')]:
         for kind,order in [('min','ASC'),('max','DESC')]:
-            row=c.execute(f"""SELECT rowid AS report_id,received AS timestamp,json_extract(data,'{path}') AS value
+            expression = f"json_extract(data,'{path}')"
+            condition = f'{expression} IS NOT NULL'
+            ordering = f'{expression} {order},received,rowid'
+            parameters = (agent,start,end)
+            if points is not None:
+                key = metric + ('_min' if kind == 'min' else '_peak')
+                candidates = [point for point in points if point[key] is not None]
+                if not candidates:
+                    continue
+                extreme = (min if kind == 'min' else max)(point[key] for point in candidates)
+                first_bucket = next(point for point in candidates if point[key] == extreme)
+                parameters = (agent,first_bucket['first'],first_bucket['last'],extreme)
+                condition = f'{expression}=?'
+                ordering = 'received'
+            row=c.execute(f"""SELECT rowid AS report_id,received AS timestamp,{expression} AS value
                 FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<=?
-                AND json_extract(data,'{path}') IS NOT NULL
-                ORDER BY json_extract(data,'{path}') {order},received,rowid LIMIT 1""",(agent,start,end)).fetchone()
+                AND {condition} ORDER BY {ordering} LIMIT 1""",parameters).fetchone()
             if row:
                 sizes=c.execute(f'SELECT {RAM_USED_SQL} AS ram_used_bytes,{RAM_TOTAL_SQL} AS ram_total_bytes FROM reports WHERE rowid=?',(row['report_id'],)).fetchone()
                 result[metric+'_'+kind]={**dict(row),**dict(sizes)}

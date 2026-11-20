@@ -2,6 +2,11 @@
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote, urlencode
 from pathlib import Path
+from math import ceil, nextafter
+import json
+from fastapi import HTTPException
+
+MSK = timezone(timedelta(hours=3))
 
 IO_SCRIPT=Path(__file__).with_name("io_history.js").read_text(encoding="utf-8")
 
@@ -13,15 +18,41 @@ PERIODS = {'15m': ('15 минут',900,10), '1h': ('Час', 3600, 60), '6h': ('
            '30d': ('30 дней', 2592000, 3600)}
 
 
-def load_history(connection, agent_id, start, end, bucket):
+def history_bounds(period, now, date_from='', date_to=''):
+    if period not in PERIODS:
+        raise HTTPException(400, 'Неизвестный период')
+    _, seconds, bucket = PERIODS[period]
+    if not (date_from or date_to):
+        return now-seconds, now, bucket
+    try:
+        start = datetime.strptime(date_from, '%Y-%m-%d').replace(tzinfo=MSK)
+        end = datetime.strptime(date_to, '%Y-%m-%d').replace(tzinfo=MSK) + timedelta(days=1)
+    except (ValueError, OverflowError):
+        raise HTTPException(400, 'Укажите обе даты периода') from None
+    first = start.timestamp()
+    last = min(nextafter(end.timestamp(), float('-inf')), now)
+    if not 0 <= first < last:
+        raise HTTPException(400, 'Проверьте порядок дат и начало периода')
+    return first, last, max(10, ceil((last-first)/360))
+
+
+def date_controls(date_from='', date_to=''):
+    return (
+        '<label>С (МСК)<input type="date" name="date_from" value="'+esc(date_from)+'"></label>'
+        '<label>По (МСК)<input type="date" name="date_to" value="'+esc(date_to)+'"></label>'
+    )
+
+
+def load_history(connection, agent_id, start, end, bucket, *, memory_sizes=True):
     # Filter by indexed agent/time before extracting metrics. Grouping returns
     # at most one point per time bucket, independent of reporting frequency.
+    used, total = (RAM_USED_SQL, RAM_TOTAL_SQL) if memory_sizes else ('NULL', 'NULL')
     return connection.execute(f'''
         WITH samples AS (
             SELECT received,
                    json_extract(data, '$.cpu_percent') AS cpu,
                    json_extract(data, '$.memory_percent') AS ram,
-                   {RAM_USED_SQL} AS ram_used_bytes, {RAM_TOTAL_SQL} AS ram_total_bytes,
+                   {used} AS ram_used_bytes, {total} AS ram_total_bytes,
                    received - LAG(received) OVER (ORDER BY received) AS gap
             FROM reports INDEXED BY reports_resource_metrics WHERE agent=? AND received>=? AND received<=?
         )
@@ -77,13 +108,16 @@ def chart(points, metric, title, start, end, color):
     return f'<section class="server"><h2>{title}</h2><div class="chart-scroll"><svg class="history-chart"{resource_attrs} data-chart-start="{start}" data-chart-end="{end}" data-chart-left="48" data-chart-right="982" data-chart-top="14" data-chart-bottom="202" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(title)}: от 0 до 100 процентов"><title>{esc(title)}</title>{drawing}</svg></div></section>'
 
 
-def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None,retention_days=186, display_name=None):
-    _, _, bucket = PERIODS[period]
+def history_page(agent_id, points, period, start, end, extra_html="", selectors=None,extremes=None,retention_days=186, display_name=None, date_from='', date_to='', bucket=None, events=()):
+    bucket = bucket or PERIODS[period][2]
     bucket_label=str(bucket)+' с' if bucket<60 else str(bucket//60)+' мин'
     url = '/history/' + quote(agent_id, safe='')
-    links = ''.join(f'<a class="period {"selected" if key == period else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{label}</a>' for key, (label, _, _) in PERIODS.items())
+    links = ''.join(f'<a class="period {"selected" if key == period and not date_from else ""}" href="{esc(url)}?{esc(urlencode({"period": key, **(selectors or {})}))}">{label}</a>' for key, (label, _, _) in PERIODS.items())
     content = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/">← Обзор серверов</a></header>'
-    content += f'<div class="heading"><div><p class="eyebrow">ИСТОРИЯ НАГРУЗКИ</p><h1>{esc(display_name or agent_id)}</h1><p class="muted">{stamp(start)} — {stamp(end)} · обновление каждые 30 с</p></div></div><nav class="periods" aria-label="Период истории">{links}</nav>'
+    refresh_note = '' if date_from else ' · обновление каждые 30 с'
+    content += f'<div class="heading"><div><p class="eyebrow">ИСТОРИЯ НАГРУЗКИ</p><h1>{esc(display_name or agent_id)}</h1><p class="muted">{stamp(start)} — {stamp(end)}{refresh_note}</p></div></div><nav class="periods" aria-label="Период истории">{links}</nav>'
+    hidden = ''.join(f'<input type="hidden" name="{esc(key)}" value="{esc(value)}">' for key,value in {'period':period, **(selectors or {})}.items())
+    content += '<form class="fleet-filter history-date-filter" method="get" action="'+esc(url)+'">'+hidden+date_controls(date_from,date_to)+'<button>Показать по датам</button></form>'
     if not points:
         content += '<div class="empty">За выбранный период отчётов нет. История появится после получения данных агента.</div>'
     else:
@@ -116,4 +150,6 @@ def history_page(agent_id, points, period, start, end, extra_html="", selectors=
         content += chart(points, 'ram', 'Оперативная память · RAM', start, end, '#83c4ff')
     content += extra_html
     from .drilldown import widget
-    return page('<div id="history-content" data-resource-agent="'+esc(agent_id)+'" data-resource-period="'+period+'" data-refresh data-refresh-interval="30000">' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится '+str(retention_days)+' дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)
+    refresh = '' if date_from else ' data-refresh data-refresh-interval="30000"'
+    refresh += ' data-resource-events="'+esc(json.dumps(events,ensure_ascii=False))+'"'
+    return page('<div id="history-content" data-resource-agent="'+esc(agent_id)+'" data-resource-period="'+period+'"'+refresh+'>' + content + '</div><script>'+IO_SCRIPT+'</script>'+widget(agent_id)+'<footer>История хранится '+str(retention_days)+' дней. Значения усредняются только по полученным отчётам, пропуски не считаются нулевой нагрузкой.</footer>', refresh=True)

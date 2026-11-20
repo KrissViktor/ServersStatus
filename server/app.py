@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
 from .server_names import lookup as server_name
 from .agents_ui import agents_page
-from .history import PERIODS, load_history, history_page
+from .history import PERIODS, load_history, history_page, history_bounds
 from .configuration import MonitoringSettings
 from .settings_ui import settings_page
 from .events import record
@@ -527,31 +527,30 @@ async def change_agent(action: str, request: Request):
 
 
 @app.get('/history/{agent_id}', response_class=HTMLResponse)
-def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str = '', disk: str = ''):
+def agent_history(agent_id: str, request: Request, period: str = '24h', nic: str = '', disk: str = '', date_from: str = '', date_to: str = ''):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
-    if period not in PERIODS:
-        raise HTTPException(400, 'Неизвестный период')
-    _, seconds, bucket = PERIODS[period]
-    end = time.time()
-    start = end - seconds
+    now = time.time()
+    start, end, bucket = history_bounds(period, now, date_from, date_to)
     with db() as c:
         if not c.execute('SELECT 1 FROM agents WHERE id=?', (agent_id,)).fetchone():
             raise HTTPException(404, 'Агент не найден')
         points = load_history(c, agent_id, start, end, bucket)
         from .io_history import sections
-        io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk)
+        io, selected_io = sections(c, agent_id, period, start, end, bucket, nic, disk, date_from, date_to)
         from .snapshots import extrema
-        extremes=extrema(c,agent_id,start,end)
+        extremes=extrema(c,agent_id,start,end,points)
         from .portal_settings import retention_days
         days=retention_days(c)
         title=server_name(c,agent_id)
         from .stability import load as load_stability, render as stability_render
         from .incident_history import sync,history_html
         latest=c.execute('SELECT a.id,r.received,r.data FROM agents a LEFT JOIN current_reports r ON r.agent=a.id WHERE a.id=?',(agent_id,)).fetchone()
-        sync(c,[latest],end)
+        sync(c,[latest],now)
         io=stability_render(load_stability(c,agent_id,start,end),agent_id,period,'history')+history_html(c,agent_id,start,end)+io
-    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes,retention_days=days,display_name=title))
+        from .resource_charts import markers
+        events = markers(c,agent_id,start,end)
+    return HTMLResponse(history_page(agent_id, points, period, start, end, io, selected_io,extremes,retention_days=days,display_name=title,date_from=date_from,date_to=date_to,bucket=bucket,events=events))
 
 
 def settings_state(agent_id):

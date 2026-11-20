@@ -1,5 +1,6 @@
 """Availability is coverage by received reports, never inferred from OS uptime."""
 from urllib.parse import quote
+from heapq import merge
 from .dashboard import esc, duration
 from .windows_ui import stamp
 
@@ -27,12 +28,25 @@ def load(c, agent, start, end, details=True,summary_only=False):
         seconds=row['covered'] or 0;total=max(0,end-start)
         tail=max(0,end-max(start,row['last']+REPORT_GRACE)) if row['last'] is not None else total
         return {'start':start,'end':end,'percent':100*seconds/total if total else None,'covered':seconds,'missing':max(0,total-seconds),'longest':max(tail,row['longest'] or 0),'gaps':[],'segments':[],'reboots':[]}
-    previous = c.execute('SELECT received FROM reports WHERE agent=? AND received<? ORDER BY received DESC LIMIT 1', (agent, start)).fetchone()
-    timestamps = ([previous[0]] if previous else []) + [r[0] for r in c.execute('SELECT received FROM reports WHERE agent=? AND received>=? AND received<=? ORDER BY received', (agent, start, end))]
-    if latest and latest[0] <= end and latest[0] not in timestamps:
-        timestamps.append(latest[0]); timestamps.sort()
+    columns = "received,json_extract(data,'$.uptime_seconds')" if details else 'received,NULL'
+    previous = c.execute(f'SELECT {columns} FROM reports WHERE agent=? AND received<? ORDER BY received DESC LIMIT 1', (agent, start)).fetchone()
+    samples = c.execute(f'SELECT {columns} FROM reports WHERE agent=? AND received>=? AND received<=? ORDER BY received', (agent, start, end))
+    edges = [(row[0], row[1], False) for row in (previous,) if row]
+    if latest and latest[0] <= end:
+        edges.append((latest[0],None,False))
     covered = []
-    for value in timestamps:
+    reboots = []
+    last = previous
+    for value,uptime,is_sample in merge(
+        ((row[0],row[1],True) for row in samples), sorted(edges,key=lambda row:row[0]), key=lambda row:row[0],
+    ):
+        if is_sample and details:
+            if last is not None and isinstance(uptime,(int,float)) and isinstance(last[1],(int,float)):
+                boot = value-uptime
+                old_boot = last[0]-last[1]
+                if (uptime+5 < last[1] or boot > old_boot+120) and last[0]-120 <= boot <= value:
+                    reboots.append({'at':boot,'detected':value})
+            last = (value,uptime)
         a, b = max(start, value), min(end, value + REPORT_GRACE)
         if b <= a:
             continue
@@ -49,18 +63,6 @@ def load(c, agent, start, end, details=True,summary_only=False):
         gaps.append([cursor, end])
     seconds = sum(b-a for a,b in covered)
     total = max(0, end-start)
-    reboots = []
-    if details:
-        # Only compare actual neighboring reports; no extrapolation across missing samples.
-        before = c.execute("SELECT received,json_extract(data,'$.uptime_seconds') AS uptime FROM reports WHERE agent=? AND received<? ORDER BY received DESC LIMIT 1", (agent,start)).fetchone()
-        last = before
-        for row in c.execute("SELECT received,json_extract(data,'$.uptime_seconds') AS uptime FROM reports WHERE agent=? AND received>=? AND received<=? ORDER BY received", (agent,start,end)):
-            if last is not None and isinstance(row['uptime'], (int,float)) and isinstance(last['uptime'], (int,float)):
-                boot = row['received'] - row['uptime']; old_boot = last['received'] - last['uptime']
-                reset = row['uptime'] + 5 < last['uptime']
-                if (reset or boot > old_boot + 120) and last['received']-120 <= boot <= row['received']:
-                    reboots.append({'at': boot, 'detected': row['received']})
-            last = row
     return {'start':start, 'end':end, 'percent':100*seconds/total if total else None,
             'covered':seconds, 'missing':max(0,total-seconds), 'longest':max((b-a for a,b in gaps),default=0),
             'gaps':gaps, 'segments':covered, 'reboots':reboots}
