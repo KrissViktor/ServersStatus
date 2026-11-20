@@ -15,8 +15,13 @@ from .notification_types import DeliveryError
 
 PORTAL_KEYBOARD = {
     **KEYBOARD,
+    'keyboard': [*KEYBOARD['keyboard'][:-1], ['Помощь','Портал']],
+}
+PORTAL_ONLY_KEYBOARD = {
+    **KEYBOARD,
     'keyboard': [['Портал'], ['/help']],
 }
+PORTAL_ONLY_REPLY = 3
 PORTAL_SUBMENU = {
     **KEYBOARD,
     'keyboard': [['Ссылка','Сессии'], ['Поменять пароль'], ['Назад']],
@@ -128,6 +133,8 @@ def queue_update(db,update,chat_id,allowed_users,limiter,now):
                         action,argument = 'password_login',text.strip()
         if action and pending<20 and limiter.allow(sender_id,now):
             parts,keyboard = portal_reply(c,action,argument,sender_id,now)
+            if keyboard==1 and not authorized:
+                keyboard = PORTAL_ONLY_REPLY
             c.execute('INSERT OR IGNORE INTO bot_replies VALUES (?,?,?,0,0,?,0,?)',(identifier,sender_id,json.dumps(parts,ensure_ascii=False),now,keyboard))
         elif authorized and fresh and command and pending<20 and limiter.allow(sender_id,now):
             parts=render(c,command,now)
@@ -150,7 +157,12 @@ def flush(db,sender,now,heartbeat=lambda:None):
             return False
     if not pending:return False
     parts=json.loads(pending['parts'])
-    keyboard = PORTAL_SUBMENU if pending['portal']==2 else PORTAL_KEYBOARD if pending['chat_id'] in portal_admins() else KEYBOARD
+    if pending['portal']==2:
+        keyboard = PORTAL_SUBMENU
+    elif pending['portal']==PORTAL_ONLY_REPLY:
+        keyboard = PORTAL_ONLY_KEYBOARD
+    else:
+        keyboard = PORTAL_KEYBOARD if pending['chat_id'] in portal_admins() else KEYBOARD
     for index in range(pending['next_part'],min(len(parts),pending['next_part']+3)):
         heartbeat()
         try:
@@ -237,7 +249,7 @@ def main():
                     if stop.is_set():raise StopRequested()
                     telegram_request(token,'sendMessage',{'chat_id':chat,'text':text,
                         'reply_markup':keyboard,'disable_web_page_preview':True})
-                    if keyboard is PORTAL_KEYBOARD or keyboard is PORTAL_SUBMENU:
+                    if any(keyboard is layout for layout in (PORTAL_KEYBOARD,PORTAL_ONLY_KEYBOARD,PORTAL_SUBMENU)):
                         register_admin(chat)
                     pause(stop,1.1,heartbeat)
                 flushed=flush(db,sender,time.time(),heartbeat)

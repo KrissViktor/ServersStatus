@@ -148,6 +148,21 @@ class BotTest(unittest.TestCase):
         self.assertIn('Ваш Telegram ID: 5',self.sent[-1][1])
         self.assertEqual(self.sent[-1][2],KEYBOARD)
 
+    def test_portal_admin_keeps_report_keyboard_in_authorized_chat(self):
+        from unittest.mock import patch
+        with patch.dict('os.environ',{'STATUS_TELEGRAM_PORTAL_ADMINS':'5'}):
+            for index,text in enumerate(('/start','Портал','Назад','Статус'),1):
+                now=1000+index*5
+                update=self.update(index,chat=5,text=text,date=now)
+                update['message']['chat']['type']='private'
+                queue_update(application.db,update,5,{'5'},self.limiter,now)
+                self.assertTrue(flush(application.db,lambda *args:self.sent.append(args),now))
+        expected=[*KEYBOARD['keyboard'][:-1],['Помощь','Портал']]
+        self.assertEqual(self.sent[0][2]['keyboard'],expected)
+        self.assertIn(['Ссылка','Сессии'],self.sent[1][2]['keyboard'])
+        self.assertEqual(self.sent[2][2]['keyboard'],expected)
+        self.assertEqual(self.sent[3][2]['keyboard'],expected)
+
     def test_antiflood_and_expired_outbox(self):
         for identifier in range(1,8):
             queue_update(application.db,self.update(identifier),123,set(),self.limiter,1000)
