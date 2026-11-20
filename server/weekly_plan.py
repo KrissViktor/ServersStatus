@@ -1,6 +1,6 @@
 """On-demand maintenance priorities from current reports and incident history."""
 import json
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from .backup_status import schedule_status
 from .dashboard import backup_problems, duration, esc, page
@@ -14,7 +14,7 @@ from .windows_ui import stamp
 WEEK = 7 * 86400
 
 
-def collect(c, group, now):
+def collect(c, group, now, include_forecasts=True):
     disks, backups, recurring, stale = [], [], [], []
     for member in members(c,group):
         agent = member['id']
@@ -48,7 +48,7 @@ def collect(c, group, now):
             label = str(backup.get('name') or backup.get('path') or 'Резервная копия')
             backups.append((overdue or 0,name,url+'#backups',label+' · '+reason))
 
-        monitored = monitored_disks(data)
+        monitored = monitored_disks(data) if include_forecasts else []
         if not monitored:
             continue
         forecasts = load_forecasts(c,agent,now)
@@ -66,16 +66,43 @@ def collect(c, group, now):
     return disks,backups,recurring,stale
 
 
-def render(c, group, now):
-    disks,backups,recurring,stale = collect(c,group,now)
+def section(title, items, empty):
+    content='<section class="server weekly-plan"><h2>'+title+'</h2>'
+    if not items:
+        return content+'<p class="muted">'+empty+'</p></section>'
+    return content+'<ul>'+''.join(
+        '<li><a href="'+esc(url)+'"><b>'+esc(name)+'</b><span>'+esc(reason)+'</span></a></li>'
+        for name,url,reason in items
+    )+'</ul></section>'
+
+
+def disk_section(disks):
+    return section('Диски с риском заполнения',[(name,url,reason) for _,name,url,reason in disks],
+                   'Подтверждённых прогнозов заполнения на эту неделю нет.')
+
+
+def render(c, group, now, forecasts=''):
+    disks,backups,recurring,stale = collect(c,group,now,include_forecasts=bool(forecasts))
+    if forecasts=='fragment':
+        return disk_section(disks)
     content = (
         '<header class="topbar"><a class="brand" href="/">ServersStatus</a></header>'
         '<div class="heading"><h1>План на неделю</h1></div>'
         '<form class="fleet-filter">'+group_select(c,group)+'<button>Показать</button></form>'
         '<p class="muted">На '+esc(stamp(now))+' · прогноз дисков на 7 дней, повторения за последние 7 дней</p>'
     )
+    if forecasts=='full':
+        content += disk_section(disks)
+    else:
+        query = '/weekly-plan?'+urlencode({'group':group,'forecasts':'fragment'})
+        fallback = '/weekly-plan?'+urlencode({'group':group,'forecasts':'full'})
+        content += (
+            '<div data-weekly-forecast="'+esc(query)+'"><section class="server weekly-plan">'
+            '<h2>Диски с риском заполнения</h2><p class="muted" role="status">Загружаем прогнозы…</p>'
+            '<a class="nav-link" href="'+esc(fallback)+'" data-weekly-forecast-retry>Открыть прогнозы</a>'
+            '</section></div>'
+        )
     sections = [
-        ('Диски с риском заполнения', [(name,url,reason) for _,name,url,reason in disks], 'Подтверждённых прогнозов заполнения на эту неделю нет.'),
         ('Бэкапы требуют проверки', [(name,url,reason) for _,name,url,reason in backups], 'В свежих отчётах проблем с файлами копий нет.'),
         ('Повторяющиеся сбои', [(name,url,str(count)+' эпизода(-ов) · '+reason) for count,name,url,reason in recurring], 'Повторяющихся инцидентов за неделю нет.'),
     ]
@@ -84,13 +111,5 @@ def render(c, group, now):
             (name,url,'Последний отчёт '+stamp(received) if received else 'Отчётов пока нет') for name,url,received in stale
         ], ''))
     for title,items,empty in sections:
-        content += '<section class="server weekly-plan"><h2>'+title+'</h2>'
-        if not items:
-            content += '<p class="muted">'+empty+'</p>'
-        else:
-            content += '<ul>'+''.join(
-                '<li><a href="'+esc(url)+'"><b>'+esc(name)+'</b><span>'+esc(reason)+'</span></a></li>'
-                for name,url,reason in items
-            )+'</ul>'
-        content += '</section>'
+        content += section(title,items,empty)
     return page(content)

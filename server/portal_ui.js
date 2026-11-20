@@ -10,8 +10,34 @@
   });
 
   window.addEventListener('pageshow',()=>document.querySelectorAll('select[data-auto-group]').forEach(select=>select.form?.removeAttribute('aria-busy')));
+  const weeklyForecast = document.querySelector('[data-weekly-forecast]');
+  if (weeklyForecast) {
+    const status = weeklyForecast.querySelector('[role="status"]');
+    const retry = weeklyForecast.querySelector('[data-weekly-forecast-retry]');
+    async function loadForecasts() {
+      weeklyForecast.setAttribute('aria-busy','true');
+      retry.hidden = true;
+      status.textContent = 'Загружаем прогнозы…';
+      try {
+        const response = await fetch(weeklyForecast.dataset.weeklyForecast,{cache:'no-store'});
+        if (!response.ok) throw new Error('Forecast request failed');
+        const partial = new DOMParser().parseFromString(await response.text(),'text/html');
+        const section = partial.querySelector('section.weekly-plan');
+        if (!section) throw new Error('Forecast data missing');
+        weeklyForecast.replaceChildren(section);
+      } catch (_) {
+        status.textContent = 'Не удалось загрузить прогнозы.';
+        retry.textContent = 'Повторить загрузку';
+        retry.hidden = false;
+      } finally {
+        weeklyForecast.removeAttribute('aria-busy');
+      }
+    }
+    retry.addEventListener('click',event=>{event.preventDefault();loadForecasts()});
+    loadForecasts();
+  }
   const areas={monitors:['/monitors'],groups:['/groups'],compare:['/compare','/daily','/history/','/heatmap','/dependencies','/timeline/'],problems:['/events','/problems','/timeline/'],updates:['/updates'],preferences:['/preferences'],admin:['/admin','/agents','/settings/','/checks/','/users','/host','/portal-health','/portal-settings','/report-rollups','/bot','/ai','/windows/','/console-access']};
-  let active=path==='/wallboard'?'/wallboard':'/';
+  let active=['/wallboard','/weekly-plan'].includes(path)?path:'/';
   for(const [area,paths] of Object.entries(areas))if(paths.some(prefix=>prefix.endsWith('/')?path.startsWith(prefix):path===prefix))active='/'+area;
   document.querySelectorAll('[data-primary-page]').forEach(link=>{if(link.dataset.primaryPage===active)link.setAttribute('aria-current','page')});
   const crumbs=document.querySelector('.portal-breadcrumbs');
