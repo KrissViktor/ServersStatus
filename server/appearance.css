@@ -198,7 +198,10 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
   padding:16px 0; border-bottom:1px solid var(--line);
 }
 .landing-header .brand { font-size:18px; }
-.landing-header .creation-trigger { margin:0; }
+.landing-header .creation-trigger {
+  width:auto; min-width:0; flex:0 0 auto; min-height:36px; margin:0 0 0 auto;
+  padding:5px 14px; border-radius:9px; font-size:13px; font-weight:650;
+}
 .landing-intro {
   display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); align-items:center;
   gap:clamp(24px,5vw,64px); padding:clamp(36px,7vw,88px) 0 46px;
@@ -225,6 +228,12 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .landing-demo .table-scroll { border:1px solid var(--line); border-radius:14px; background:var(--panel); }
 .landing-demo table { margin:0; min-width:500px; }
 .landing-demo th small { display:block; margin-top:3px; color:var(--muted); font-weight:400; }
+.landing-demo,.landing-how { scroll-margin-top:20px; }
+.landing-site-examples { margin-top:16px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+.landing-site-examples h3 { margin:0 0 8px; }
+.landing-site-row { display:flex; flex-wrap:wrap; align-items:center; gap:5px 14px; padding:6px 0; font-size:13px; }
+.landing-site-row + .landing-site-row { border-top:1px solid var(--line); }
+.landing-site-row strong { min-width:145px; }
 .landing-how { margin:36px 0; }
 .landing-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:12px; }
 .landing-steps article { padding:16px; border:1px solid var(--line); background:var(--panel); border-radius:12px; }
