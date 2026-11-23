@@ -247,6 +247,7 @@ def main():
                 c.execute('DELETE FROM bot_replies')
             state(c,'bot_id',bot_id)
             state(c,'restart_applied',marker)
+            state(c,'heartbeat',time.time())
             for key in ('last_poll','poll_error','send_error'):
                 state(c,key,'0' if key=='last_poll' else '')
         allowed_users=user_ids(config.get('allowed',''))
@@ -254,7 +255,9 @@ def main():
         def heartbeat():
             notify_systemd('WATCHDOG=1')
             with db() as c:
-                if restart_marker(c)!=marker:
+                requested=restart_marker(c)
+                if requested!=marker:
+                    state(c,'restart_seen',requested)
                     stop.set()
                 else:
                     state(c,'heartbeat',time.time())

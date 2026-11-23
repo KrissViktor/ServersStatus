@@ -1020,11 +1020,14 @@ async def bot_settings(request: Request):
                 if previous_token:
                     c.execute("INSERT OR IGNORE INTO bot_state VALUES ('bot_id',?)",(previous_token.partition(':')[0],))
                 state(c,'restart_request',secrets.token_hex(16))
+                state(c,'restart_requested_at',time.time())
                 record(c,'','configuration','Запрошен перезапуск Telegram-бота')
         return ''
 
     error=await run_in_threadpool(persist)
-    return RedirectResponse('/bot?error='+error if error else '/bot?saved=1',303)
+    if error:
+        return RedirectResponse('/bot?error='+error,303)
+    return RedirectResponse('/bot' if action=='/bot/restart' else '/bot?saved=1',303)
 
 from .updates import register as register_updates
 register_updates(app,db,authenticated,csrf_token,digest)

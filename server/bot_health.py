@@ -14,6 +14,29 @@ ERRORS = {
 }
 
 
+def restart_status(values, now):
+    marker=values.get('restart_request')
+    if not marker:
+        return None
+    requested=float(values.get('restart_requested_at',0))
+    if marker==values.get('restart_applied'):
+        if not requested or now-requested>300:
+            return None
+        if values.get('poll_error'):
+            return 'warning','Бот перезапустился, но пока не подключился к Telegram.'
+        if float(values.get('last_poll',0)):
+            return 'normal','Бот перезапустился и подключился к Telegram.'
+        return 'warning','Бот перезапустился. Ожидаем подключения к Telegram.'
+    seen=marker==values.get('restart_seen')
+    if requested and now-requested<60:
+        if seen:
+            return 'warning','Бот принял запрос. Ожидаем запуска нового процесса.'
+        return 'warning','Запрос отправлен. Ожидаем ответа от бота.'
+    if seen:
+        return 'danger','Бот принял запрос, но новый процесс не подтвердил запуск. Проверьте журнал службы.'
+    return 'danger','Бот не подтвердил перезапуск. Проверьте, что служба запущена и обновлена.'
+
+
 def user_fields(identifier='', alias='', roles=()):
     fields = ''
     if identifier:
@@ -49,24 +72,27 @@ def health_page(connection,now=None,csrf=None,saved=False,error=''):
     else:
         status='Бот работает';color='normal'
     pending=connection.execute('SELECT COUNT(*) FROM bot_replies WHERE completed=0').fetchone()[0] if connection.execute("SELECT 1 FROM sqlite_master WHERE name='bot_replies'").fetchone() else 0
-    content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Обзор</a></header><div class="heading"><h1>Telegram-бот</h1></div><div class="bot-settings"><section class="server"><div class="server-head"><h2 class="text-'+color+'">'+status+'</h2>'
+    content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Обзор</a></header><div class="heading"><h1>Telegram-бот</h1></div><div class="bot-settings"><section class="server"><div class="server-head"><h2>Состояние бота</h2>'
     if csrf is not None:
         hidden=f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
         content+=f'<form method="post" action="/bot/restart">{hidden}<button>Перезапустить бота</button></form>'
     content+='</div>'
-    if csrf is not None and values.get('restart_request')!=values.get('restart_applied'):
-        content+='<p class="text-warning" role="status">Перезапуск запрошен. Обновите страницу, чтобы проверить состояние.</p>'
-    elif csrf is not None and saved:
+    if csrf is not None and saved and not error:
         content+='<p class="text-normal" role="status">Настройки сохранены.</p>'
     if csrf is not None and error in ERRORS:
         content+='<p class="notice" role="alert">'+ERRORS[error]+'</p>'
+    content+='<div id="telegram-health" data-refresh data-refresh-interval="10000"><p class="text-'+color+'">'+status+'</p>'
+    restart=restart_status(values,now) if csrf is not None else None
+    if restart:
+        tone,message=restart
+        content+=f'<p class="text-{tone}" role="status">{message}</p>'
     content+='<p><span>Ожидающих ответов:</span> '+str(pending)+'</p><details class="service-details"><summary>Время проверок и диагностика</summary>'
     for label,key in [('Состояние процесса','heartbeat'),('Последний успешный опрос Telegram','last_poll'),('Последний ответ на команду','last_delivery')]:
         value=float(values.get(key,0))
         content+='<p><span>'+label+'</span> · '+(duration(max(0,now-value))+' назад' if value else 'ещё нет данных')+'</p>'
 
     if values.get('send_error'):content+='<p class="text-warning"><span>Ошибка отправки ответа. Проверьте доступ бота к чату.</span> <code>'+esc(values['send_error'])+'</code></p>'
-    content+='<p class="muted">Состояние на момент открытия страницы. В Telegram отправьте /start, чтобы показать кнопки. Запросы по кнопкам доступны круглосуточно.</p></details></section>'
+    content+='<p class="muted">Состояние обновляется автоматически. В Telegram отправьте /start, чтобы показать кнопки. Запросы по кнопкам доступны круглосуточно.</p></details></div></section>'
     if csrf is not None:
         config=read()
         membership={'admins':user_ids(config.get('admins','')), 'allowed':user_ids(config.get('allowed','')),
@@ -101,4 +127,4 @@ def health_page(connection,now=None,csrf=None,saved=False,error=''):
         content+='<div class="bot-token-warning"><p>После замены токена старый бот перестанет обслуживать портал. Вы уверены?</p>'
         content+='<label class="check"><input type="checkbox" name="confirm_token" value="1"><span>Подтверждаю замену токена</span></label></div>'
         content+='<button>Сохранить настройки</button></form></section>'
-    return page(content+'</div>')
+    return page(content+'</div>',refresh=True)

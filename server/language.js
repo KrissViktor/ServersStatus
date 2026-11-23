@@ -497,7 +497,14 @@ IP-адрес|IP address
 Настройки Telegram|Telegram settings
 Настройки сохранены.|Settings saved.
 Перезапустить бота|Restart bot
-Перезапуск запрошен. Обновите страницу, чтобы проверить состояние.|Restart requested. Refresh the page to check its status.
+Состояние бота|Bot status
+Запрос отправлен. Ожидаем ответа от бота.|Restart requested. Waiting for the bot to respond.
+Бот принял запрос. Ожидаем запуска нового процесса.|The bot accepted the request. Waiting for the new process to start.
+Бот не подтвердил перезапуск. Проверьте, что служба запущена и обновлена.|The bot did not acknowledge the restart. Check that the service is running and up to date.
+Бот принял запрос, но новый процесс не подтвердил запуск. Проверьте журнал службы.|The bot accepted the request, but the new process did not confirm startup. Check the service log.
+Бот перезапустился. Ожидаем подключения к Telegram.|The bot restarted. Waiting for Telegram connectivity.
+Бот перезапустился и подключился к Telegram.|The bot restarted and connected to Telegram.
+Бот перезапустился, но пока не подключился к Telegram.|The bot restarted but has yet to connect to Telegram.
 Проверьте формат токена и ID чата.|Check the token and chat ID format.
 Подтвердите замену токена перед сохранением.|Confirm the token replacement before saving.
 Укажите числовой Telegram ID и имя длиной до 80 символов.|Enter a numeric Telegram ID and a name of up to 80 characters.
@@ -522,7 +529,7 @@ IP-адрес|IP address
 Последний ответ на команду|Last command reply
 ещё нет данных|No data yet
 Ошибка отправки ответа. Проверьте доступ бота к чату.|Could not send a reply. Check the bot's access to the chat.
-Состояние на момент открытия страницы. В Telegram отправьте /start, чтобы показать кнопки. Запросы по кнопкам доступны круглосуточно.|Status as of page load. Send /start in Telegram to show the buttons. Commands are available around the clock.
+Состояние обновляется автоматически. В Telegram отправьте /start, чтобы показать кнопки. Запросы по кнопкам доступны круглосуточно.|Status refreshes automatically. Send /start in Telegram to show the buttons. Commands are available around the clock.
 Процесс работает, но соединение с Telegram недоступно|The bot is running but cannot connect to Telegram
 Процесс работает, но ответ в Telegram не доставлен|The bot is running but Telegram did not receive a reply
 Процесс работает, успешный опрос Telegram пока не подтверждён|The bot is running but has not successfully polled Telegram
