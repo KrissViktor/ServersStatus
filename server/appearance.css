@@ -187,6 +187,38 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .creation-dialog>header button { flex:none; min-width:40px; min-height:40px; margin:0; }
 .creation-dialog .fleet-filter { display:grid; grid-template-columns:1fr; align-items:stretch; }
 .creation-dialog .agent-create-body { padding:0; }
+
+.monitoring-workspace .overview-commandbar { margin:10px 0; }
+.monitoring-workspace .overview-commandbar h1 { font-size:clamp(20px,2vw,26px); }
+.overview-page .overview-shortcut { padding:4px 8px; min-height:30px; }
+.overview-page .overview-summary-row { gap:6px; margin-bottom:8px; }
+.overview-page .overview-summary-row .problem-summary { min-height:0; padding:5px 9px; }
+.overview-page .overview-summary-row .stat-filter { min-height:0; padding:5px 9px; }
+.overview-page .overview-summary-row .stat-filter strong { font-size:17px; }
+.overview-page .searchbar {
+  grid-template-columns:minmax(140px,320px) minmax(120px,180px) minmax(120px,180px) auto;
+  justify-content:start; gap:8px;
+}
+.overview-page .overview-resultbar { gap:6px 12px; margin:6px 0 9px; align-items:center; }
+.overview-page .overview-resultbar .result-count { margin:0; }
+.overview-page .overview-order { min-width:0; margin:0; }
+.overview-page .overview-order-controls {
+  display:flex; flex-wrap:wrap; align-items:center; gap:5px; width:auto;
+}
+.overview-page .overview-order-controls>label { margin:0; }
+.overview-page .overview-order-controls select { width:clamp(130px,15vw,180px); }
+.overview-page .overview-display-tools {
+  margin-left:auto; display:flex; flex-wrap:wrap; align-items:center; gap:5px;
+}
+@media(max-width:640px) {
+  .overview-page .searchbar { grid-template-columns:repeat(2,minmax(0,1fr)) auto; }
+  .overview-page .overview-display-tools { width:100%; margin-left:0; }
+  .overview-page .overview-order { flex-basis:100%; }
+  .overview-page .overview-order-controls>.overview-problem-shortcut,
+  .overview-page .overview-order-controls>button { width:auto; }
+  .overview-page .overview-order-controls>label { flex:1 1 120px; min-width:0; }
+  .overview-page .overview-order-controls select { width:100%; }
+}
 @media(max-width:680px) {
   .monitoring-workspace .fleet-table tbody tr { background:var(--panel); border-radius:12px; box-shadow:var(--soft-shadow); }
   .monitoring-workspace .fleet-table td[data-metric-label] { background:var(--subtle); }
