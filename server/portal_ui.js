@@ -7,6 +7,24 @@
     if(close)close.closest('dialog')?.close();
   });
   document.querySelector('dialog.creation-dialog[data-reopen]')?.showModal();
+  const landingLogin=document.querySelector('[data-landing-login]');
+  landingLogin?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const button=landingLogin.querySelector('[type="submit"]'),status=landingLogin.querySelector('[data-login-status]');
+    if(button.disabled)return;
+    button.disabled=true;status.hidden=false;status.textContent='Проверяем данные…';
+    try{
+      const response=await fetch(landingLogin.action,{
+        method:'POST',body:new URLSearchParams(new FormData(landingLogin)),
+        credentials:'same-origin',redirect:'manual',cache:'no-store',
+      });
+      if(response.type==='opaqueredirect'||response.status===303){location.assign('/');return}
+      status.textContent=response.status===401?'Неверный логин или пароль.'
+        :response.status===429?'Слишком много попыток. Попробуйте позже.'
+        :'Не удалось войти. Повторите попытку.';
+    }catch(_){status.textContent='Не удалось связаться с порталом. Повторите попытку.'}
+    finally{button.disabled=false}
+  });
   document.addEventListener('change',event=>{
     const select=event.target.closest('select[data-auto-group]');const form=select?.form;
     if(!form||form.method.toLowerCase()!=='get')return;

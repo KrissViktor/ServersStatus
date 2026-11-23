@@ -183,7 +183,14 @@ def creation_dialog(identifier, title, content, reopen=False):
 
 
 def login_page():
-    return page('''<div class="login"><div class="logo">'''+brand_mark()+'''</div><p class="eyebrow">Server Pulse</p><h1>Всё под контролем</h1><p class="muted">Войдите, чтобы увидеть состояние серверов</p><form method="post" action="/login"><label>Логин<input name="username" autocomplete="username" required autofocus></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">Войти</button></form><p class="muted footnote">Центр мониторинга инфраструктуры</p></div>''')
+    from .landing import content
+    login = creation_dialog(
+        'portal-login','Войти',
+        '<form method="post" action="/login" data-landing-login><label>Логин<input name="username" autocomplete="username" required autofocus></label>'
+        '<label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>'
+        '<p role="status" data-login-status hidden></p><button type="submit" class="primary">Войти в панель</button></form>',
+    )
+    return page(content(brand_link(),login))
 
 
 def backup_problems(backup, elapsed=0):
