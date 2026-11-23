@@ -73,9 +73,12 @@ def register(app,db,authenticated,csrf_token):
             chosen={row['id'] for row in members(c,group)} if group else None
             content='<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Серверы</a></header><div class="heading"><h1>'+icon('dependencies')+' Связи серверов</h1></div><form class="fleet-filter">'+group_select(c,group)+'<button>Показать</button></form>'+diagram(rows,edges,chosen)
             csrf='<input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
-            content+='<details class="server dependency-editor"><summary>Добавить или изменить связь</summary><form method="post">'+csrf+'<div class="rule-grid">'
-            for field,label in [('dependent','Зависимый сервер'),('provider','От какого сервера зависит')]:content+='<label>'+label+'<select name="'+field+'">'+''.join('<option value="'+esc(row['id'])+'">'+esc(row['name'])+'</option>' for row in rows)+'</select></label>'
-            content+='<label>Назначение (необязательно)<input name="label" maxlength="80" placeholder="SQL, файловое хранилище…"></label></div><button name="mode" value="save">Сохранить связь</button></form></details><details class="server dependency-records"><summary>Настроенные связи <span class="count">'+str(len(edges))+'</span></summary><div class="dependency-list">'
+            from .dashboard import creation_dialog
+            editor='<form method="post">'+csrf+'<div class="rule-grid">'
+            for field,label in [('dependent','Зависимый сервер'),('provider','От какого сервера зависит')]:editor+='<label>'+label+'<select name="'+field+'">'+''.join('<option value="'+esc(row['id'])+'">'+esc(row['name'])+'</option>' for row in rows)+'</select></label>'
+            editor+='<label>Назначение (необязательно)<input name="label" maxlength="80" placeholder="SQL, файловое хранилище…"></label></div><button name="mode" value="save">Сохранить связь</button></form>'
+            content+=creation_dialog('create-dependency','Добавить или изменить связь',editor)
+            content+='<details class="server dependency-records"><summary>Настроенные связи <span class="count">'+str(len(edges))+'</span></summary><div class="dependency-list">'
             names={row['id']:row['name'] for row in rows}
             for edge in edges:
                 content+='<form method="post" class="dependency-list-row">'+csrf+'<input type="hidden" name="dependent" value="'+esc(edge['dependent'])+'"><input type="hidden" name="provider" value="'+esc(edge['provider'])+'"><span>'+esc(names.get(edge['dependent'],edge['dependent']))+' → '+esc(names.get(edge['provider'],edge['provider']))+(' · '+esc(edge['label']) if edge['label'] else '')+'</span><button name="mode" value="delete" aria-label="Удалить связь '+esc(names.get(edge['dependent'],edge['dependent'])+' → '+names.get(edge['provider'],edge['provider']))+'">Удалить</button></form>'

@@ -6,14 +6,17 @@ SCRIPT=Path(__file__).with_name("agents.js").read_text(encoding="utf-8")
 from urllib.parse import quote
 
 
-def agents_page(rows, csrf, message='', key=None, agent_id=None):
+def agents_page(rows, csrf, message='', key=None, agent_id=None, reopen_create=False):
     hidden = f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
     content = '<header class="topbar"><a class="brand" href="/">S<span>●</span> <b>ServersStatus</b></a><a class="nav-link" href="/">← Обзор серверов</a></header><div class="heading"><div><p class="eyebrow">ПОДКЛЮЧЕНИЯ</p><h1>Управление агентами</h1><p class="muted">Регистрация компьютеров и управление доступом</p></div></div>'
-    if message:
+    if message and not reopen_create:
         content += f'<p class="notice">{esc(message)}</p>'
     if key:
         content += f'<section class="server key-result"><h2>Ключ для {esc(agent_id)}</h2><p>Сохраните ключ сейчас — повторно он не отображается. Введите его в установщике Windows вместе с именем агента.</p><label>Имя агента<input readonly value="{esc(agent_id)}"></label><label>Индивидуальный ключ<input readonly value="{esc(key)}" autocomplete="off" spellcheck="false" aria-label="Новый ключ агента"></label><p class="muted">Не отправляйте ключ в чат. После перевыпуска обновите ключ в конфигурации Windows-агента и перезапустите службу.</p><a class="nav-link" href="/agents">Ключ сохранён — закрыть</a></section>'
-    content += '<details class="server agent-create-fold"><summary>Добавить компьютер</summary><div class="agent-create-body"><p class="muted">Имя — постоянный идентификатор. Латинские буквы, цифры, дефис и подчёркивание; до 64 символов.</p><form class="agent-create" method="post" action="/agents/create">' + hidden + '<label>Имя агента<input name="agent_id" required pattern="[A-Za-z0-9_-]{1,64}" maxlength="64" placeholder="windows-02" autocomplete="off"></label><button>Создать и получить ключ</button></form></div></details>'
+    from .dashboard import creation_dialog
+    notice = f'<p class="notice" role="alert">{esc(message)}</p>' if reopen_create else ''
+    draft = esc(agent_id or '') if reopen_create else ''
+    content += creation_dialog('create-agent','Добавить компьютер',notice+'<div class="agent-create-body"><p class="muted">Имя — постоянный идентификатор. Латинские буквы, цифры, дефис и подчёркивание; до 64 символов.</p><form class="agent-create" method="post" action="/agents/create">' + hidden + '<label>Имя агента<input name="agent_id" required pattern="[A-Za-z0-9_-]{1,64}" maxlength="64" placeholder="windows-02" autocomplete="off" value="'+draft+'"></label><button>Создать и получить ключ</button></form></div>',reopen=reopen_create)
     content+='<p class="muted agent-flags-help">Важный — уведомления о проблемах. Активный — в основном списке. Флажки сохраняются сразу.</p><div class="agent-grid">'
     for row in rows:
         item=dict(row);identifier=quote(row['id'],safe='');title=item.get('display_name') or item.get('hostname') or row['id']

@@ -1,5 +1,12 @@
 (() => {
   const path=location.pathname;
+  document.addEventListener('click',event=>{
+    const trigger=event.target.closest('[data-create-dialog]');
+    if(trigger)document.getElementById(trigger.dataset.createDialog)?.showModal();
+    const close=event.target.closest('[data-close-creation]');
+    if(close)close.closest('dialog')?.close();
+  });
+  document.querySelector('dialog.creation-dialog[data-reopen]')?.showModal();
   document.addEventListener('change',event=>{
     const select=event.target.closest('select[data-auto-group]');const form=select?.form;
     if(!form||form.method.toLowerCase()!=='get')return;

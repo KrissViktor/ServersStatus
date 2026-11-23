@@ -159,6 +159,18 @@ def page(content, refresh=False, protection_entry=False):
 
 
 
+def creation_dialog(identifier, title, content, reopen=False):
+    return (
+        f'<button type="button" class="primary creation-trigger" data-create-dialog="{identifier}" '
+        f'aria-haspopup="dialog" aria-controls="{identifier}">{esc(title)}</button>'
+        f'<dialog id="{identifier}" class="creation-dialog" aria-labelledby="{identifier}-title"'
+        + (' data-reopen' if reopen else '')
+        + f'><header><h2 id="{identifier}-title">{esc(title)}</h2>'
+        '<button type="button" data-close-creation aria-label="Закрыть">×</button></header>'
+        + content + '</dialog>'
+    )
+
+
 def login_page():
     return page('''<div class="login"><div class="logo">S<span>●</span></div><p class="eyebrow">SERVERSSTATUS</p><h1>Всё под контролем</h1><p class="muted">Войдите, чтобы увидеть состояние серверов</p><form method="post" action="/login"><label>Логин<input name="username" autocomplete="username" required autofocus></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">Войти</button></form><p class="muted footnote">Центр мониторинга инфраструктуры</p></div>''')
 

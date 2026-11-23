@@ -26,8 +26,10 @@ def render(rows,csrf,actor,message='',draft=None,ip_blocks=None):
     hidden='<input type="hidden" name="csrf" value="'+esc(csrf)+'">'
     def choices(selected):return ''.join('<option value="'+key+'" '+('selected' if key==selected else '')+'>'+value+'</option>' for key,value in ROLES.items())
     content='<header class="topbar"><a href="/admin">← Администрирование</a><a class="nav-link" href="/users/sessions">Сеансы портала</a></header><div class="heading"><h1>Пользователи</h1></div>'
-    if message:content+='<p class="notice" role="alert">'+esc(message)+'</p>'
-    content+='<details class="server user-create" '+('open' if creating else '')+'><summary>Добавить пользователя</summary><form method="post" action="/users/create">'+hidden+'<label>Логин<input name="name" required pattern="[A-Za-zА-Яа-яЁё0-9_.\\-]{1,64}" maxlength="64" autocomplete="off" value="'+esc(draft.get('name',''))+'"> <small>Латиница, кириллица, цифры и _.-, без пробелов; до 64 символов.</small></label><label>Пароль (от 12 символов)<input type="password" name="password" required minlength="12" maxlength="256" autocomplete="new-password"></label><label>Доступ<select name="role">'+choices(draft.get('role') if draft.get('role') in ROLES else 'viewer')+'</select></label><button>Создать пользователя</button></form></details><div class="user-grid">'
+    if message and not creating:content+='<p class="notice" role="alert">'+esc(message)+'</p>'
+    from .dashboard import creation_dialog
+    notice = '<p class="notice" role="alert">'+esc(message)+'</p>' if creating and message else ''
+    content+=creation_dialog('create-user','Добавить пользователя',notice+'<form method="post" action="/users/create">'+hidden+'<label>Логин<input name="name" required pattern="[A-Za-zА-Яа-яЁё0-9_.\\-]{1,64}" maxlength="64" autocomplete="off" value="'+esc(draft.get('name',''))+'"> <small>Латиница, кириллица, цифры и _.-, без пробелов; до 64 символов.</small></label><label>Пароль (от 12 символов)<input type="password" name="password" required minlength="12" maxlength="256" autocomplete="new-password"></label><label>Доступ<select name="role">'+choices(draft.get('role') if draft.get('role') in ROLES else 'viewer')+'</select></label><button>Создать пользователя</button></form>',reopen=creating)+'<div class="user-grid">'
     for row in rows:
         name=row['name'];role='superadmin' if name=='admin' else row['role'];enabled=bool(row['enabled'])
         fields=hidden+'<input type="hidden" name="name" value="'+esc(name)+'">'

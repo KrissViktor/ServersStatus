@@ -174,6 +174,19 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .monitoring-workspace .overview-order-controls > .overview-problem-shortcut:hover { background:var(--accent-soft); border-color:var(--accent-line); }
 .appearance-settings .theme-picker { display:grid; gap:6px; width:min(100%,240px); margin:12px 0; color:var(--muted); }
 .appearance-settings .theme-picker select { margin:0; min-height:40px; }
+.creation-trigger { margin:0 0 16px; min-height:40px; }
+.creation-dialog {
+  width:min(560px,calc(100% - 24px)); max-height:calc(100dvh - 24px); overflow:auto;
+  box-sizing:border-box; padding:clamp(16px,4vw,26px); color:var(--text);
+  background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--float-shadow);
+}
+.creation-dialog::backdrop { background:#0b1229a0; }
+.creation-dialog[open] { animation:portal-panel-in 180ms var(--ease) both; }
+.creation-dialog>header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.creation-dialog>header h2 { margin:0; }
+.creation-dialog>header button { flex:none; min-width:40px; min-height:40px; margin:0; }
+.creation-dialog .fleet-filter { display:grid; grid-template-columns:1fr; align-items:stretch; }
+.creation-dialog .agent-create-body { padding:0; }
 @media(max-width:680px) {
   .monitoring-workspace .fleet-table tbody tr { background:var(--panel); border-radius:12px; box-shadow:var(--soft-shadow); }
   .monitoring-workspace .fleet-table td[data-metric-label] { background:var(--subtle); }

@@ -184,7 +184,8 @@ def register(app,db,authenticated,csrf_token):
             history=c.execute('SELECT at,result FROM site_monitor_runs WHERE monitor=? ORDER BY at DESC LIMIT 30',(monitor,)).fetchall() if monitor else []
         csrf='<input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
         content='<header class="topbar"><a class="brand" href="/">ServersStatus</a></header><div class="heading"><h1>Мониторы сайтов</h1></div>'
-        content+='<details class="server"><summary>Добавить монитор</summary><form class="fleet-filter" action="/monitors" method="post">'+csrf+fields(None)+'<button>Добавить</button></form></details>'
+        from .dashboard import creation_dialog
+        content+=creation_dialog('create-monitor','Добавить монитор','<form class="fleet-filter" action="/monitors" method="post">'+csrf+fields(None)+'<button>Добавить</button></form>')
         for row in rows:
             identifier=str(row['id'])
             result=json.loads(row['latest']) if row['latest'] else {'tls':'unknown' if row['url'].startswith('https:') else 'off','rkn':'unknown' if row['registry'] else 'off'}

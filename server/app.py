@@ -580,7 +580,8 @@ async def change_agent(action: str, request: Request):
                 c.execute('DELETE FROM report_rollups WHERE agent=?', (name,))
     if action == 'delete' and not error:
         return RedirectResponse('/agents', status_code=303)
-    return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name), status_code=status)
+    return HTMLResponse(agents_page(agent_rows(), csrf_token(request), error, key, name,
+                                    reopen_create=action=='create' and bool(error)), status_code=status)
 
 
 @app.get('/history/{agent_id}', response_class=HTMLResponse)
