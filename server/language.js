@@ -464,20 +464,76 @@ Raspberry Pi — портал|Raspberry Pi — portal host
 Доступность за 24 ч:|24-hour uptime:
 В работе:|Uptime:
 Нет измерений CPU и RAM рядом|No nearby CPU or RAM measurements
+Посещаемость портала|Portal traffic
+Визитка, переходы в панель, источники и попытки входа.|Landing page, panel visits, referral sources, and sign-in attempts.
+Просмотры визитки|Landing page views
+Открытия формы входа|Sign-in form opens
+Открытия панели|Dashboard opens
+Успешные входы|Successful sign-ins
+Отклонено блокировкой|Blocked sign-ins
+Переходы к примеру|Demo clicks
+Переходы к описанию|How it works clicks
+Сеансы портала →|Portal sessions →
+24 часа|24 hours
+7 дней|7 days
+90 дней|90 days
+IP-адрес|IP address
+Событие|Event
+Все события|All events
+Применить|Apply
+Уникальные IP визитки|Unique landing page IPs
+Частые IP визитки|Top landing page IPs
+Нет данных за период|No data for this period
+Источники визитки|Landing page sources
+Источник не передан|Source unavailable
+Журнал посещений и входов|Traffic and sign-in log
+Время|Time
+Страна|Country
+Источник|Source
+Подробнее|Details
+← Назад|← Previous
+Далее →|Next →
+Новые события навигации записываются после обновления. Один IP могут использовать несколько человек. Страна показывается при наличии базы IP-геолокации.|New navigation events are recorded after the update. Multiple people can share an IP address. Country is shown when an IP geolocation database is available.
 Настройки Telegram|Telegram settings
+Настройки сохранены.|Settings saved.
+Перезапустить бота|Restart bot
+Перезапуск запрошен. Обновите страницу, чтобы проверить состояние.|Restart requested. Refresh the page to check its status.
+Проверьте формат токена и ID чата.|Check the token and chat ID format.
+Подтвердите замену токена перед сохранением.|Confirm the token replacement before saving.
+Укажите числовой Telegram ID и имя длиной до 80 символов.|Enter a numeric Telegram ID and a name of up to 80 characters.
+Достигнут предел списка пользователей Telegram.|The Telegram user list has reached its limit.
+Этот Telegram ID уже есть в списке. Измените существующую запись.|This Telegram ID is already listed. Edit the existing entry.
+Сначала настройте токен и чат уведомлений.|Set up the bot token and notifications chat first.
+Не удалось сохранить настройки Telegram.|Could not save Telegram settings.
+Имя в портале|Name in the portal
+Администратор бота|Bot administrator
+Заблокирован|Blocked
+Исходное имя появится после первого сообщения, которое бот получит от пользователя.|The original name appears after the bot receives its first message from the user.
+Пока список пользователей отчётов пуст, команды доступны участникам чата уведомлений.|While the reporting user list is empty, members of the notifications chat can run report commands.
+Заблокированный пользователь не сможет пользоваться ботом или получать личные сообщения. Чтобы скрыть уведомления общего чата, удалите пользователя из этого чата в Telegram.|Blocked users cannot use the bot or receive direct messages. To hide shared notifications from a user, remove them from the Telegram chat.
+Имя пока неизвестно|Name not yet known
+После замены токена старый бот перестанет обслуживать портал. Вы уверены?|Replacing the token will disconnect the old bot from the portal. Are you sure?
+Подтверждаю замену токена|Confirm token replacement
+Сохранить настройки|Save settings
+Ожидающих ответов:|Pending replies:
+Время проверок и диагностика|Check times and diagnostics
+Состояние процесса|Process heartbeat
+Последний успешный опрос Telegram|Last successful Telegram poll
+Последний ответ на команду|Last command reply
+ещё нет данных|No data yet
+Ошибка отправки ответа. Проверьте доступ бота к чату.|Could not send a reply. Check the bot's access to the chat.
+Состояние на момент открытия страницы. В Telegram отправьте /start, чтобы показать кнопки. Запросы по кнопкам доступны круглосуточно.|Status as of page load. Send /start in Telegram to show the buttons. Commands are available around the clock.
+Процесс работает, но соединение с Telegram недоступно|The bot is running but cannot connect to Telegram
+Процесс работает, но ответ в Telegram не доставлен|The bot is running but Telegram did not receive a reply
+Процесс работает, успешный опрос Telegram пока не подтверждён|The bot is running but has not successfully polled Telegram
 Токен настроен|Token configured
 Токен не задан|Token missing
 Новый токен бота|New bot token
 Оставьте токен пустым, чтобы сохранить текущий.|Leave the token blank to keep the current one.
 ID чата уведомлений|Notifications chat ID
-Telegram ID администраторов|Administrator Telegram IDs
-Telegram ID пользователей отчётов|Reporting user Telegram IDs
-ID разделяются запятыми. Пустой список пользователей отчётов разрешает команды всем участникам настроенного чата.|Separate IDs with commas. An empty reporting allowlist allows commands from everyone in the configured chat.
-Имена пользователей по ID|Names by user ID
 Доступ пользователей Telegram|Telegram user access
 Администратор портала|Portal administrator
 Пользователь отчётов|Reporting user
-Настройки сохранены. Перезапустите службу serversstatus-bot.service.|Settings saved. Restart serversstatus-bot.service.
 Бот ещё не запущен|Bot has not started
 Бот работает|Bot is running
 Нет свежего состояния процесса бота|Bot status is stale

@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager, contextmanager
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from .dashboard import dashboard, login_page
@@ -132,6 +132,8 @@ def _initialize_database(connection):
     initialize(connection)
     from .portal_sessions import initialize as initialize_sessions
     initialize_sessions(connection)
+    from .traffic import SCHEMA as TRAFFIC_SCHEMA
+    connection.executescript(TRAFFIC_SCHEMA)
     from .site_monitors import SCHEMA as MONITOR_SCHEMA
     connection.executescript(MONITOR_SCHEMA)
     from .news import sync as sync_news
@@ -183,13 +185,17 @@ def server_rows(agent_id=None, sparklines=True):
 
 @app.get('/', response_class=HTMLResponse)
 def index(request: Request, q: str = '', view: str = 'all', group: str = '', layout: str = 'table'):
-    if not authenticated(request):
+    from .access import principal
+    from .traffic import record_navigation
+    user=principal(request,db)
+    if user is None:
+        record_navigation(db,request,'landing')
         return HTMLResponse(login_page())
     if view not in ('all', 'online', 'problems', 'offline', 'disks') or len(q) > 200 or len(group)>20:
         raise HTTPException(400)
     from .news import banner
-    from .access import current_user
-    with db() as c:news_html=banner(c,current_user().get('name') or '')
+    record_navigation(db,request,'panel',user['name'])
+    with db() as c:news_html=banner(c,user['name'])
     layout = 'cards' if layout=='cards' else 'table'
     return HTMLResponse(dashboard(server_rows(sparklines=layout=='cards'), q, view, group,news_html=news_html,csrf=csrf_token(request),layout=layout))
 
@@ -473,6 +479,30 @@ def administration(request: Request):
         return RedirectResponse('/', status_code=303)
     from .admin_ui import administration_page
     return HTMLResponse(administration_page())
+
+
+@app.post('/visit/{kind}',status_code=204,response_class=Response)
+def visit_action(request: Request, kind: str):
+    from .traffic import record_visit
+    if (kind not in ('login_open','demo','how')
+            or request.headers.get('x-portal-visit')!='1'
+            or request.headers.get('sec-fetch-site','same-origin')!='same-origin'):
+        raise HTTPException(404)
+    record_visit(db,request,kind)
+    return Response(status_code=204)
+
+
+@app.get('/admin/traffic',response_class=HTMLResponse)
+def traffic_status(request: Request, days: int = 7, ip: str = '', kind: str = '', offset: int = 0):
+    from .access import principal
+    from .traffic import traffic_page
+    user=principal(request,db)
+    if user is None:
+        return RedirectResponse('/',303)
+    if user['role']!='superadmin':
+        raise HTTPException(403)
+    with db() as c:
+        return HTMLResponse(traffic_page(c,time.time(),days,ip,kind,offset))
 
 
 @app.get('/preferences', response_class=HTMLResponse)
@@ -894,57 +924,107 @@ def ai_connection(request: Request):
 
 
 @app.get('/bot', response_class=HTMLResponse)
-def bot_status(request: Request, saved: bool = False):
-    if not authenticated(request):
+def bot_status(request: Request, saved: bool = False, error: str = ''):
+    from .access import principal
+    user=principal(request,db)
+    if user is None:
         return RedirectResponse('/', status_code=303)
     from .bot_health import health_page
-    from .access import can_console
     with db() as c:
-        return HTMLResponse(health_page(c,csrf=csrf_token(request) if can_console() else None,saved=saved))
+        return HTMLResponse(
+            health_page(c,csrf=csrf_token(request) if user['role']=='superadmin' else None,saved=saved,error=error),
+            headers={'Cache-Control':'no-store'},
+        )
 
 
 @app.post('/bot/settings')
+@app.post('/bot/users')
+@app.post('/bot/restart')
 async def bot_settings(request: Request):
     from urllib.parse import parse_qs
-    from .access import can_console
+    from .access import principal
+    from .bot import state
     from .console import read_body
-    from .telegram_config import read, user_ids, write
-    if not authenticated(request) or not can_console():
+    from .telegram_config import read, user_ids, valid_user_id, write
+    user=principal(request,db)
+    if user is None or user['role']!='superadmin':
         raise HTTPException(403)
     try:
         fields=parse_qs((await read_body(request,16384)).decode())
     except UnicodeError:
-        raise HTTPException(400,'Некорректная форма') from None
+        raise HTTPException(400) from None
+
     def value(name):
         return fields.get(name,[''])[0].strip()
+
     if not hmac.compare_digest(value('csrf').encode(),csrf_token(request).encode()):
         raise HTTPException(403)
+    action=request.url.path
     token,chat=value('token'),value('chat')
-    admins,allowed=user_ids(value('admins')),user_ids(value('allowed'))
-    if (token and not re.fullmatch(r'[0-9]{1,20}:[A-Za-z0-9_-]{20,100}',token)) or not re.fullmatch(r'-?[0-9]{1,19}',chat) or int(chat)==0:
-        raise HTTPException(400,'Проверьте формат токена и ID чата')
-    if len(admins|allowed)>100 or any(not re.fullmatch(r'[1-9][0-9]{0,18}',item) or int(item)>=2**63 for item in admins|allowed):
-        raise HTTPException(400,'Укажите числовые Telegram ID через запятую')
-    names={}
-    for line in value('names').splitlines():
-        identifier,separator,name=line.partition('=')
-        identifier,name=identifier.strip(),name.strip()
-        if not separator or identifier not in admins|allowed or not 1<=len(name)<=80:
-            raise HTTPException(400,'Имена задаются строками ID = имя для пользователей из списка')
-        names[identifier]=name
+    identifier,alias=value('telegram_id'),value('alias')
+
     def persist():
         with db() as c:
             c.execute('BEGIN IMMEDIATE')
             config=read()
-            config.update(token=token or config.get('token',''),chat=chat,admins=','.join(sorted(admins)),
-                          allowed=','.join(sorted(allowed)),names=names)
-            try:
-                write(config)
-            except OSError:
-                raise HTTPException(503,'Не удалось сохранить настройки Telegram') from None
-            record(c,'','configuration','Настройки Telegram обновлены')
-    await run_in_threadpool(persist)
-    return RedirectResponse('/bot?saved=1',303)
+            previous_token=config.get('token','')
+            restart=action=='/bot/restart'
+            if action=='/bot/settings':
+                if (token and not re.fullmatch(r'[0-9]{1,20}:[A-Za-z0-9_-]{20,100}',token)
+                        or not re.fullmatch(r'-?[0-9]{1,19}',chat) or not 0<abs(int(chat))<2**63):
+                    return 'format'
+                token_changed=bool(token and token!=previous_token)
+                if token_changed and value('confirm_token')!='1':
+                    return 'confirm'
+                restart=token_changed or chat!=config.get('chat')
+                config.update(token=token or config.get('token',''),chat=chat)
+            elif action=='/bot/users':
+                if not valid_user_id(identifier) or len(alias)>80:
+                    return 'user'
+                identifier_key=str(int(identifier))
+                known=user_ids(config.get('users',''))
+                if value('add')=='1':
+                    known_roles=set().union(*(user_ids(config.get(key,'')) for key in ('admins','allowed','blocked')))
+                    observed=(c.execute("SELECT 1 FROM sqlite_master WHERE name='bot_users'").fetchone()
+                              and c.execute('SELECT 1 FROM bot_users WHERE id=?',(identifier_key,)).fetchone())
+                    if identifier_key in known|known_roles|set(config.get('names',{})) or observed:
+                        return 'duplicate'
+                known.add(identifier_key)
+                if len(known)>1000:
+                    return 'limit'
+                config['users']=','.join(sorted(known))
+                for key in ('admins','allowed','blocked'):
+                    ids=user_ids(config.get(key,''))
+                    if value(key)=='1':
+                        ids.add(identifier_key)
+                    else:
+                        ids.discard(identifier_key)
+                    if len(ids)>1000:
+                        return 'limit'
+                    config[key]=','.join(sorted(ids))
+                names=config.setdefault('names',{})
+                if alias:
+                    names[identifier_key]=alias
+                else:
+                    names.pop(identifier_key,None)
+            if restart and (not config.get('token') or not config.get('chat')):
+                return 'missing'
+            if action!='/bot/restart':
+                try:
+                    write(config)
+                except OSError:
+                    return 'write'
+                record(c,'','configuration','Настройки Telegram обновлены')
+            if restart:
+                c.execute('CREATE TABLE IF NOT EXISTS bot_state(name TEXT PRIMARY KEY,value TEXT)')
+                if previous_token:
+                    c.execute("INSERT OR IGNORE INTO bot_state VALUES ('bot_id',?)",(previous_token.partition(':')[0],))
+                state(c,'restart_request',secrets.token_hex(16))
+                record(c,'','configuration','Запрошен перезапуск Telegram-бота')
+        return ''
+
+    error=await run_in_threadpool(persist)
+    return RedirectResponse('/bot?error='+error if error else '/bot?saved=1',303)
 
 from .updates import register as register_updates
 register_updates(app,db,authenticated,csrf_token,digest)

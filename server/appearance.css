@@ -305,3 +305,35 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
   .monitoring-workspace .overview-page .stat-filter:nth-child(2n) { border-right:0; }
   .monitoring-workspace .overview-page .stat-filter:nth-child(-n+2) { border-bottom:1px solid var(--line); }
 }
+.bot-settings .server-head { flex-wrap: wrap; }
+.bot-settings .server-head button { margin: 0; }
+.bot-settings .server > p { margin-top: 8px; }
+.bot-settings .bot-user-form {
+  display: flex; align-items: end; flex-wrap: wrap; gap: 10px 16px;
+}
+.bot-settings .bot-user-form > label { flex: 1 1 180px; margin: 0; }
+.bot-settings .bot-user-form button { margin: 0; }
+.bot-settings .bot-user-add { margin: 16px 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.bot-settings .bot-user { padding: 12px 0; border-top: 1px solid var(--line); }
+.bot-user-identity { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.bot-user-identity code { color: var(--muted); }
+.bot-roles { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.bot-settings .bot-roles label { margin: 8px 0; }
+.bot-connection { max-width: 620px; }
+.bot-token-warning { margin: 14px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; }
+.bot-token-warning p { color: var(--yellow); }
+.bot-settings .bot-token-warning label { margin: 8px 0 0; }
+@media (max-width: 560px) {
+  .bot-settings .bot-user-form > label, .bot-roles { flex-basis: 100%; }
+}
+.traffic-note { margin: 12px 0 16px; }
+.traffic-stats { gap: 8px; grid-template-columns: repeat(auto-fit,minmax(min(165px,100%),1fr)); }
+.traffic-stats .stat { gap: 6px; padding: 9px 12px; background: var(--panel); }
+.traffic-stats .stat strong { font-size: 20px; }
+.traffic-leaders { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); gap: 12px; }
+.traffic-leaders .list-row { overflow-wrap: anywhere; }
+.traffic-table details { border: 0; margin: 0; padding: 0; }
+.traffic-table td { vertical-align: top; }
+.traffic-table td:first-child { min-width: 0; white-space: nowrap; }
+.traffic-table dd { margin: 0 0 6px; max-width: 300px; white-space: normal; overflow-wrap: anywhere; }
+.traffic-pages { display: flex; gap: 18px; padding-top: 12px; }

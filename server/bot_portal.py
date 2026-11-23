@@ -8,7 +8,7 @@ from .events import record
 from .password_reset import issue
 from .portal_sessions import current, end
 from .windows_ui import stamp
-from .telegram_config import read, user_ids
+from .telegram_config import blocked, read, user_ids, valid_user_id
 
 COMMANDS = {
     'portal_users':'Учётные записи портала',
@@ -20,8 +20,8 @@ COMMANDS = {
 
 
 def admins():
-    ids = user_ids(read().get('admins',''))
-    return {value for value in ids if len(value)<=19 and value.isascii() and value.isdecimal() and 0<int(value)<2**63}
+    config = read()
+    return {value for value in user_ids(config.get('admins','')) - blocked(config) if valid_user_id(value)}
 
 
 def render(c, command, argument, actor, now):

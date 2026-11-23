@@ -1,18 +1,25 @@
 (() => {
   const path=location.pathname;
+  function recordVisit(kind) {
+    fetch('/visit/'+kind,{method:'POST',headers:{'X-Portal-Visit':'1'},keepalive:true}).catch(()=>{});
+  }
   document.querySelector('.landing-links')?.addEventListener('click',event=>{
     const link=event.target.closest('a[href^="#"]');
     if(!link||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
     const section=document.getElementById(link.hash.slice(1));
     if(!section)return;
     event.preventDefault();
+    if(link.hash==='#demo'||link.hash==='#how')recordVisit(link.hash.slice(1));
     if(location.hash!==link.hash)history.pushState(null,'',link.hash);
     section.focus({preventScroll:true});
     section.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
   });
   document.addEventListener('click',event=>{
     const trigger=event.target.closest('[data-create-dialog]');
-    if(trigger)document.getElementById(trigger.dataset.createDialog)?.showModal();
+    if(trigger){
+      document.getElementById(trigger.dataset.createDialog)?.showModal();
+      if(trigger.dataset.createDialog==='portal-login')recordVisit('login_open');
+    }
     const close=event.target.closest('[data-close-creation]');
     if(close)close.closest('dialog')?.close();
   });

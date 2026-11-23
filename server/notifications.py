@@ -64,6 +64,9 @@ def telegram_request(token, method, payload):
 
 
 def send_message(token, chat_id, text):
+    from .telegram_config import blocked, read
+    if str(chat_id) in blocked(read()):
+        raise DeliveryError()
     telegram_request(token, 'sendMessage', {'chat_id': chat_id, 'text': text[:4000]})
 
 
@@ -134,7 +137,7 @@ def main():
     parser.add_argument('--daily-test', action='store_true')
     parser.add_argument('--discover-chat', action='store_true')
     args = parser.parse_args()
-    from .telegram_config import read
+    from .telegram_config import blocked, read
     config = read()
     token = config.get('token','')
     chat_id = config.get('chat','')
@@ -151,6 +154,8 @@ def main():
             return
         if not chat_id:
             raise SystemExit('Не задан STATUS_TELEGRAM_CHAT_ID.')
+        if chat_id in blocked(config):
+            return
         if args.test:
             send_message(token, chat_id, 'Server Pulse: тестовое уведомление. Отправка работает.')
             print('Тестовое сообщение отправлено.')
@@ -175,6 +180,9 @@ def main():
             except BlockingIOError:
                 return
             def sender(text):
+                active=read()
+                if token!=active.get('token') or chat_id!=active.get('chat'):
+                    raise DeliveryError()
                 send_message(token, chat_id, text)
                 time.sleep(1.1)
             from .events import process_events

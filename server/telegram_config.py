@@ -38,3 +38,11 @@ def write(config):
 
 def user_ids(value):
     return {item.strip() for item in value.split(',') if item.strip()}
+
+
+def blocked(config):
+    return user_ids(config.get('blocked',''))
+
+
+def valid_user_id(identifier):
+    return 0 < len(identifier) <= 19 and identifier.isascii() and identifier.isdecimal() and 0 < int(identifier) < 2**63

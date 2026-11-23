@@ -42,6 +42,9 @@ def cleanup(connection,now):
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='portal_login_audit'").fetchone():
         from .portal_sessions import cleanup as cleanup_sessions
         cleanup_sessions(connection,now,now-days*86400)
+    if connection.execute("SELECT 1 FROM sqlite_master WHERE name='portal_traffic'").fetchone():
+        connection.execute('DELETE FROM portal_traffic WHERE id IN (SELECT id FROM portal_traffic WHERE at<? ORDER BY at LIMIT ?)',
+                           (now-days*86400,CLEANUP_BATCH))
     removed_rollups = 0
     if connection.execute("SELECT 1 FROM sqlite_master WHERE name='report_rollups'").fetchone():
         from .report_rollups import DAY, midnight

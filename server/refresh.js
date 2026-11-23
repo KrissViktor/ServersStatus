@@ -8,7 +8,7 @@
     busy = true;
     try {
       const requested=location.href;
-      const response = await fetch(requested, {credentials: 'same-origin', cache: 'no-store'});
+      const response = await fetch(requested, {credentials: 'same-origin', cache: 'no-store', headers:{'X-Portal-Refresh':'1'}});
       if (!response.ok) return;
       const next = new DOMParser().parseFromString(await response.text(), 'text/html');
       if(requested!==location.href || targets.some(target=>target.dataset.fetchBusy==='true'))return;

@@ -32,6 +32,7 @@ def administration_page():
     if available():
         sections.append(('/ai','ИИ-помощник','Локальный чат на сервере Backup и личная история диалогов.'))
     if can_console():
+        sections.append(('/admin/traffic','Посещаемость портала','Визитка, переходы в панель, источники и попытки входа.'))
         sections.append(('/portal-settings','Настройки хранения','Срок хранения истории; доступ только суперадминистратору.'))
         sections.append(('/report-rollups','Суточные сводки','Состояние фонового расчёта и ручной пересчёт по датам.'))
     if can_users():
@@ -43,9 +44,11 @@ def administration_page():
     content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Все серверы</a></header><div class="heading"><div><h1>Администрирование</h1><p class="muted">Настройки и обслуживание портала</p></div></div>'
     content+=appearance_settings()
     icons['/users/sessions']='users'
+    icons['/admin/traffic']='chart'
     icons['/ai-connection']='settings'
     categories[0][1].add('/ai-connection')
     categories[-1][1].add('/users/sessions')
+    categories[-1][1].add('/admin/traffic')
     for heading,paths in categories:
         visible=[section for section in sections if section[0] in paths]
         if not visible:continue
