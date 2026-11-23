@@ -1,15 +1,12 @@
 """Single entry point for portal administration."""
-from .dashboard import page, esc
+from .dashboard import page, esc, theme_control
 from .ui_icons import icon
 from .access import can_console,can_users
 
 
 def appearance_settings():
     return (
-        '<section class="server appearance-settings"><h2>Внешний вид</h2>'
-        '<label class="theme-picker"><span>Тема сайта</span><select data-theme-choice>'
-        '<option value="system">Системная</option><option value="light">Светлая</option>'
-        '<option value="dark">Тёмная</option></select></label>'
+        '<section class="server appearance-settings"><h2>Внешний вид</h2>'+theme_control()+
         '<p class="muted">Тема сохраняется в этом браузере.</p></section>'
     )
 

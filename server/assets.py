@@ -6,7 +6,7 @@ from fastapi import Request,HTTPException
 from fastapi.responses import Response
 
 ROOT=Path(__file__).parent
-FILES=frozenset(('dashboard.css','appearance.css','theme.js','ui_motion.js','folding.js','cpu_cores.js','refresh.js','portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','overview.js','ai_chat.js','ai_widget.js','task_manager.js','drilldown.js','chart_geometry.js','disk_forecast.js','server-pulse.svg'))
+FILES=frozenset(('dashboard.css','appearance.css','theme.js','language.js','ui_motion.js','folding.js','cpu_cores.js','refresh.js','portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','overview.js','ai_chat.js','ai_widget.js','task_manager.js','drilldown.js','chart_geometry.js','disk_forecast.js','server-pulse.svg'))
 
 
 @lru_cache(maxsize=32)

@@ -22,6 +22,22 @@ def brand_mark():
 def brand_link():
     return '<a class="brand" href="/?reset=1" aria-label="Server Pulse — обзор серверов">'+brand_mark()+'<b>'+PRODUCT_NAME+'</b></a>'
 
+
+def language_control():
+    return (
+        '<label class="language-picker"><span aria-hidden="true">🌐</span>'
+        '<select data-language-choice aria-label="Язык сайта"><option value="ru">RUS</option>'
+        '<option value="en">ENG</option></select></label>'
+    )
+
+
+def theme_control():
+    return (
+        '<label class="theme-picker"><span>Тема сайта</span><select data-theme-choice>'
+        '<option value="system">Системная</option><option value="light">Светлая</option>'
+        '<option value="dark">Тёмная</option></select></label>'
+    )
+
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')+'\n'+Path(__file__).with_name('appearance.css').read_text(encoding='utf-8')
 PROTECTION_SCRIPT=Path(__file__).with_name('protection.js').read_text(encoding='utf-8')
 
@@ -142,6 +158,7 @@ def page(content, refresh=False, protection_entry=False):
     bounds=topbar_bounds(content)
     if bounds:content=content[:bounds[1]]+unify_header(content[bounds[1]:bounds[2]])+content[bounds[2]:]
     if '<header class="topbar"' in content:
+        content=topbar_insert(content,language_control())
         if can_history() and 'href="/admin"' not in content:
             content=topbar_insert(content,'<a class="nav-link" href="/admin">Администрирование</a>')
         if not can_history() and 'href="/preferences"' not in content:
@@ -159,13 +176,15 @@ def page(content, refresh=False, protection_entry=False):
         navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+icon(navigation_icons[url.split('?')[0]])+esc(label)+'</a>' for url,label in links)
         bar='<nav class="portal-navigation" aria-label="Основные разделы"><div class="portal-navigation-desktop">'+navigation+'</div><details class="portal-navigation-mobile"><summary>Разделы портала <span aria-hidden="true">⌄</span></summary><div>'+navigation+'</div></details></nav><nav class="portal-breadcrumbs" aria-label="Путь страницы" hidden></nav>'
         content=topbar_insert(content,bar,after=True)
+    elif 'data-language-choice' not in content:
+        content='<div class="standalone-language">'+language_control()+'</div>'+content
     widget=''
     if can_history() and '<header class="topbar"' in content and 'data-ai-csrf=' not in content:
         widget=('<button type="button" id="ai-launcher" class="ai-launcher" aria-label="Открыть ИИ-помощника" aria-expanded="false" aria-controls="ai-widget">✦ <span>ИИ-помощник</span></button>'
                 '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside>'+ui_script('ai_chat.js')+ui_script('ai_widget.js'))
     shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')
     if refresh:shared+=ui_script('refresh.js')
-    shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js'))
+    shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','language.js'))
     return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+PRODUCT_NAME+'</title><link rel="icon" type="image/svg+xml" href="'+asset_url('server-pulse.svg')+'">'+ui_script('theme.js')+ui_styles()+'</head><body class="monitoring-workspace"><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 
@@ -190,7 +209,7 @@ def login_page():
         '<label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>'
         '<p role="status" data-login-status hidden></p><button type="submit" class="primary">Войти в панель</button></form>',
     )
-    return page(content(brand_link(),login))
+    return page(content(brand_link(),theme_control()+language_control()+login))
 
 
 def backup_problems(backup, elapsed=0):
