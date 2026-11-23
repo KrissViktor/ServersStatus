@@ -201,10 +201,12 @@ def pause(stop,seconds,heartbeat=None):
 
 
 def main():
-    token=os.environ.get('STATUS_TELEGRAM_TOKEN','').strip()
-    chat_id=os.environ.get('STATUS_TELEGRAM_CHAT_ID','').strip()
+    from .telegram_config import read, user_ids
+    config=read()
+    token=config.get('token','')
+    chat_id=config.get('chat','')
     if not token or not chat_id:raise SystemExit('Не настроены токен бота и ID чата.')
-    allowed_users={user.strip() for user in os.environ.get('STATUS_TELEGRAM_ALLOWED_USERS','').split(',') if user.strip()}
+    allowed_users=user_ids(config.get('allowed',''))
     from .app import db,DB
     import fcntl
     stop=threading.Event()

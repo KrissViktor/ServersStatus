@@ -32,7 +32,8 @@ DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 async def lifespan(_app):
     from .report_rollup_jobs import worker
     from .site_monitors import worker as monitor_worker
-    async with worker(db), monitor_worker(db):
+    from .ai_connection import worker as ai_connection_worker
+    async with worker(db), monitor_worker(db), ai_connection_worker():
         yield
 
 
@@ -869,13 +870,81 @@ def journal(request: Request, agent: str = '', level: str = '', before: int = 0,
         categories=[row[0] for row in c.execute("SELECT DISTINCT category FROM events WHERE (? OR category!='console') AND (? OR category!='users') ORDER BY category",(access,can_users()))]
     return HTMLResponse(event_page(rows,agent,level,before,days=days,agents=agents,categories=categories,q=q,category=category))
 
+@app.get('/ai-connection', response_class=HTMLResponse)
+def ai_connection(request: Request):
+    from .access import can_history
+    from .ai_connection import available
+    from .dashboard import page
+    if not authenticated(request):
+        return RedirectResponse('/',303)
+    if not can_history():
+        raise HTTPException(403)
+    status = 'Локальная модель доступна' if available() else 'Локальная модель не подключена'
+    content=(
+        '<header class="topbar"><a class="brand" href="/">Server Pulse</a></header>'
+        '<div class="heading"><h1>Подключение локального ИИ</h1></div><section class="server">'
+        '<h2>'+status+'</h2>'
+        '<p>Ответы генерирует локальная модель на вашем сервере. Веб-токен облачного ИИ для этого не используется.</p>'
+        '<ol><li>Установите локальную модель и обратный SSH-туннель на сервере Backup по инструкции deploy/AI-CONNECTION.md.</li>'
+        '<li>На сервере портала запустите настройку ключа локальной модели.</li></ol>'
+        '<pre>sudo bash /opt/ServersStatus/deploy/ai-ssh/Enable-PortalAI.sh</pre>'
+        '<p>Введите ключ в терминале по запросу скрипта. Портал проверяет локальное подключение в фоне. Когда модель доступна, кнопка чата появляется в панели.</p></section>'
+    )
+    return HTMLResponse(page(content),headers={'Cache-Control':'no-store'})
+
+
 @app.get('/bot', response_class=HTMLResponse)
-def bot_status(request: Request):
+def bot_status(request: Request, saved: bool = False):
     if not authenticated(request):
         return RedirectResponse('/', status_code=303)
     from .bot_health import health_page
+    from .access import can_console
     with db() as c:
-        return HTMLResponse(health_page(c))
+        return HTMLResponse(health_page(c,csrf=csrf_token(request) if can_console() else None,saved=saved))
+
+
+@app.post('/bot/settings')
+async def bot_settings(request: Request):
+    from urllib.parse import parse_qs
+    from .access import can_console
+    from .console import read_body
+    from .telegram_config import read, user_ids, write
+    if not authenticated(request) or not can_console():
+        raise HTTPException(403)
+    try:
+        fields=parse_qs((await read_body(request,16384)).decode())
+    except UnicodeError:
+        raise HTTPException(400,'Некорректная форма') from None
+    def value(name):
+        return fields.get(name,[''])[0].strip()
+    if not hmac.compare_digest(value('csrf').encode(),csrf_token(request).encode()):
+        raise HTTPException(403)
+    token,chat=value('token'),value('chat')
+    admins,allowed=user_ids(value('admins')),user_ids(value('allowed'))
+    if (token and not re.fullmatch(r'[0-9]{1,20}:[A-Za-z0-9_-]{20,100}',token)) or not re.fullmatch(r'-?[0-9]{1,19}',chat) or int(chat)==0:
+        raise HTTPException(400,'Проверьте формат токена и ID чата')
+    if len(admins|allowed)>100 or any(not re.fullmatch(r'[1-9][0-9]{0,18}',item) or int(item)>=2**63 for item in admins|allowed):
+        raise HTTPException(400,'Укажите числовые Telegram ID через запятую')
+    names={}
+    for line in value('names').splitlines():
+        identifier,separator,name=line.partition('=')
+        identifier,name=identifier.strip(),name.strip()
+        if not separator or identifier not in admins|allowed or not 1<=len(name)<=80:
+            raise HTTPException(400,'Имена задаются строками ID = имя для пользователей из списка')
+        names[identifier]=name
+    def persist():
+        with db() as c:
+            c.execute('BEGIN IMMEDIATE')
+            config=read()
+            config.update(token=token or config.get('token',''),chat=chat,admins=','.join(sorted(admins)),
+                          allowed=','.join(sorted(allowed)),names=names)
+            try:
+                write(config)
+            except OSError:
+                raise HTTPException(503,'Не удалось сохранить настройки Telegram') from None
+            record(c,'','configuration','Настройки Telegram обновлены')
+    await run_in_threadpool(persist)
+    return RedirectResponse('/bot?saved=1',303)
 
 from .updates import register as register_updates
 register_updates(app,db,authenticated,csrf_token,digest)

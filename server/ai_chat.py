@@ -256,6 +256,8 @@ def register(app,db,authenticated,csrf_token):
     def view(request:Request):
         if not authenticated(request):return RedirectResponse('/',303)
         user(request)
+        from .ai_connection import available
+        if not available():return RedirectResponse('/ai-connection',303)
         from .ai_ui import render
         with db() as c:
             from .portal_settings import retention_days

@@ -1,6 +1,5 @@
 """Privileged portal commands accepted only from explicitly allowed private chats."""
 import json
-import os
 import re
 
 from .access import ROLES, revoke
@@ -9,6 +8,7 @@ from .events import record
 from .password_reset import issue
 from .portal_sessions import current, end
 from .windows_ui import stamp
+from .telegram_config import read, user_ids
 
 COMMANDS = {
     'portal_users':'Учётные записи портала',
@@ -20,7 +20,7 @@ COMMANDS = {
 
 
 def admins():
-    ids = (value.strip() for value in os.environ.get('STATUS_TELEGRAM_PORTAL_ADMINS','').split(','))
+    ids = user_ids(read().get('admins',''))
     return {value for value in ids if len(value)<=19 and value.isascii() and value.isdecimal() and 0<int(value)<2**63}
 
 

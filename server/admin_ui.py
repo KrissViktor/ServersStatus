@@ -17,6 +17,7 @@ def preferences_page():
 
 
 def administration_page():
+    from .ai_connection import available
     sections = [
         ('/problems','Отмеченные проблемы','Кто отметил «Всё окей», комментарии и возврат предупреждений.'),
         ('/groups','Группы серверов','Площадки, роли и состав групп.'),
@@ -25,9 +26,11 @@ def administration_page():
         ('/portal-health','Контроль портала','База данных, свободное место, фоновые задачи и резервные копии.'),
         ('/host', 'Raspberry Pi', 'Состояние сервера, на котором работает панель мониторинга.'),
         ('/bot', 'Telegram-бот', 'Состояние бота, уведомления и отчёты.'),
-        ('/ai','ИИ-помощник','Локальный чат на сервере Backup и личная история диалогов.'),
+        ('/ai-connection','Подключение локального ИИ','Состояние подключения и инструкция по настройке.'),
         ('/events', 'Журнал событий', 'Проблемы серверов, изменения состояния и события портала.'),
     ]
+    if available():
+        sections.append(('/ai','ИИ-помощник','Локальный чат на сервере Backup и личная история диалогов.'))
     if can_console():
         sections.append(('/portal-settings','Настройки хранения','Срок хранения истории; доступ только суперадминистратору.'))
         sections.append(('/report-rollups','Суточные сводки','Состояние фонового расчёта и ручной пересчёт по датам.'))
@@ -40,6 +43,8 @@ def administration_page():
     content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Все серверы</a></header><div class="heading"><div><h1>Администрирование</h1><p class="muted">Настройки и обслуживание портала</p></div></div>'
     content+=appearance_settings()
     icons['/users/sessions']='users'
+    icons['/ai-connection']='settings'
+    categories[0][1].add('/ai-connection')
     categories[-1][1].add('/users/sessions')
     for heading,paths in categories:
         visible=[section for section in sections if section[0] in paths]

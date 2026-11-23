@@ -181,7 +181,8 @@ def page(content, refresh=False, protection_entry=False):
     elif 'data-language-choice' not in content:
         content='<div class="standalone-language">'+language_control()+'</div>'+content
     widget=''
-    if can_history() and '<header class="topbar"' in content and 'data-ai-csrf=' not in content:
+    from .ai_connection import available as ai_available
+    if can_history() and ai_available() and '<header class="topbar"' in content and 'data-ai-csrf=' not in content:
         widget=('<button type="button" id="ai-launcher" class="ai-launcher" aria-label="Открыть ИИ-помощника" aria-expanded="false" aria-controls="ai-widget">✦ <span>ИИ-помощник</span></button>'
                 '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside>'+ui_script('ai_chat.js')+ui_script('ai_widget.js'))
     shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')

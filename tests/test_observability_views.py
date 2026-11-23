@@ -59,7 +59,9 @@ class ObservatoryTest(unittest.TestCase):
             self.assertIsNotNone(c.execute("SELECT 1 FROM current_reports WHERE agent='pc'").fetchone())
             self.assertEqual(c.execute("SELECT COUNT(*) FROM events WHERE message='old'").fetchone()[0],0)
         self.assertIn('7 дней',admin.get('/history/pc').text)
-        self.assertIn('7 дней',admin.get('/ai').text)
+        from unittest.mock import patch
+        with patch('server.ai_connection.available',return_value=True):
+            self.assertIn('7 дней',admin.get('/ai').text)
 
     def test_heatmap_unobserved_days_are_unknown_and_gaps_reduce_percent(self):
         with a.db() as c:

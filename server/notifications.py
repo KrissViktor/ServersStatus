@@ -134,8 +134,10 @@ def main():
     parser.add_argument('--daily-test', action='store_true')
     parser.add_argument('--discover-chat', action='store_true')
     args = parser.parse_args()
-    token = os.environ.get('STATUS_TELEGRAM_TOKEN', '').strip()
-    chat_id = os.environ.get('STATUS_TELEGRAM_CHAT_ID', '').strip()
+    from .telegram_config import read
+    config = read()
+    token = config.get('token','')
+    chat_id = config.get('chat','')
     if not token:
         raise SystemExit('Не задан STATUS_TELEGRAM_TOKEN. Настройте файл окружения.')
     try:

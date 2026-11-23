@@ -71,7 +71,7 @@
     retry.addEventListener('click',event=>{event.preventDefault();loadForecasts()});
     loadForecasts();
   }
-  const areas={monitors:['/monitors'],groups:['/groups'],compare:['/compare','/daily','/history/','/heatmap','/dependencies','/timeline/'],problems:['/events','/problems','/timeline/'],updates:['/updates'],preferences:['/preferences'],admin:['/admin','/agents','/settings/','/checks/','/users','/host','/portal-health','/portal-settings','/report-rollups','/bot','/ai','/windows/','/console-access']};
+  const areas={monitors:['/monitors'],groups:['/groups'],compare:['/compare','/daily','/history/','/heatmap','/dependencies','/timeline/'],problems:['/events','/problems','/timeline/'],updates:['/updates'],preferences:['/preferences'],admin:['/admin','/agents','/settings/','/checks/','/users','/host','/portal-health','/portal-settings','/report-rollups','/bot','/ai','/ai-connection','/windows/','/console-access']};
   let active=['/wallboard','/weekly-plan'].includes(path)?path:'/';
   for(const [area,paths] of Object.entries(areas))if(paths.some(prefix=>prefix.endsWith('/')?path.startsWith(prefix):path===prefix))active='/'+area;
   document.querySelectorAll('[data-primary-page]').forEach(link=>{if(link.dataset.primaryPage===active)link.setAttribute('aria-current','page')});

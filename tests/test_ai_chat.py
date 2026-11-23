@@ -26,7 +26,8 @@ class AIChatTest(unittest.TestCase):
             for name,role in [('alice','administrator'),('bob','administrator'),('reader','viewer')]:
                 c.execute('INSERT INTO users VALUES (?,?,?)',(name,'00'*16,'0'*128));c.execute('INSERT INTO user_roles VALUES (?,?,1)',(name,role))
             c.execute('INSERT INTO sessions VALUES (?,?)',(a.digest('test'),time.time()+3600));c.execute("INSERT INTO session_users VALUES (?,'alice')",(a.digest('test'),))
-        self.csrf=re.search('data-ai-csrf="([^"]+)"',self.client.get('/ai').text).group(1)
+        with patch('server.ai_connection.available',return_value=True):
+            self.csrf=re.search('data-ai-csrf="([^"]+)"',self.client.get('/ai').text).group(1)
         self.chat='a'*32;self.nonce='b'*32
 
     def ask(self,**changes):

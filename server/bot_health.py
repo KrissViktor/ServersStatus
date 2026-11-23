@@ -1,8 +1,9 @@
 import time
 from .dashboard import esc,page,duration
+from .telegram_config import read,user_ids
 
 
-def health_page(connection,now=None):
+def health_page(connection,now=None,csrf=None,saved=False):
     now=time.time() if now is None else now
     exists=connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='bot_state'").fetchone()
     values=dict(connection.execute('SELECT name,value FROM bot_state').fetchall()) if exists else {}
@@ -31,4 +32,25 @@ def health_page(connection,now=None):
 
     if values.get('send_error'):content+='<p class="text-warning">Ошибка отправки ответа. Проверьте доступ бота к чату; код '+esc(values['send_error'])+'.</p>'
     content+='<p class="muted">Состояние на момент открытия страницы. В Telegram отправьте /start, чтобы показать кнопки. Запросы по кнопкам доступны круглосуточно.</p></details></section>'
+    if csrf is not None:
+        config=read()
+        admins=user_ids(config.get('admins',''))
+        allowed=user_ids(config.get('allowed',''))
+        names=config.get('names',{})
+        content+='<section class="server"><h2>Настройки Telegram</h2>'
+        if saved:
+            content+='<p class="notice" role="status">Настройки сохранены. Перезапустите службу serversstatus-bot.service.</p>'
+        content+='<p>'+('Токен настроен' if config.get('token') else 'Токен не задан')+'</p>'
+        content+='<form method="post" action="/bot/settings"><input type="hidden" name="csrf" value="'+esc(csrf)+'">'
+        content+='<label>Новый токен бота<input type="password" name="token" autocomplete="new-password" maxlength="128"></label>'
+        content+='<p class="muted">Оставьте токен пустым, чтобы сохранить текущий.</p>'
+        for key,label in [('chat','ID чата уведомлений'),('admins','Telegram ID администраторов'),('allowed','Telegram ID пользователей отчётов')]:
+            content+='<label>'+label+'<input name="'+key+'" value="'+esc(config.get(key,''))+'" maxlength="2000"></label>'
+        content+='<p class="muted">ID разделяются запятыми. Пустой список пользователей отчётов разрешает команды всем участникам настроенного чата.</p>'
+        content+='<label>Имена пользователей по ID<textarea name="names" rows="4" placeholder="123456789 = Alex">'+esc('\n'.join(key+' = '+value for key,value in names.items()))+'</textarea></label><button>Сохранить</button></form>'
+        content+='<h3>Доступ пользователей Telegram</h3><ul>'
+        for identifier in sorted(admins|allowed):
+            roles=[role for members,role in [(admins,'Администратор портала'),(allowed,'Пользователь отчётов')] if identifier in members]
+            content+='<li><b>'+esc(names.get(identifier,identifier))+'</b> · '+esc(identifier)+' · '+' / '.join('<span>'+role+'</span>' for role in roles)+'</li>'
+        content+='</ul></section>'
     return page(content)
