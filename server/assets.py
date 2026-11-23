@@ -6,7 +6,7 @@ from fastapi import Request,HTTPException
 from fastapi.responses import Response
 
 ROOT=Path(__file__).parent
-FILES=frozenset(('dashboard.css','appearance.css','theme.js','ui_motion.js','folding.js','cpu_cores.js','refresh.js','portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','overview.js','ai_chat.js','ai_widget.js','task_manager.js','drilldown.js','chart_geometry.js','disk_forecast.js'))
+FILES=frozenset(('dashboard.css','appearance.css','theme.js','ui_motion.js','folding.js','cpu_cores.js','refresh.js','portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','overview.js','ai_chat.js','ai_widget.js','task_manager.js','drilldown.js','chart_geometry.js','disk_forecast.js','server-pulse.svg'))
 
 
 @lru_cache(maxsize=32)
@@ -34,4 +34,5 @@ def register(app):
         headers={'ETag':'W/"'+checksum+'"','Cache-Control':'public, max-age=31536000, immutable'}
         if request.headers.get('if-none-match')==headers['ETag']:return Response(status_code=304,headers=headers)
         headers['Content-Length']=str(len(data))
-        return Response(b'' if request.method=='HEAD' else data,media_type='text/css' if name.endswith('.css') else 'text/javascript',headers=headers)
+        media_type={'.css':'text/css','.svg':'image/svg+xml','.js':'text/javascript'}[Path(name).suffix]
+        return Response(b'' if request.method=='HEAD' else data,media_type=media_type,headers=headers)

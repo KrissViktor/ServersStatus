@@ -1,4 +1,4 @@
-# ServersStatus
+# Server Pulse
 
 Единый центр мониторинга Windows Server 2019 / Windows 10 на Raspberry Pi 5 (Linux, ARM64).
 Python 3.11+, FastAPI, SQLite, HTML. Обновлённые агенты отправляют отчёты через HTTPS каждые 10 секунд.

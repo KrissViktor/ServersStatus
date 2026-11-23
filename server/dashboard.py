@@ -10,6 +10,17 @@ import time
 from urllib.parse import quote, urlencode
 from pathlib import Path
 from .assets import script as ui_script,styles as ui_styles
+from .assets import url as asset_url
+
+PRODUCT_NAME = 'Server Pulse'
+
+
+def brand_mark():
+    return '<img class="brand-mark" src="'+asset_url('server-pulse.svg')+'" width="30" height="30" alt="">'
+
+
+def brand_link():
+    return '<a class="brand" href="/?reset=1" aria-label="Server Pulse — обзор серверов">'+brand_mark()+'<b>'+PRODUCT_NAME+'</b></a>'
 
 CSS = Path(__file__).with_name('dashboard.css').read_text(encoding='utf-8')+'\n'+Path(__file__).with_name('appearance.css').read_text(encoding='utf-8')
 PROTECTION_SCRIPT=Path(__file__).with_name('protection.js').read_text(encoding='utf-8')
@@ -123,7 +134,7 @@ def topbar_insert(content,addition,after=False):
 def page(content, refresh=False, protection_entry=False):
     # Every section uses the same brand markup, including older page templates.
     def unify_header(body):
-        brand='<a class="brand" href="/?reset=1" aria-label="ServersStatus — обзор серверов">S<span>●</span> <b>ServersStatus</b></a>'
+        brand=brand_link()
         if re.search(r'<a class="brand"[^>]*>.*?</a>',body,re.S):
             body=re.sub(r'<a class="brand"[^>]*>.*?</a>',lambda _:brand,body,count=1,flags=re.S)
         else:body=brand+body
@@ -155,7 +166,7 @@ def page(content, refresh=False, protection_entry=False):
     shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')
     if refresh:shared+=ui_script('refresh.js')
     shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js'))
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Статус серверов</title>'+ui_script('theme.js')+ui_styles()+'</head><body class="monitoring-workspace"><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+PRODUCT_NAME+'</title><link rel="icon" type="image/svg+xml" href="'+asset_url('server-pulse.svg')+'">'+ui_script('theme.js')+ui_styles()+'</head><body class="monitoring-workspace"><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 
 
@@ -172,7 +183,7 @@ def creation_dialog(identifier, title, content, reopen=False):
 
 
 def login_page():
-    return page('''<div class="login"><div class="logo">S<span>●</span></div><p class="eyebrow">SERVERSSTATUS</p><h1>Всё под контролем</h1><p class="muted">Войдите, чтобы увидеть состояние серверов</p><form method="post" action="/login"><label>Логин<input name="username" autocomplete="username" required autofocus></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">Войти</button></form><p class="muted footnote">Центр мониторинга инфраструктуры</p></div>''')
+    return page('''<div class="login"><div class="logo">'''+brand_mark()+'''</div><p class="eyebrow">Server Pulse</p><h1>Всё под контролем</h1><p class="muted">Войдите, чтобы увидеть состояние серверов</p><form method="post" action="/login"><label>Логин<input name="username" autocomplete="username" required autofocus></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">Войти</button></form><p class="muted footnote">Центр мониторинга инфраструктуры</p></div>''')
 
 
 def backup_problems(backup, elapsed=0):
@@ -384,4 +395,4 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf='', layout='t
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now,csrf)
     from .drilldown import widget
-    return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+summary+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>ServersStatus · Показатели на момент последнего отчёта агента</footer>')
+    return page('<div class="overview-page">'+header+'<div class="overview-summary-row"><div id="overview-alerts">'+summary+backup_alerts([row for row in rows if dict(row).get('important',1)],now)+'</div><div id="overview-stats" role="group" aria-label="Фильтры по состоянию серверов">'+stats+'</div></div>'+cards+'</div>'+(widget('') if can_history() else '')+'<footer>Server Pulse · Показатели на момент последнего отчёта агента</footer>')

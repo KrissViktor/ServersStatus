@@ -36,7 +36,7 @@ async def lifespan(_app):
         yield
 
 
-app = FastAPI(title='ServersStatus',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
+app = FastAPI(title='Server Pulse',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
 login_slots = asyncio.Semaphore(2)
 
 

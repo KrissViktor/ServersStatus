@@ -187,6 +187,10 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .creation-dialog>header button { flex:none; min-width:40px; min-height:40px; margin:0; }
 .creation-dialog .fleet-filter { display:grid; grid-template-columns:1fr; align-items:stretch; }
 .creation-dialog .agent-create-body { padding:0; }
+.monitoring-workspace .brand { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+.monitoring-workspace .brand b { margin-left:0; }
+.brand-mark { display:block; flex:none; width:30px; height:30px; }
+.login .brand-mark { width:56px; height:56px; margin:0 auto; }
 
 .monitoring-workspace .overview-commandbar { margin:10px 0; }
 .monitoring-workspace .overview-commandbar h1 { font-size:clamp(20px,2vw,26px); }

@@ -5,11 +5,10 @@ from pathlib import Path
 from urllib.parse import quote
 from fastapi import Request
 from fastapi.responses import HTMLResponse,JSONResponse,RedirectResponse
-from .dashboard import page,esc,number
+from .dashboard import page,esc,number,brand_mark
 from .disks import monitored_disks
 from .overview import issues
 from .fleet import members,group_select
-from .ui_icons import icon
 
 SCRIPT=Path(__file__).with_name('wallboard.js')
 
@@ -34,7 +33,7 @@ def register(app,db,authenticated):
         with db() as c:
             data=payload(c,group);selector=group_select(c,group)
         seed=json.dumps(data,ensure_ascii=False).replace('<','\\u003c')
-        content='<div class="wallboard" data-wallboard-url="/api/wallboard?group='+esc(quote(group,safe=''))+'"><header class="wallboard-toolbar"><a class="brand" href="/">'+icon('wallboard')+' ServersStatus</a><form>'+selector+'<button>Показать</button></form><time id="wallboard-clock"></time><button type="button" id="wallboard-fullscreen">Полный экран</button><a class="nav-link" href="/">← Обзор</a></header><div id="wallboard-summary" class="wallboard-summary"></div><p id="wallboard-status" class="muted" role="status"></p><div id="wallboard-grid" class="wallboard-grid"></div></div><script type="application/json" id="wallboard-seed">'+seed+'</script><script>'+SCRIPT.read_text(encoding='utf-8')+'</script>'
+        content='<div class="wallboard" data-wallboard-url="/api/wallboard?group='+esc(quote(group,safe=''))+'"><header class="wallboard-toolbar"><a class="brand" href="/">'+brand_mark()+' Server Pulse</a><form>'+selector+'<button>Показать</button></form><time id="wallboard-clock"></time><button type="button" id="wallboard-fullscreen">Полный экран</button><a class="nav-link" href="/">← Обзор</a></header><div id="wallboard-summary" class="wallboard-summary"></div><p id="wallboard-status" class="muted" role="status"></p><div id="wallboard-grid" class="wallboard-grid"></div></div><script type="application/json" id="wallboard-seed">'+seed+'</script><script>'+SCRIPT.read_text(encoding='utf-8')+'</script>'
         return HTMLResponse(page(content))
 
     @app.get('/api/wallboard')

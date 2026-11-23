@@ -114,7 +114,7 @@ def tick(db, sender, now=None):
             if not enabled or not enabled[0]:
                 c.execute('DELETE FROM telegram_state WHERE agent=?',(state['agent'],))
                 continue
-        text = ('🔴 ServersStatus · ПРОБЛЕМА\n' if state['active'] else '🟢 ServersStatus · ВОССТАНОВЛЕНО\nПроблема больше не обнаружена:\n') + state['body']
+        text = ('🔴 Server Pulse · ПРОБЛЕМА\n' if state['active'] else '🟢 Server Pulse · ВОССТАНОВЛЕНО\nПроблема больше не обнаружена:\n') + state['body']
         try:
             sender(text)
         except DeliveryError as error:
@@ -150,7 +150,7 @@ def main():
         if not chat_id:
             raise SystemExit('Не задан STATUS_TELEGRAM_CHAT_ID.')
         if args.test:
-            send_message(token, chat_id, 'ServersStatus: тестовое уведомление. Отправка работает.')
+            send_message(token, chat_id, 'Server Pulse: тестовое уведомление. Отправка работает.')
             print('Тестовое сообщение отправлено.')
             return
         from .app import db, DB

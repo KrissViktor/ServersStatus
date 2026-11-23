@@ -188,8 +188,8 @@ def pdf_bytes(report):
         story.append(Spacer(1,10))
     story.extend(p(note) for note in report['notes'])
     def footer(canvas,doc):
-        canvas.setFont('PortalSans',7);canvas.drawString(32,18,'ServersStatus');canvas.drawRightString(width-32,18,'Страница '+str(doc.page))
-    SimpleDocTemplate(buffer,pagesize=(width,height),leftMargin=32,rightMargin=32,topMargin=30,bottomMargin=32,title=report['title'],author='ServersStatus').build(story,onFirstPage=footer,onLaterPages=footer)
+        canvas.setFont('PortalSans',7);canvas.drawString(32,18,'Server Pulse');canvas.drawRightString(width-32,18,'Страница '+str(doc.page))
+    SimpleDocTemplate(buffer,pagesize=(width,height),leftMargin=32,rightMargin=32,topMargin=30,bottomMargin=32,title=report['title'],author='Server Pulse').build(story,onFirstPage=footer,onLaterPages=footer)
     return buffer.getvalue()
 
 
