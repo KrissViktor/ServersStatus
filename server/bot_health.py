@@ -1,6 +1,7 @@
 import time
 from .dashboard import esc,page,duration
 from .telegram_config import blocked,read,user_ids
+from .ui_icons import icon
 
 
 ERRORS = {
@@ -12,6 +13,31 @@ ERRORS = {
     'missing':'Сначала настройте токен и чат уведомлений.',
     'write':'Не удалось сохранить настройки Telegram.',
 }
+
+
+def indicator_state(db):
+    try:
+        config=read()
+    except (OSError,ValueError):
+        return False
+    if not config.get('token') or not config.get('chat'):
+        return None
+    with db() as c:
+        if not c.execute("SELECT 1 FROM sqlite_master WHERE name='bot_state'").fetchone():
+            return False
+        values=dict(c.execute("SELECT name,value FROM bot_state WHERE name IN ('heartbeat','last_poll','poll_error','send_error')"))
+    now=time.time()
+    return (all(0<=now-float(values.get(key,0))<=180 for key in ('heartbeat','last_poll'))
+            and not (values.get('poll_error') or values.get('send_error')))
+
+
+def indicator_markup(db):
+    active=indicator_state(db)
+    if active is None:
+        return ''
+    color='normal' if active else 'danger'
+    label='Telegram-бот работает' if active else 'Telegram-бот не работает'
+    return f'<span class="telegram-indicator {color}" data-telegram-indicator role="img" aria-label="{label}" title="{label}">'+icon('telegram')+'</span>'
 
 
 def restart_status(values, now):
@@ -72,7 +98,7 @@ def health_page(connection,now=None,csrf=None,saved=False,error=''):
     else:
         status='Бот работает';color='normal'
     pending=connection.execute('SELECT COUNT(*) FROM bot_replies WHERE completed=0').fetchone()[0] if connection.execute("SELECT 1 FROM sqlite_master WHERE name='bot_replies'").fetchone() else 0
-    content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Обзор</a></header><div class="heading"><h1>Telegram-бот</h1></div><div class="bot-settings"><section class="server"><div class="server-head"><h2>Состояние бота</h2>'
+    content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Обзор</a></header><div class="heading monitor-heading"><h1>'+icon('telegram')+' Telegram-бот</h1></div><div class="bot-settings"><section class="server"><div class="server-head"><h2>Состояние бота</h2>'
     if csrf is not None:
         hidden=f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
         content+=f'<form method="post" action="/bot/restart">{hidden}<button>Перезапустить бота</button></form>'

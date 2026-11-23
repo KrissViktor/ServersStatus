@@ -22,7 +22,7 @@ CATEGORIES={'portal':'Портал','agents':'Агенты','ai':'ИИ-помо�
 
 
 def git_entries(extra_tags=None):
-    result=subprocess.run(['git','--no-pager','-c','safe.directory='+str(ROOT),'-C',str(ROOT),'log','--no-show-signature','--reverse','-n','10000','--format=%H%x1f%ct%x1f%s%x1e','HEAD'],capture_output=True,text=True,timeout=5,check=True)
+    result=subprocess.run(['git','--no-pager','-c','safe.directory='+str(ROOT),'-C',str(ROOT),'log','--encoding=UTF-8','--no-show-signature','--reverse','-n','10000','--format=%H%x1f%ct%x1f%s%x1e','HEAD'],capture_output=True,encoding='utf-8',timeout=5,check=True)
     tags=dict(extra_tags or {})
     try:
         refs=subprocess.run(['git','-c','safe.directory='+str(ROOT),'-C',str(ROOT),'for-each-ref','--format=%(objectname)%09%(refname:short)%09%(*objectname)','refs/tags'],capture_output=True,text=True,timeout=3,check=True)
@@ -78,7 +78,7 @@ def banner(c,username):
     result='<details class="portal-news-top"><summary title="Новости портала">'+icon('news')+'<span>Новости</span>'+('<b>'+('99+' if count>99 else str(count))+'</b>' if count else '')+'</summary><div class="news-popover"><header><strong>Что нового</strong><a href="/news">Все обновления →</a></header>'
     from .windows_ui import stamp
     for row in c.execute('SELECT * FROM portal_news ORDER BY id DESC LIMIT 3'):
-        result+='<a class="news-preview" href="/news"><small>'+esc(stamp(row['published']))+' · '+esc(CATEGORIES.get(row['category'],'Проект'))+'</small><span>'+esc(row['title'])+'</span></a>'
+        result+='<a class="news-preview" href="/news"><small>'+esc(stamp(row['published']))+' · '+esc(CATEGORIES.get(row['category'],'Проект'))+'</small><span data-no-translate>'+esc(row['original'])+'</span></a>'
     return result+'</div></details>'
 
 
@@ -96,12 +96,12 @@ def register(app,db,authenticated):
             latest=c.execute('SELECT COALESCE(MAX(id),0) FROM portal_news').fetchone()[0]
             c.execute('INSERT INTO portal_news_seen VALUES (?,?) ON CONFLICT(username) DO UPDATE SET news_id=MAX(news_id,excluded.news_id)',(current_user().get('name') or '',latest))
             total=c.execute('SELECT COUNT(*) FROM portal_news').fetchone()[0]
-        content='<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Серверы</a></header><div class="heading"><h1>'+icon('news')+' Новости портала</h1><span class="muted">'+str(total)+' записей из Git</span></div><form class="fleet-filter"><label>Поиск<input name="q" value="'+esc(q)+'"></label><label>Раздел<select name="category"><option value="">Все</option>'+''.join('<option value="'+key+'" '+('selected' if key==category else '')+'>'+label+'</option>' for key,label in CATEGORIES.items())+'</select></label><button>Показать</button></form><p class="muted">История разработки и релизов. Даты восстановлены из Git и не являются временем установки обновления на вашем сервере.</p><div class="news-feed">'
+        content='<header class="topbar"><a class="brand" href="/">ServersStatus</a><a class="nav-link" href="/">← Серверы</a></header><div class="heading"><h1>'+icon('news')+' Новости портала</h1><span class="muted">'+str(total)+' <span>записей из Git</span></span></div><p class="muted">Все новости пишется на языке разработчикам в комитах git hub.</p><form class="fleet-filter"><label>Поиск<input name="q" value="'+esc(q)+'"></label><label>Раздел<select name="category"><option value="">Все</option>'+''.join('<option value="'+key+'" '+('selected' if key==category else '')+'>'+label+'</option>' for key,label in CATEGORIES.items())+'</select></label><button>Показать</button></form><div class="news-feed">'
         for row in rows[:20]:
             tags=json.loads(row['tags'])
-            content+='<article class="news-entry"><div class="news-entry-icon">'+icon('update' if row['category']!='verification' else 'timeline')+'</div><div><p class="muted">'+esc(stamp(row['published']))+' · '+esc(CATEGORIES.get(row['category'],'Проект'))+'</p><h2>'+esc(row['title'])+'</h2>'
+            content+='<article class="news-entry"><div class="news-entry-icon">'+icon('update' if row['category']!='verification' else 'timeline')+'</div><div><p class="muted">'+esc(stamp(row['published']))+' · '+esc(CATEGORIES.get(row['category'],'Проект'))+'</p><h2 data-no-translate>'+esc(row['original'])+'</h2>'
             if tags:content+='<div class="news-tags">'+''.join('<span>'+esc(tag)+'</span>' for tag in tags)+'</div>'
-            content+='<details><summary>Исходная запись Git · '+row['sha'][:7]+'</summary><p>'+esc(row['original'])+'</p><a class="nav-link" href="https://github.com/KrissViktor/ServersStatus/commit/'+row['sha']+'" target="_blank" rel="noopener noreferrer">Открыть коммит ↗</a></details></div></article>'
+            content+='<a class="nav-link" href="https://github.com/KrissViktor/ServersStatus/commit/'+row['sha']+'" target="_blank" rel="noopener noreferrer"><span>Открыть коммит ↗</span> · <code>'+row['sha'][:7]+'</code></a></div></article>'
         if not rows:content+='<p class="empty">Записей по выбранным условиям нет.</p>'
         content+='</div>'
         if len(rows)>20:content+='<a class="nav-link" href="/news?'+esc(urlencode({'before':rows[19]['id'],'category':category,'q':q}))+'">Предыдущие обновления →</a>'

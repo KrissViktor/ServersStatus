@@ -44,6 +44,7 @@ def administration_page():
     content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Все серверы</a></header><div class="heading"><div><h1>Администрирование</h1><p class="muted">Настройки и обслуживание портала</p></div></div>'
     content+=appearance_settings()
     icons['/users/sessions']='users'
+    icons['/bot']='telegram'
     icons['/admin/traffic']='chart'
     icons['/ai-connection']='settings'
     categories[0][1].add('/ai-connection')

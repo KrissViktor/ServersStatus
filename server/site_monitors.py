@@ -15,7 +15,9 @@ from starlette.concurrency import run_in_threadpool
 from .dashboard import esc, page
 from .delivery_policy import delivery_window
 from .monitor_probes import check_http, check_registry, target
+from .monitor_history import BUCKETS, DANGER_SQL, history_panel, timeline, tone
 from .notification_types import DeliveryError
+from .ui_icons import icon
 from .windows_ui import stamp
 
 SCHEMA = """
@@ -31,6 +33,7 @@ CREATE TABLE IF NOT EXISTS site_monitor_runs (
 );
 CREATE INDEX IF NOT EXISTS site_monitor_runs_time ON site_monitor_runs(monitor,at);
 CREATE INDEX IF NOT EXISTS site_monitor_runs_retention ON site_monitor_runs(at);
+CREATE INDEX IF NOT EXISTS site_monitor_runs_issues ON site_monitor_runs(at,monitor) WHERE """ + DANGER_SQL + """;
 CREATE TABLE IF NOT EXISTS site_monitor_alerts (
     monitor INTEGER NOT NULL, kind TEXT NOT NULL, active INTEGER NOT NULL,
     sent INTEGER NOT NULL DEFAULT 0, retry REAL NOT NULL DEFAULT 0, body TEXT NOT NULL,
@@ -52,6 +55,7 @@ def process_one(db):
                                     (now+90,token,row['id'],now)).rowcount:
             return False
     result=check_http(row['url'],row['expected'],row['warn_days'],now)
+    result['interval']=row['interval']
     if row['registry']:
         result.update(check_registry(row['url'],now))
     checked=time.time()
@@ -164,7 +168,7 @@ def render_result(result):
     rkn=badge(result.get('rkn','off'))
     if result.get('registry_at'):
         rkn+=' · снимок '+esc(stamp(result['registry_at']))
-    return '<p>HTTP '+http+'</p><p>TLS '+tls+'</p><p>РКН '+rkn+'</p>'+(
+    return '<div class="monitor-probes"><p>'+icon('connection')+' HTTP '+http+'</p><p>'+icon('shield')+' TLS '+tls+'</p><p>'+icon('globe')+' <span>РКН</span> '+rkn+'</p></div>'+(
         '<p class="muted">'+esc(result['error'])+'</p>' if result.get('error') else '')
 
 
@@ -175,33 +179,60 @@ def register(app,db,authenticated,csrf_token):
             raise HTTPException(403)
 
     @app.get('/monitors',response_class=HTMLResponse)
-    def listing(request:Request, monitor:int=0):
+    def listing(request:Request, monitor:int=0, period:str='7d', date_from:str='', date_to:str='', slot:int=-1, anchor:int=0):
         authorize(request)
-        if not 0<=monitor<2**63:
+        periods={'24h':'24 часа','7d':'7 дней','30d':'30 дней'}
+        if not 0<=monitor<2**63 or period not in periods or not -1<=slot<BUCKETS or not 0<=anchor<2**63:
             raise HTTPException(400)
+        from .history import date_controls, history_bounds
+        now=int(time.time())
+        start,end,_=history_bounds(period,min(anchor,now) if anchor else now,date_from,date_to)
+        end=int(end)
+        filters={'period':period,'date_from':date_from,'date_to':date_to}
+        history=None
         with db() as c:
             rows=c.execute('SELECT * FROM site_monitors ORDER BY name,id').fetchall()
-            history=c.execute('SELECT at,result FROM site_monitor_runs WHERE monitor=? ORDER BY at DESC LIMIT 30',(monitor,)).fetchall() if monitor else []
+            recent_issues={row[0] for row in c.execute(
+                f'SELECT DISTINCT monitor FROM site_monitor_runs INDEXED BY site_monitor_runs_issues WHERE at>=? AND {DANGER_SQL}',
+                (now-86400,))}
+            if monitor:
+                chosen=next((row for row in rows if row['id']==monitor),None)
+                if chosen is None:
+                    raise HTTPException(404)
+                history=timeline(c,chosen,start,end,slot,now)
         csrf='<input type="hidden" name="csrf" value="'+esc(csrf_token(request))+'">'
-        content='<header class="topbar"><a class="brand" href="/">ServersStatus</a></header><div class="heading"><h1>Мониторы сайтов</h1></div>'
+        content='<header class="topbar"><a class="brand" href="/">Server Pulse</a></header><div class="heading monitor-heading"><h1>'+icon('globe')+' Мониторинг</h1>'
         from .dashboard import creation_dialog
-        content+=creation_dialog('create-monitor','Добавить монитор','<form class="fleet-filter" action="/monitors" method="post">'+csrf+fields(None)+'<button>Добавить</button></form>')
+        content+=creation_dialog('create-monitor','Добавить монитор','<form class="fleet-filter" action="/monitors" method="post">'+csrf+fields(None)+'<button>Добавить</button></form>')+'</div>'
+        content+='<div class="monitor-grid">'
         for row in rows:
             identifier=str(row['id'])
             result=json.loads(row['latest']) if row['latest'] else {'tls':'unknown' if row['url'].startswith('https:') else 'off','rkn':'unknown' if row['registry'] else 'off'}
-            content+='<section class="server" id="monitor-'+identifier+'"><h2>'+esc(row['name'])+'</h2><p class="muted">'+esc(row['url'])+'</p>'
-            content+=render_result(result)+'<p class="muted">'+('На паузе · ' if not row['enabled'] else '')+'Последняя проверка: '+esc(stamp(row['checked']))+'</p>'
-            if row['enabled'] and row['checked'] and time.time()-row['checked']>max(120,2*row['interval']):
-                content+='<p class="muted">Результат проверки устарел.</p>'
-            content+='<a class="nav-link" href="/monitors?monitor='+identifier+'#monitor-'+identifier+'">История проверок</a>'
-            content+='<details><summary>Настройки</summary><form class="fleet-filter" action="/monitors" method="post">'+csrf+'<input type="hidden" name="id" value="'+identifier+'">'+fields(row)+'<button>Сохранить</button><button name="action" value="toggle" formnovalidate>'+('Пауза' if row['enabled'] else 'Возобновить')+'</button></form></details>'
+            color=tone(result)
+            state={'normal':'В норме','danger':'Проблемы','warning':'Предупреждения','neutral':'Ожидает проверки'}[color]
+            if not row['enabled']:
+                color,state='neutral','На паузе'
+            elif row['checked'] and now-row['checked']>max(120,2*row['interval']):
+                color,state='warning','Данные устарели'
+            expanded=' is-expanded' if monitor==row['id'] else ''
+            content+=f'<section class="server monitor-card{expanded}" id="monitor-{identifier}"><div class="server-head"><h2 data-no-translate>{esc(row["name"])}</h2>'
+            content+=f'<span class="badge {color}">{state}</span></div><p class="muted monitor-url" data-no-translate>{esc(row["url"])}</p>'
+            content+=render_result(result)+'<p class="muted monitor-checked"><span>Последняя проверка</span> · '+esc(stamp(row['checked']))+'</p>'
+            content+='<div class="monitor-actions"><a class="nav-link" href="/monitors?monitor='+identifier+'#monitor-history">'+icon('chart')+' История проверок</a>'
+            if row['id'] in recent_issues:
+                content+=f'<a class="nav-link text-danger" href="/monitors?monitor={identifier}&amp;period=24h#monitor-history">'+icon('incident')+' Были проблемы за сутки</a>'
+            content+='<details><summary>'+icon('settings')+' Настройки</summary><form class="fleet-filter" action="/monitors" method="post">'+csrf+'<input type="hidden" name="id" value="'+identifier+'">'+fields(row)+'<button>Сохранить</button><button name="action" value="toggle" formnovalidate>'+('Пауза' if row['enabled'] else 'Возобновить')+'</button></form></details></div>'
             if monitor==row['id']:
-                content+='<details open><summary>Последние проверки</summary>'
-                for run in history:
-                    content+='<article><h3>'+esc(stamp(run['at']))+'</h3>'+render_result(json.loads(run['result']))+'</article>'
-                content+=('</details>' if history else '<p class="muted">Проверок пока нет.</p></details>')
+                choices=''.join(f'<option value="{key}"{" selected" if key==period else ""}>{label}</option>' for key,label in periods.items())
+                controls=f'<form class="monitor-filters" action="/monitors#monitor-history"><input type="hidden" name="monitor" value="{identifier}"><label>Период<select name="period">{choices}</select></label>'
+                controls+=date_controls(date_from,date_to)+'<button>Показать</button></form>'
+                if date_from:
+                    controls+=f'<a class="nav-link" href="/monitors?monitor={identifier}#monitor-history">Сбросить даты</a>'
+                content+=history_panel(row,history,slot,end,filters,controls,render_result)
             content+='</section>'
-        return HTMLResponse(page(content),headers={'Cache-Control':'no-store'})
+        if not rows:
+            content+='<p class="empty">Сайты для мониторинга пока не добавлены.</p>'
+        return HTMLResponse(page(content+'</div>'),headers={'Cache-Control':'no-store'})
 
     @app.post('/monitors')
     async def save(request:Request):

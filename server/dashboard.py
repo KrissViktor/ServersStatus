@@ -159,8 +159,12 @@ def page(content, refresh=False, protection_entry=False):
     if '<header class="topbar"' in content:
         content=topbar_insert(content,language_control())
         from .access import current_user
-        if current_user().get('name') and 'action="/logout"' not in content:
-            content=topbar_insert(content,'<form method="post" action="/logout"><button type="submit">Выйти</button></form>')
+        if current_user().get('name'):
+            from .app import db
+            from .bot_health import indicator_markup
+            content=topbar_insert(content,indicator_markup(db))
+            if 'action="/logout"' not in content:
+                content=topbar_insert(content,'<form method="post" action="/logout"><button type="submit">Выйти</button></form>')
         if can_history() and 'href="/admin"' not in content:
             content=topbar_insert(content,'<a class="nav-link" href="/admin">Администрирование</a>')
         if not can_history() and 'href="/preferences"' not in content:
@@ -173,8 +177,8 @@ def page(content, refresh=False, protection_entry=False):
         links=[('/?reset=1','Серверы'),('/wallboard','Большой экран'),('/preferences','Настройки')]
         if can_history():links=[('/?reset=1','Серверы'),('/groups','Группы'),('/compare','Аналитика'),('/problems?view=active','Проблемы'),('/weekly-plan','План на неделю'),('/updates','Обновления'),('/admin','Администрирование')]
         from .ui_icons import icon
-        if can_history():links.insert(1,('/monitors','Мониторы'))
-        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/weekly-plan':'timeline','/updates':'update','/admin':'equipment','/preferences':'settings','/monitors':'wallboard'}
+        if can_history():links.insert(1,('/monitors','Мониторинг'))
+        navigation_icons={'/':'cards','/wallboard':'wallboard','/groups':'layers','/compare':'chart','/problems':'incident','/weekly-plan':'timeline','/updates':'update','/admin':'equipment','/preferences':'settings','/monitors':'globe'}
         navigation=''.join('<a data-primary-page="'+esc(url.split('?')[0])+'" href="'+esc(url)+'">'+icon(navigation_icons[url.split('?')[0]])+esc(label)+'</a>' for url,label in links)
         bar='<nav class="portal-navigation" aria-label="Основные разделы"><div class="portal-navigation-desktop">'+navigation+'</div><details class="portal-navigation-mobile"><summary>Разделы портала <span aria-hidden="true">⌄</span></summary><div>'+navigation+'</div></details></nav><nav class="portal-breadcrumbs" aria-label="Путь страницы" hidden></nav>'
         content=topbar_insert(content,bar,after=True)

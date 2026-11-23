@@ -937,6 +937,14 @@ def bot_status(request: Request, saved: bool = False, error: str = ''):
         )
 
 
+@app.get('/bot/indicator')
+def telegram_indicator(request: Request):
+    if not authenticated(request):
+        raise HTTPException(403)
+    from .bot_health import indicator_state
+    return {'active':indicator_state(db)}
+
+
 @app.post('/bot/settings')
 @app.post('/bot/users')
 @app.post('/bot/restart')

@@ -1,5 +1,8 @@
 """Small original line icons shared by the portal views."""
 PATHS={
+ 'telegram':'<path d="m2 10 19-7-4 18-6-5-4 3 1-6 10-7-11 6-5-2Z"/>',
+ 'globe':'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
+ 'shield':'<path d="M12 2 4 5v6c0 6 4 9 8 11 4-2 8-5 8-11V5l-8-3Zm-4 10 3 3 5-6"/>',
  'server':'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M12 6.5h5m-5 11h5"/>',
  'layers':'<path d="m12 2 10 5-10 5L2 7Zm-10 10 10 5 10-5M2 17l10 5 10-5"/>',
  'users':'<circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2m2-17a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 5v2"/>',

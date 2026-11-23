@@ -60,8 +60,6 @@ CPU, RAM и диски на общей шкале. Откройте снимок
 Основные разделы|Main navigation
 Разделы портала|Portal sections
 Путь страницы|Breadcrumbs
-Мониторы|Monitors
-Мониторы сайтов|Website monitors
 Группы|Groups
 Группы серверов|Server groups
 Аналитика|Analytics
@@ -173,6 +171,43 @@ CPU, RAM и диски на общей шкале. Откройте снимок
 Службы|Services
 Процессы|Processes
 Диски|Disks
+Telegram-бот работает|Telegram bot is working
+Telegram-бот не работает|Telegram bot is unavailable
+В норме|Healthy
+Предупреждения|Warnings
+Нет проверок|No checks
+За этот период проверок нет.|No checks in this period.
+На выбранном участке проверок нет.|No checks in this segment.
+Выберите участок шкалы, чтобы увидеть проверки и длительность сбоев.|Select a segment to see checks and outage durations.
+HTTP снова отвечает|HTTP service recovered
+Сбой продолжается|Outage ongoing
+Восстановление не подтверждено|Recovery unconfirmed
+Первый сбой|First failed check
+Последний сбой|Last failed check
+Восстановление|Recovery
+Длительность по замерам|Duration based on checks
+Длительность пока неизвестна.|Duration is unknown.
+Начало и восстановление определяются по проверкам внутри выбранного периода.|Outage start and recovery are based on checks within the selected period.
+Проверки участка|Checks in this segment
+На паузе|Paused
+Последняя проверка|Last check
+Сбросить даты|Reset dates
+Сайты для мониторинга пока не добавлены.|No monitored websites yet.
+Были проблемы за сутки|Issues in the last 24 hours
+РКН|RKN
+Новости|News
+Новости портала|Portal news
+Что нового|What's new
+Все обновления →|All updates →
+записей из Git|Git entries
+Все новости пишется на языке разработчикам в комитах git hub.|News entries use the original language of the developers' GitHub commits.
+Раздел|Category
+Агенты|Agents
+Проверки и сборки|Checks and builds
+Проект|Project
+Открыть коммит ↗|Open commit ↗
+Записей по выбранным условиям нет.|No entries match the filters.
+Предыдущие обновления →|Earlier updates →
 История проверок|Check history
 Последние проверки|Recent checks
 Интервал, секунд|Interval, seconds

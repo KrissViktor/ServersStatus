@@ -1,5 +1,23 @@
 (() => {
   const path=location.pathname;
+  const telegram=document.querySelector('[data-telegram-indicator]');
+  if(telegram)window.setInterval(async()=>{
+    if(document.hidden)return;
+    try{
+      const response=await fetch('/bot/indicator',{cache:'no-store'});
+      if(!response.ok)return;
+      const {active}=await response.json();
+      telegram.hidden=active===null;
+      if(active===null)return;
+      const color=active?'normal':'danger';
+      if(telegram.classList.contains(color))return;
+      telegram.classList.toggle('normal',active);
+      telegram.classList.toggle('danger',!active);
+      const label=active?'Telegram-бот работает':'Telegram-бот не работает';
+      telegram.setAttribute('aria-label',label);
+      telegram.title=label;
+    }catch(_){}
+  },30000);
   function recordVisit(kind) {
     fetch('/visit/'+kind,{method:'POST',headers:{'X-Portal-Visit':'1'},keepalive:true}).catch(()=>{});
   }
