@@ -244,7 +244,12 @@ CPU, RAM и диски на общей шкале. Откройте снимок
   function apply(choice) {
     language=choice==='en'?'en':'ru';
     root.lang=language;
-    for(const control of document.querySelectorAll('[data-language-choice]'))control.value=language;
+    for(const control of document.querySelectorAll('[data-language-choice]')){
+      const label=language==='en'?'ENG':'RUS';
+      const caption=control.querySelector('[data-language-label]');
+      if(caption&&caption.textContent!==label)caption.textContent=label;
+      control.setAttribute('aria-label',language==='en'?'Переключить на русский':'Switch to English');
+    }
     visit(document.body);
   }
 
@@ -261,9 +266,9 @@ CPU, RAM и диски на общей шкале. Откройте снимок
     }
   });
   observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:attributes});
-  document.addEventListener('change',event=>{
-    if(!event.target.matches('[data-language-choice]'))return;
-    apply(event.target.value);
+  document.addEventListener('click',event=>{
+    if(!event.target.closest('[data-language-choice]'))return;
+    apply(language==='ru'?'en':'ru');
     try{localStorage.setItem(key,language)}catch(_){}
   });
   window.addEventListener('storage',event=>{if(event.key===key||event.key===null)apply(event.newValue)});

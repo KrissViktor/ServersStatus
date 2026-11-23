@@ -200,7 +200,14 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 .landing-header .brand { font-size:18px; }
 .landing-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; }
 .language-picker,.landing-actions .theme-picker { display:inline-flex; align-items:center; gap:4px; flex:none; margin:0; font-size:12px; }
-.language-picker select,.landing-actions .theme-picker select { width:auto; min-height:33px; margin:0; padding:4px 6px; font-size:12px; }
+.landing-actions .theme-picker select { width:auto; min-height:33px; margin:0; padding:4px 6px; font-size:12px; }
+.monitoring-workspace button.language-picker,
+.monitoring-workspace button.language-picker:is(:hover,:focus-visible) {
+  --control-bg:transparent; --control-line:transparent; --control-text:var(--accent);
+  width:auto; min-height:34px; padding:4px 5px; border:0; font-weight:650; white-space:nowrap;
+}
+.monitoring-workspace .topbar > form[action="/logout"] { order:100; flex:none; margin-left:auto; }
+.monitoring-workspace .landing-header [data-create-dialog="portal-login"] { order:100; }
 .standalone-language { display:flex; justify-content:flex-end; padding:10px 0; }
 .landing-actions .theme-picker>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .landing-scenario { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:stretch; }

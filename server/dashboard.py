@@ -25,9 +25,8 @@ def brand_link():
 
 def language_control():
     return (
-        '<label class="language-picker"><span aria-hidden="true">🌐</span>'
-        '<select data-language-choice aria-label="Язык сайта"><option value="ru">RUS</option>'
-        '<option value="en">ENG</option></select></label>'
+        '<button type="button" class="language-picker" data-language-choice aria-label="Switch to English">'
+        '<span aria-hidden="true">🌐</span><span data-language-label>RUS</span></button>'
     )
 
 
@@ -159,6 +158,9 @@ def page(content, refresh=False, protection_entry=False):
     if bounds:content=content[:bounds[1]]+unify_header(content[bounds[1]:bounds[2]])+content[bounds[2]:]
     if '<header class="topbar"' in content:
         content=topbar_insert(content,language_control())
+        from .access import current_user
+        if current_user().get('name') and 'action="/logout"' not in content:
+            content=topbar_insert(content,'<form method="post" action="/logout"><button type="submit">Выйти</button></form>')
         if can_history() and 'href="/admin"' not in content:
             content=topbar_insert(content,'<a class="nav-link" href="/admin">Администрирование</a>')
         if not can_history() and 'href="/preferences"' not in content:
