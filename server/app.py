@@ -23,7 +23,7 @@ from .settings_ui import settings_page
 from .events import record
 from .disks import monitored_disks
 from .retention import cleanup
-from .security import client_address, limiter, asset_limiter, login_limiter, blocked_seconds, failed_login, account_blocked_seconds, failed_account_login
+from .security import client_address, limiter, asset_limiter, login_limiter, blocked_seconds, failed_login
 
 DB = os.environ.get('STATUS_DB', 'status.sqlite3')
 
@@ -191,7 +191,7 @@ def index(request: Request, q: str = '', view: str = 'all', group: str = '', lay
     if user is None:
         record_navigation(db,request,'landing')
         with db() as c:
-            wait=blocked_seconds(c,client_address(request),time.time())
+            wait=portal_login_wait(c,request,time.time())
         return HTMLResponse(login_page(wait))
     if view not in ('all', 'online', 'problems', 'offline', 'disks') or len(q) > 200 or len(group)>20:
         raise HTTPException(400)
@@ -216,6 +216,11 @@ def weekly_plan(request: Request, group: str = '', forecasts: str = ''):
         return HTMLResponse(render(c,group,time.time(),forecasts),headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'})
 
 
+def portal_login_wait(c, request, now):
+    return max(blocked_seconds(c,client_address(request),now),
+               blocked_seconds(c,request.state.login_device,now))
+
+
 def login_locked(wait):
     return HTMLResponse(login_page(wait),status_code=429,headers={'Retry-After':str(wait),'Cache-Control':'no-store'})
 
@@ -238,7 +243,7 @@ async def login(request: Request):
     browser = browser_info(request)
     now = time.time()
     with db() as c:
-        wait = max(blocked_seconds(c, address, now),account_blocked_seconds(c,name,now))
+        wait = portal_login_wait(c,request,now)
         if wait:
             audit_blocked(c,name,now,address,browser)
             c.commit()
@@ -253,24 +258,20 @@ async def login(request: Request):
     country = await run_in_threadpool(country_for,address)
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
-        wait = max(blocked_seconds(c, address, now),account_blocked_seconds(c,name,now))
+        wait = portal_login_wait(c,request,now)
         if wait:
             audit_blocked(c,name,now,address,browser)
             c.commit()
             return login_locked(wait)
         if not valid:
             audit_login(c,name,now,False,address,country,browser)
-            wait = failed_login(c, address, now)
-            if user is not None and (not enabled or enabled[0]):
-                account_wait=failed_account_login(c,name,now)
-                if account_wait:record(c,'','users','Временно заблокирован вход пользователя '+name,'warning',now)
-                wait=max(wait,account_wait)
-            if blocked_seconds(c,address,now):
-                record(c, '', 'security', 'IP заблокирован после двух ошибок входа: '+address, 'warning',now)
+            device_wait=failed_login(c,request.state.login_device,now,seconds=300,multiplier=2)
+            ip_wait=failed_login(c,address,now,limit=6,multiplier=2)
+            wait=max(device_wait,ip_wait)
+            if ip_wait:
+                record(c,'','security','IP заблокирован после шести ошибок входа: '+address,'warning',now)
         else:
-            # Successful login clears the error counter, not escalation history.
-            c.execute('UPDATE auth_guard SET failures=0 WHERE address=?', (address,))
-            c.execute('UPDATE account_auth_guard SET failures=0 WHERE name=?',(name,))
+            c.execute('UPDATE auth_guard SET failures=0 WHERE address=?',(request.state.login_device,))
             token = secrets.token_urlsafe(32)
             c.execute('DELETE FROM sessions WHERE expires<?', (now,))
             current=c.execute('SELECT password FROM users WHERE name=?',(name,)).fetchone()
@@ -873,7 +874,16 @@ async def request_protection(request: Request, call_next):
         allowed, retry = login_limiter.allow(address)
         if not allowed:
             return login_locked(retry)
+    new_device=None
+    if request.url.path in ('/','/login'):
+        device=request.cookies.get('portal_login_device','')
+        if not re.fullmatch(r'[0-9a-f]{32}',device):
+            new_device=device=secrets.token_hex(16)
+        request.state.login_device='device:'+digest(device)[:32]
     response = await call_next(request)
+    if new_device:
+        response.set_cookie('portal_login_device',new_device,max_age=31536000,httponly=True,
+                            secure=os.environ.get('STATUS_INSECURE_LOCAL')!='1',samesite='lax')
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'

@@ -33,7 +33,9 @@ PORTAL_HELP = (
     '/portal_sessions [логин] — активные сеансы и их ID\n'
     '/portal_end ID — завершить один сеанс\n'
     '/portal_kick логин — завершить все сеансы пользователя\n'
-    '/portal_password логин — ссылка для смены пароля'
+    '/portal_password логин — ссылка для смены пароля\n'
+    '/portal_blocks — блокировки входа / sign-in locks\n'
+    '/portal_unblock ID — снять блокировку / remove a lock'
 )
 
 

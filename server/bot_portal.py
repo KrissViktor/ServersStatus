@@ -1,5 +1,6 @@
 """Privileged portal commands accepted only from explicitly allowed private chats."""
 import json
+import ipaddress
 import re
 
 from .access import ROLES, revoke
@@ -16,6 +17,8 @@ COMMANDS = {
     'portal_kick':'Завершить все сеансы пользователя',
     'portal_end':'Завершить один сеанс портала',
     'portal_password':'Ссылка для смены пароля',
+    'portal_blocks':'Блокировки входа',
+    'portal_unblock':'Снять блокировку устройства или IP',
 }
 
 
@@ -25,6 +28,30 @@ def admins():
 
 
 def render(c, command, argument, actor, now):
+    if command == 'portal_blocks':
+        lines=['Блокировки входа. Снять блокировку: /portal_unblock ID или IP']
+        for row in c.execute("SELECT address,blocked_until FROM auth_guard WHERE address NOT LIKE 'console:%' ORDER BY address"):
+            remaining=int(row['blocked_until'])-int(now)
+            if remaining>0:
+                lines.append(f'{row["address"]} · {(remaining+59)//60} мин')
+            if len(lines)==51:
+                lines.append('Показаны первые 50 блокировок.')
+                break
+        return split_text('\n'.join(lines)) if len(lines)>1 else ['Активных блокировок входа нет.']
+
+    if command == 'portal_unblock':
+        identifier=argument.strip()
+        if not re.fullmatch(r'device:[0-9a-f]{32}',identifier):
+            try:
+                identifier=str(ipaddress.ip_address(identifier))
+            except ValueError:
+                return ['Используйте /portal_unblock ID или IP из /portal_blocks.']
+        changed=c.execute('DELETE FROM auth_guard WHERE address=?',(identifier,)).rowcount
+        if changed:
+            record(c,'','security',f'Telegram {actor} снял блокировку входа: {identifier}')
+            return [f'Блокировка снята: {identifier}']
+        return ['Для этого устройства или IP записи о блокировке нет.']
+
     if command == 'portal_users':
         rows = c.execute("""SELECT u.name,COALESCE(r.role,'viewer') AS role,COALESCE(r.enabled,1) AS enabled,
             (SELECT COUNT(*) FROM session_users i JOIN sessions s ON s.token=i.token

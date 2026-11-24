@@ -274,7 +274,7 @@ class WorkflowTest(unittest.TestCase):
         self.client.post('/servers/pc/name', data={'csrf': csrf, 'display_name': ''})
         self.assertNotIn('SQL — ERP &lt;main&gt;', self.client.get('/servers/pc').text)
 
-    def test_ban_is_per_ip_persists_and_preserves_agent_reports(self):
+    def test_device_and_ip_locks_preserve_landing_and_agent_reports(self):
         from unittest.mock import patch
         from fastapi.testclient import TestClient
         proxy = TestClient(module.app, base_url='https://testserver', client=('127.0.0.1', 1234))
@@ -283,10 +283,10 @@ class WorkflowTest(unittest.TestCase):
         wrong = {'username': 'admin', 'password': 'wrong'}
         with patch('server.app.time.time', return_value=1000):
             self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).status_code, 401)
-            self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).headers['retry-after'], '900')
+            self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).headers['retry-after'], '300')
             landing = proxy.get('/', headers=ip1)
             self.assertEqual(landing.status_code, 200)
-            self.assertIn('data-login-lock="900"', landing.text)
+            self.assertIn('data-login-lock="300"', landing.text)
             self.assertEqual(proxy.get('/', headers=ip2).status_code, 200)
             headers = dict(ip1, Authorization='Bearer agent-secret')
             payload = {'hostname': 'pc', 'cpu_percent': 1, 'memory_percent': 2, 'uptime_seconds': 3, 'disks': []}
@@ -295,7 +295,12 @@ class WorkflowTest(unittest.TestCase):
             self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).status_code, 401)
             response = proxy.post('/login', data=wrong, headers=ip1)
             self.assertEqual(response.status_code, 429)
-            self.assertEqual(response.headers['retry-after'], '2700')
+            self.assertEqual(response.headers['retry-after'], '600')
+            for device in range(3):
+                browser=TestClient(module.app,base_url='https://testserver',client=('127.0.0.1',1234))
+                self.assertEqual(browser.post('/login',data=wrong,headers=ip2).status_code,401)
+                response=browser.post('/login',data=wrong,headers=ip2)
+                self.assertEqual(response.headers['retry-after'],'900' if device==2 else '300')
 
     def test_http_flood_rejected_before_handler(self):
         from server.security import limiter

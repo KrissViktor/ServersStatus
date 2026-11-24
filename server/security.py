@@ -57,7 +57,7 @@ class RequestLimiter:
 limiter = RequestLimiter()
 # Cached public assets have their own bounded budget; they must not consume login/UI requests.
 asset_limiter = RequestLimiter(capacity=80,refill=20,global_capacity=240,global_refill=80)
-login_limiter = RequestLimiter(capacity=4, refill=1/30, global_capacity=10, global_refill=1)
+login_limiter = RequestLimiter(capacity=12, refill=1/30, global_capacity=30, global_refill=1)
 
 
 def blocked_seconds(connection, address, now):
@@ -65,13 +65,13 @@ def blocked_seconds(connection, address, now):
     return max(0, int(row['blocked_until']) - int(now)) if row else 0
 
 
-def failed_login(connection, address, now):
+def failed_login(connection, address, now, *, limit=2, seconds=900, multiplier=3):
     row = connection.execute('SELECT failures, strikes FROM auth_guard WHERE address=?', (address,)).fetchone()
     failures, strikes = (row['failures'], row['strikes']) if row else (0, 0)
     failures += 1
     blocked_until = 0
-    if failures >= 2:
-        blocked_until = int(now) + 900 * 3**strikes
+    if failures >= limit:
+        blocked_until = int(now) + seconds * multiplier**strikes
         strikes += 1
         failures = 0
     connection.execute('''INSERT INTO auth_guard VALUES (?,?,?,?)
