@@ -418,10 +418,12 @@ svg[data-resource-metric]{min-width:0;touch-action:pan-y;cursor:crosshair}.histo
   .fleet-table { min-width: 0; display: block; }
   .fleet-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .fleet-table tbody { display: grid; gap: 8px; }
-  .fleet-table tbody tr { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  .fleet-table tbody tr { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
   .fleet-table td { border: 0; min-width: 0; padding: 5px 6px; overflow-wrap: anywhere; }
-  .fleet-table td:first-child { grid-column: span 2; }
-  .fleet-table td[data-metric-label] { background: #7d9abc13; }
+  .fleet-table td:first-child, .fleet-table .fleet-status { grid-column: span 3; }
+  .fleet-table .fleet-status { display: flex; justify-content: flex-end; align-items: flex-start; }
+  .fleet-table .fleet-status .badge { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .fleet-table td[data-metric-label] { grid-column: span 2; background: #7d9abc13; white-space: normal; }
   .fleet-table td[data-metric-label]::before { content: attr(data-metric-label); display: block; color: var(--muted); font-size: 10px; }
   .fleet-table td progress { width: 100%; }
   .fleet-table .fleet-availability { display: none; }

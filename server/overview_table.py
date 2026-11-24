@@ -39,7 +39,7 @@ def render(rows,now):
         attrs=sort_values(row,now)
         result+='<tr data-table-server-id="'+esc(row['id'])+'" '+('class="table-row-stale" ' if state_key=='stale' else '')+' '.join('data-sort-'+key+'="'+esc(value if value is not None else '')+'"' for key,value in attrs.items())+'>'
         issue='<small class="fleet-primary-issue">'+esc(problems[0])+'</small>' if problems else ''
-        result+='<td>'+pin_button(row['id'])+'<a href="/servers/'+esc(quote(row['id'],safe=''))+'">'+esc(name)+'</a><small>'+esc(row['id'])+(' · Не активный' if not dict(row).get('active',1) else '')+'</small>'+issue+'</td><td><span class="badge '+color+'">● '+state+'</span></td>'
+        result+='<td>'+pin_button(row['id'])+'<a href="/servers/'+esc(quote(row['id'],safe=''))+'">'+esc(name)+'</a><small>'+esc(row['id'])+(' · Не активный' if not dict(row).get('active',1) else '')+'</small>'+issue+'</td><td class="fleet-status"><span class="badge '+color+'">● '+state+'</span></td>'
         for key in ('cpu_percent','memory_percent'):
             value=data.get(key);percent=number(value)
             label='CPU' if key=='cpu_percent' else 'RAM'
