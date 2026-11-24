@@ -533,6 +533,30 @@ IP-адрес|IP address
 Настройки Telegram|Telegram settings
 Настройки сохранены.|Settings saved.
 Перезапустить бота|Restart bot
+Снятие защиты|Unlock protected actions
+← На главную|← Home
+Защита ещё не настроена администратором. Выполните настройку на Raspberry Pi по deploy/CONSOLE-ACCESS.md.|Protected access has not been configured. Follow deploy/CONSOLE-ACCESS.md on the Raspberry Pi.
+Защита снята для этого сеанса на 60 минут.|Protected actions are unlocked for this session for 60 minutes.
+Включить защиту|Lock protected actions
+Вернуться к серверам|Return to servers
+Код отправляется. Обновите страницу через несколько секунд.|Sending the code. Refresh the page in a few seconds.
+Постоянный PIN: 4 цифры|Fixed PIN: 4 digits
+Код из Telegram: 6 знаков, латинские буквы и цифры|Telegram code: 6 characters, letters and digits
+Шаг 1 из 2|Step 1 of 2
+Шаг 2 из 2|Step 2 of 2
+Продолжить|Continue
+Код из Telegram действует 5 минут. После проверки доступ откроется на 60 минут.|The Telegram code is valid for 5 minutes. Verification unlocks access for 60 minutes.
+Временно заблокировано после ошибок. Попробуйте позже.|Temporarily locked after failed attempts. Try again later.
+Защита не настроена.|Protected access is not configured.
+Дождитесь отправки кода.|Wait for the code to be sent.
+Запрос устарел или временно заблокирован.|The request expired or is temporarily blocked.
+Код истёк или уже использован.|The code expired or has already been used.
+Продолжите текущую проверку или дождитесь её окончания.|Continue the current verification or wait for it to expire.
+Неверный или просроченный код. Начните проверку заново.|Invalid or expired code. Start verification again.
+Слишком много отправок. Повторите через минуту.|Too many codes sent. Try again in a minute.
+Не удалось отправить код в Telegram. Доступ остаётся закрытым.|Could not send the code to Telegram. Access remains locked.
+Защита снята|Protected actions unlocked
+Доступ открыт на 60 минут.|Access is open for 60 minutes.
 Состояние бота|Bot status
 Запрос отправлен. Ожидаем ответа от бота.|Restart requested. Waiting for the bot to respond.
 Бот принял запрос. Ожидаем запуска нового процесса.|The bot accepted the request. Waiting for the new process to start.

@@ -37,7 +37,6 @@ class ConsoleAccessTest(unittest.TestCase):
     def unlock(self):
         self.assertEqual(self.enter('1234').status_code,303)
         self.assertEqual(self.enter(self.codes[-1][0]).status_code,303)
-        self.assertEqual(self.enter(self.codes[-1][0]).status_code,303)
 
     def test_administration_navigation_and_protection_entry(self):
         anonymous=TestClient(a.app,base_url='https://testserver')
@@ -55,16 +54,13 @@ class ConsoleAccessTest(unittest.TestCase):
         agents=self.client.get('/agents').text
         self.assertRegex(agents,r'<button data-protection-entry="true"[^>]*id="protection-toggle"')
 
-    def test_hidden_html_and_api_until_all_three_steps(self):
+    def test_hidden_html_and_api_until_both_steps(self):
         html=self.client.get('/servers/pc').text
         self.assertNotIn('Мини-консоль',html);self.assertNotIn('remote-console',html);self.assertNotIn('console_v1',html)
         self.assertIn('Снять защиту',html)
         self.assertEqual(self.client.get('/api/servers/pc/console').status_code,403)
         self.assertEqual(self.client.post('/api/servers/pc/console',json={}).status_code,403)
         self.assertEqual(self.enter('1234').status_code,303)
-        numeric=self.codes[-1][0];self.assertRegex(numeric,r'^\d{6}$')
-        self.assertFalse(self.client.get('/console-access/status').json()['unlocked'])
-        self.assertEqual(self.enter(numeric).status_code,303)
         mixed=self.codes[-1][0];self.assertEqual(len(mixed),6)
         self.assertTrue(any(v.isdigit() for v in mixed));self.assertTrue(any(v.isalpha() for v in mixed));self.assertRegex(mixed,r'^[A-Za-z0-9]{6}$')
         with a.db() as c:
@@ -74,7 +70,7 @@ class ConsoleAccessTest(unittest.TestCase):
         self.assertEqual(self.enter(mixed).status_code,303)
         self.assertIn('Мини-консоль',self.client.get('/servers/pc').text)
         self.assertEqual(self.client.get('/api/servers/pc/console').status_code,200)
-        self.assertEqual([stage for _,stage in self.codes],[2,3])
+        self.assertEqual([stage for _,stage in self.codes],[2])
 
     def test_wrong_codes_block_after_two_and_do_not_send(self):
         self.assertEqual(self.enter('9999').status_code,400)
@@ -171,16 +167,15 @@ class ConsoleAccessTest(unittest.TestCase):
         self.assertEqual(self.client.get('/openapi.json').status_code,404)
         self.assertEqual(self.client.get('/docs').status_code,404)
 
-    def test_modal_fragments_and_thirty_minute_cookie(self):
+    def test_modal_fragments_and_sixty_minute_cookie(self):
         started=time.time()
         fragment=self.client.get('/console-access?modal=1')
-        self.assertNotIn('<html',fragment.text);self.assertIn('Шаг 1 из 3',fragment.text)
+        self.assertNotIn('<html',fragment.text);self.assertIn('Шаг 1 из 2',fragment.text)
         def submit(code):return self.client.post('/console-access?modal=1',data={'csrf':self.csrf,'code':code},follow_redirects=False)
-        response=submit('1234');self.assertEqual(response.status_code,200);self.assertIn('Шаг 2 из 3',response.text)
-        response=submit(self.codes[-1][0]);self.assertEqual(response.status_code,200);self.assertIn('Шаг 3 из 3',response.text)
-        response=submit(self.codes[-1][0]);self.assertEqual(response.status_code,200);self.assertIn('30 минут',response.text)
-        self.assertIn('Max-Age=1800',response.headers['set-cookie'])
-        with a.db() as c:self.assertGreaterEqual(c.execute('SELECT expires FROM console_grants').fetchone()[0],started+1800)
+        response=submit('1234');self.assertEqual(response.status_code,200);self.assertIn('Шаг 2 из 2',response.text)
+        response=submit(self.codes[-1][0]);self.assertEqual(response.status_code,200);self.assertIn('60 минут',response.text)
+        self.assertIn('Max-Age=3600',response.headers['set-cookie'])
+        with a.db() as c:self.assertGreaterEqual(c.execute('SELECT expires FROM console_grants').fetchone()[0],started+3600)
         self.assertTrue(self.client.get('/console-access/status').json()['unlocked'])
         response=self.client.post('/console-access/lock?modal=1',data={'csrf':self.csrf},follow_redirects=False)
         self.assertEqual(response.status_code,200);self.assertNotIn('<html',response.text)

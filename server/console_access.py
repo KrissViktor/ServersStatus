@@ -1,4 +1,4 @@
-"""Session-bound three-step authorization for protected actions."""
+"""Session-bound two-step authorization for protected actions."""
 import asyncio
 import getpass
 import hashlib
@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS console_challenges(session TEXT PRIMARY KEY,step INTE
 CREATE TABLE IF NOT EXISTS console_grants(session TEXT PRIMARY KEY,expires REAL);
 CREATE TABLE IF NOT EXISTS console_grant_tokens(session TEXT PRIMARY KEY,token TEXT);
 CREATE TABLE IF NOT EXISTS console_delivery_rate(created REAL);'''
-ACCESS_SECONDS=1800
+ACCESS_SECONDS=3600
+# Distinct stages invalidate challenges issued by the old three-step flow.
+SENDING=-1
+VERIFY_CODE=4
 _slots=asyncio.Semaphore(2)
 
 
@@ -45,11 +48,29 @@ def code_hash(config,session,nonce,code):
     return hmac.new(bytes.fromhex(config['pepper']),(session+':'+nonce+':'+code).encode(),hashlib.sha256).hexdigest()
 
 
+def challenge_step(challenge, now):
+    if challenge and challenge['expires']>now and challenge['step'] in (SENDING,VERIFY_CODE):
+        return challenge['step']
+    return 1
+
+
 def send_code(code,step):
-    from .notifications import send_message
-    token=os.environ.get('STATUS_TELEGRAM_TOKEN','').strip();chat=os.environ.get('STATUS_TELEGRAM_CHAT_ID','').strip()
-    if not token or not chat:raise RuntimeError('Telegram unavailable')
-    send_message(token,chat,'🔐 Снятие защиты портала · шаг '+str(step)+'/3\nКод: '+code+'\nДействует 5 минут. Если вы не запрашивали код, не вводите и никому не сообщайте его.')
+    from .notifications import telegram_request
+    from .telegram_config import blocked,read,user_ids,valid_user_id
+    config=read()
+    admins={identifier for identifier in user_ids(config.get('admins','')) if valid_user_id(identifier)}
+    recipient=os.environ.get('STATUS_CONSOLE_TELEGRAM_ADMIN_ID','').strip()
+    if not recipient and len(admins)==1:
+        recipient=next(iter(admins))
+    token=config.get('token')
+    if not token or recipient not in admins or recipient in blocked(config):
+        raise RuntimeError('Console Telegram administrator unavailable')
+    telegram_request(token,'sendMessage',{
+        'chat_id':int(recipient),
+        'text':f'🔐 Доступ к консоли / Console access · {step}/2\n\n{code}\n\nДействует 5 минут / Valid for 5 minutes',
+        'protect_content':True,
+        'reply_markup':{'inline_keyboard':[[{'text':'Копировать код / Copy code','copy_text':{'text':code}}]]},
+    })
 
 
 def access_page(request,db,csrf,message='',fragment=False):
@@ -64,16 +85,15 @@ def access_page(request,db,csrf,message='',fragment=False):
     if message:body+='<p class="notice">'+esc(message)+'</p>'
     if not config:return render(body+'<p>Защита ещё не настроена администратором. Выполните настройку на Raspberry Pi по deploy/CONSOLE-ACCESS.md.</p>')
     if unlocked(request,db):
-        return render(body+f'<p>Защита снята для этого сеанса на 30 минут.</p><form method="post" action="/console-access/lock"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Включить защиту</button></form><a href="/">Вернуться к серверам</a>')
-    step=challenge['step'] if challenge and challenge['expires']>time.time() else 1
-    if step==0:return render(body+'<p>Код отправляется. Обновите страницу через несколько секунд.</p>')
+        return render(body+f'<p>Защита снята для этого сеанса на 60 минут.</p><form method="post" action="/console-access/lock"><input type="hidden" name="csrf" value="{esc(csrf)}"><button>Включить защиту</button></form><a href="/">Вернуться к серверам</a>')
+    step=challenge_step(challenge,time.time())
+    if step==SENDING:return render(body+'<p>Код отправляется. Обновите страницу через несколько секунд.</p>')
     if step==1:
         label='Постоянный PIN: 4 цифры';pattern='[0-9]{4}';maxlength=4;autocomplete='off'
-    elif step==2:
-        label='Код из Telegram: 6 цифр';pattern='[0-9]{6}';maxlength=6;autocomplete='one-time-code'
     else:
-        label='Второй код из Telegram: 6 цифр и латинских букв';pattern='[A-Za-z0-9]{6}';maxlength=6;autocomplete='off'
-    return render(body+f'<section class="server"><h2>Шаг {step} из 3</h2><form method="post" action="/console-access"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>{label}<input type="password" name="code" required pattern="{pattern}" maxlength="{maxlength}" autocomplete="{autocomplete}" autofocus></label><button>Продолжить</button></form><p class="muted">Каждый код действует 5 минут. Доступ откроется только после всех трёх шагов.</p></section>')
+        label='Код из Telegram: 6 знаков, латинские буквы и цифры';pattern='[A-Za-z0-9]{6}';maxlength=6;autocomplete='one-time-code'
+    display_step=1 if step==1 else 2
+    return render(body+f'<section class="server"><h2>Шаг {display_step} из 2</h2><form method="post" action="/console-access"><input type="hidden" name="csrf" value="{esc(csrf)}"><label>{label}<input type="password" name="code" required pattern="{pattern}" maxlength="{maxlength}" autocomplete="{autocomplete}" autofocus></label><button>Продолжить</button></form><p class="muted">Код из Telegram действует 5 минут. После проверки доступ откроется на 60 минут.</p></section>')
 
 
 def register(app,db,authenticated,csrf_token):
@@ -103,8 +123,8 @@ def register(app,db,authenticated,csrf_token):
             if blocked_seconds(c,address,now):error='Временно заблокировано после ошибок. Попробуйте позже.'
             elif not config:error='Защита не настроена.'
         if not error:
-            step=challenge['step'] if challenge and challenge['expires']>now else 1
-            if step==0:error='Дождитесь отправки кода.'
+            step=challenge_step(challenge,now)
+            if step==SENDING:error='Дождитесь отправки кода.'
             else:
                 async with _slots:
                     valid=await asyncio.to_thread(lambda: bool(re.fullmatch('[0-9]{4}',code)) and hmac.compare_digest(pin_hash(code,config['salt']),config['pin'])) if step==1 else hmac.compare_digest(code_hash(config,session,challenge['nonce'],code),challenge['digest'])
@@ -112,44 +132,44 @@ def register(app,db,authenticated,csrf_token):
                     c.execute('BEGIN IMMEDIATE')
                     fresh=c.execute('SELECT * FROM console_challenges WHERE session=?',(session,)).fetchone()
                     settings=c.execute('SELECT * FROM console_access_config').fetchone()
-                    if not settings or settings['pin']!=config['pin'] or blocked_seconds(c,address,time.time()):error='Запрос устарел или временно заблокирован.'
-                    elif step>1 and (not fresh or fresh['nonce']!=challenge['nonce'] or fresh['step']!=step or fresh['expires']<time.time()):error='Код истёк или уже использован.'
-                    elif step==1 and fresh and fresh['expires']>time.time():error='Продолжите текущую проверку или дождитесь её окончания.'
+                    if settings!=config or blocked_seconds(c,address,time.time()):error='Запрос устарел или временно заблокирован.'
+                    elif step==VERIFY_CODE and (challenge_step(fresh,time.time())!=VERIFY_CODE or fresh['nonce']!=challenge['nonce']):error='Код истёк или уже использован.'
+                    elif step==1 and challenge_step(fresh,time.time())!=1:error='Продолжите текущую проверку или дождитесь её окончания.'
                     elif not valid:
                         failed_login(c,address,time.time());c.execute('DELETE FROM console_challenges WHERE session=?',(session,))
                         error='Неверный или просроченный код. Начните проверку заново.'
-                    elif step==3:
+                    elif step==VERIFY_CODE:
                         lease_token=secrets.token_urlsafe(32)
                         c.execute('INSERT INTO console_grant_tokens VALUES (?,?) ON CONFLICT(session) DO UPDATE SET token=excluded.token',(session,hashlib.sha256(lease_token.encode()).hexdigest()))
                         c.execute('DELETE FROM console_challenges WHERE session=?',(session,))
                         c.execute('INSERT INTO console_grants VALUES (?,?) ON CONFLICT(session) DO UPDATE SET expires=excluded.expires',(session,time.time()+ACCESS_SECONDS))
                         c.execute('UPDATE auth_guard SET failures=0 WHERE address=?',(address,))
                         from .events import record
-                        record(c,'','security','Защита снята для сеанса портала на 30 минут')
+                        record(c,'','security','Защита снята для сеанса портала на 60 минут')
                     else:
                         c.execute('DELETE FROM console_delivery_rate WHERE created<?',(time.time()-60,))
                         if c.execute('SELECT count(*) FROM console_delivery_rate').fetchone()[0]>=6:
                             error='Слишком много отправок. Повторите через минуту.'
                         nonce=secrets.token_hex(16)
-                        if step==1:otp=''.join(secrets.choice(string.digits) for _ in range(6))
-                        else:
-                            chars=[secrets.choice(string.digits),secrets.choice(string.ascii_letters)]+[secrets.choice(string.digits+string.ascii_letters) for _ in range(4)]
-                            secrets.SystemRandom().shuffle(chars);otp=''.join(chars)
-                        if not error:c.execute('INSERT INTO console_challenges VALUES (?,0,?,?,?,?) ON CONFLICT(session) DO UPDATE SET step=0,nonce=excluded.nonce,digest=excluded.digest,expires=excluded.expires,created=excluded.created',(session,nonce,code_hash(config,session,nonce,otp),time.time()+300,time.time()))
+                        chars=[secrets.choice(string.digits),secrets.choice(string.ascii_letters)]
+                        chars.extend(secrets.choice(string.ascii_letters+string.digits) for _ in range(4))
+                        secrets.SystemRandom().shuffle(chars)
+                        otp=''.join(chars)
+                        if not error:c.execute('INSERT INTO console_challenges VALUES (?,?,?,?,?,?) ON CONFLICT(session) DO UPDATE SET step=excluded.step,nonce=excluded.nonce,digest=excluded.digest,expires=excluded.expires,created=excluded.created',(session,SENDING,nonce,code_hash(config,session,nonce,otp),time.time()+300,time.time()))
                         if not error:
                             c.execute('INSERT INTO console_delivery_rate VALUES (?)',(time.time(),))
-                            delivery=(otp,step+1,nonce)
+                            delivery=(otp,nonce)
         if delivery:
-            otp,next_step,nonce=delivery
-            try:await asyncio.to_thread(send_code,otp,next_step)
+            otp,nonce=delivery
+            try:await asyncio.to_thread(send_code,otp,2)
             except Exception:
                 with db() as c:c.execute('DELETE FROM console_challenges WHERE session=? AND nonce=?',(session,nonce))
                 error='Не удалось отправить код в Telegram. Доступ остаётся закрытым.'
             else:
-                with db() as c:c.execute('UPDATE console_challenges SET step=? WHERE session=? AND nonce=?',(next_step,session,nonce))
+                with db() as c:c.execute('UPDATE console_challenges SET step=? WHERE session=? AND nonce=?',(VERIFY_CODE,session,nonce))
         if error:return HTMLResponse(access_page(request,db,csrf_token(request),error,fragment=request.query_params.get('modal')=='1'),status_code=400,headers={'Cache-Control':'no-store'})
         response=HTMLResponse(access_page(request,db,csrf_token(request),fragment=True),headers={'Cache-Control':'no-store'}) if request.query_params.get('modal')=='1' else RedirectResponse('/console-access',303)
-        if lease_token and request.query_params.get('modal')=='1':response=HTMLResponse('<h1 id="protection-title">Защита снята</h1><p>Доступ открыт на 30 минут.</p>',headers={'Cache-Control':'no-store'})
+        if lease_token and request.query_params.get('modal')=='1':response=HTMLResponse('<h1 id="protection-title">Защита снята</h1><p>Доступ открыт на 60 минут.</p>',headers={'Cache-Control':'no-store'})
         if lease_token:response.set_cookie('__Host-console-access',lease_token,max_age=ACCESS_SECONDS,httponly=True,secure=True,samesite='strict',path='/')
         return response
 
