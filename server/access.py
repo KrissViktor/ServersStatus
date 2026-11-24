@@ -67,7 +67,7 @@ def revoke(c,name):
 
 def middleware(db):
     async def enforce(request,call_next):
-        if request.url.path.startswith('/assets/'):
+        if request.url.path=='/manifest.webmanifest' or request.url.path.startswith('/assets/'):
             return await call_next(request)
         user=await run_in_threadpool(principal,request,db) if request.cookies.get('session') else None
         token=_context.set(user or {'name':None,'role':None})

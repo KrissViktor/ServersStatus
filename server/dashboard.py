@@ -10,9 +10,7 @@ import time
 from urllib.parse import quote, urlencode
 from pathlib import Path
 from .assets import script as ui_script,styles as ui_styles
-from .assets import url as asset_url
-
-PRODUCT_NAME = 'Server Pulse'
+from .assets import PRODUCT_NAME, url as asset_url
 
 
 def brand_mark():
@@ -192,7 +190,13 @@ def page(content, refresh=False, protection_entry=False):
     shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')
     if refresh:shared+=ui_script('refresh.js')
     shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','language.js'))
-    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+PRODUCT_NAME+'</title><link rel="icon" type="image/svg+xml" href="'+asset_url('server-pulse.svg')+'">'+ui_script('theme.js')+ui_styles()+'</head><body class="monitoring-workspace"><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
+    app_metadata=(
+        '<link rel="manifest" href="/manifest.webmanifest">'
+        '<meta name="apple-mobile-web-app-capable" content="yes">'
+        f'<meta name="apple-mobile-web-app-title" content="{PRODUCT_NAME}">'
+        '<link rel="apple-touch-icon" sizes="180x180" href="'+asset_url('server-pulse-180.png')+'">'
+    )
+    return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+PRODUCT_NAME+'</title><link rel="icon" type="image/svg+xml" href="'+asset_url('server-pulse.svg')+'">'+app_metadata+ui_script('theme.js')+ui_styles()+'</head><body class="monitoring-workspace"><main>'+content+shared+'<footer class="credits">Created by: tg @krissviktor / ds _krissviktor.</footer></main>'+widget+'</body></html>'
 
 
 

@@ -377,3 +377,19 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
   .monitor-timeline { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 4px; }
   .monitor-timeline a { height: 26px; border-radius: 3px; }
 }
+.server > .server-head > :first-child { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .server > .server-head { flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+  .server > .server-head > .badge,
+  .server > .server-head .server-overview-status .badge {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .server > .server-head .server-overview-status {
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+}
