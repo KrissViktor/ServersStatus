@@ -32,12 +32,15 @@ def render(rows,now):
     for row in rows:
         from .overview import issues
         data=json.loads(row['data'] or '{}');name=dict(row).get('display_name') or data.get('hostname') or row['id'];age=max(0,now-row['received']) if row['received'] is not None else None
-        from .freshness import status as freshness_status
-        state_key,color,state=freshness_status(row['received'],now)
+        from .freshness import overview_status
+        state_key,color,state,prolonged=overview_status(row['received'],now)
+        row_class='table-row-stale' if state_key=='stale' else ''
+        if prolonged:
+            row_class+=' server-offline'
         problems=issues(row,now)
         disks=monitored_disks(data);disk=max(disks,key=lambda item:number(item.get('used_percent'))) if disks else None
         attrs=sort_values(row,now)
-        result+='<tr data-table-server-id="'+esc(row['id'])+'" '+('class="table-row-stale" ' if state_key=='stale' else '')+' '.join('data-sort-'+key+'="'+esc(value if value is not None else '')+'"' for key,value in attrs.items())+'>'
+        result+='<tr data-table-server-id="'+esc(row['id'])+'" class="'+row_class+'" '+' '.join('data-sort-'+key+'="'+esc(value if value is not None else '')+'"' for key,value in attrs.items())+'>'
         issue='<small class="fleet-primary-issue">'+esc(problems[0])+'</small>' if problems else ''
         result+='<td>'+pin_button(row['id'])+'<a href="/servers/'+esc(quote(row['id'],safe=''))+'">'+esc(name)+'</a><small>'+esc(row['id'])+(' · Не активный' if not dict(row).get('active',1) else '')+'</small>'+issue+'</td><td class="fleet-status"><span class="badge '+color+'">● '+state+'</span></td>'
         for key in ('cpu_percent','memory_percent'):

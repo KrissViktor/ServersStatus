@@ -89,9 +89,11 @@ def compact_card(row, now, csrf=""):
     title = dict(row).get('display_name') or hostname
     url = '/servers/' + quote(row['id'], safe='')
     age = max(0, now-row['received']) if row['received'] is not None else None
-    from .freshness import status as freshness_status,line as freshness_line
-    _,color,state=freshness_status(row['received'],now)
+    from .freshness import overview_status,line as freshness_line
+    _,color,state,prolonged=overview_status(row['received'],now)
     problem_class = ' problem-server' if issues(row, now) else ''
+    if prolonged:
+        problem_class += ' server-offline'
     from .overview_table import sort_values,pin_button
     sort_attrs=' '.join('data-sort-'+key+'="'+esc(value if value is not None else '')+'"' for key,value in sort_values(row,now).items())
     content = f'<article class="server compact{problem_class}" data-server-id="{esc(row["id"])}" {sort_attrs}><header class="server-head"><div><h2><a href="{esc(url)}">{esc(title)}</a></h2><p class="muted">{esc(hostname)} · {esc(row["id"])}</p></div><div class="server-overview-status">{pin_button(row["id"])}<span class="badge {color}">● {state}</span></div></header>'

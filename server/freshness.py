@@ -19,6 +19,14 @@ def status(received,now):
     return 'fresh','normal','Отчёты поступают'
 
 
+def overview_status(received, now):
+    state, color, label = status(received, now)
+    prolonged = state == 'stale' and now - received > 300
+    if prolonged:
+        label = 'Не в сети'
+    return state, color, label, prolonged
+
+
 def line(received,now=None,info=None,historical=False,max_age=180):
     now=time.time() if now is None else now
     received=timestamp(received);info=info or {}

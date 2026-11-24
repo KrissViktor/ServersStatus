@@ -85,6 +85,7 @@ CPU, RAM и диски на общей шкале. Откройте снимок
 Всего|Total
 Онлайн|Online
 Нет связи|Offline
+Не в сети|offline
 Диски от 85%|Disks at 85% or above
 Поиск|Search
 Показать|Show

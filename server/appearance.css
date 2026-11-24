@@ -393,3 +393,17 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
     justify-content: flex-start;
   }
 }
+.monitoring-workspace .server.compact.server-offline,
+.monitoring-workspace .fleet-table tbody tr.server-offline {
+  background: color-mix(in srgb, var(--red) 14%, var(--panel));
+  border-color: color-mix(in srgb, var(--red) 66%, var(--line));
+}
+.monitoring-workspace .server.compact.server-offline,
+.monitoring-workspace .fleet-table tbody tr.server-offline td:first-child {
+  box-shadow: inset 4px 0 var(--red);
+}
+.monitoring-workspace .server-offline .badge.danger {
+  font-weight: 700;
+  border-color: var(--red);
+  white-space: normal;
+}

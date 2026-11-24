@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse,JSONResponse,RedirectResponse
 from .dashboard import page,esc,number,brand_mark
 from .disks import monitored_disks
 from .overview import issues
+from .problem_acknowledgements import active as active_incidents
 from .fleet import members,group_select
 
 SCRIPT=Path(__file__).with_name('wallboard.js')
@@ -16,9 +17,15 @@ SCRIPT=Path(__file__).with_name('wallboard.js')
 def payload(c,group='',now=None):
     now=time.time() if now is None else now
     selected={row['id'] for row in members(c,group)}
+    acknowledged={}
+    for incident in active_incidents(c):
+        if incident['acknowledged'] is not None and incident['agent'] in selected:
+            acknowledged.setdefault(incident['agent'], {})[incident['key']]={'acknowledged':True}
     items=[]
     for row in c.execute('SELECT a.id,COALESCE(p.display_name,a.id) AS name,r.received,r.data,COALESCE(f.active,1) AS active FROM agents a LEFT JOIN agent_profiles p ON p.agent=a.id LEFT JOIN current_reports r ON r.agent=a.id LEFT JOIN agent_flags f ON f.agent=a.id ORDER BY name'):
         if row['id'] not in selected or not row['active']:continue
+        row=dict(row)
+        row['problem_states']=acknowledged.get(row['id'],{})
         data=json.loads(row['data'] or '{}');age=max(0,now-row['received']) if row['received'] is not None else None
         state='pending' if age is None else 'online' if age<180 else 'offline'
         disks=monitored_disks(data)
