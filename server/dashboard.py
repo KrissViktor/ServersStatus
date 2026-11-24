@@ -212,7 +212,7 @@ def creation_dialog(identifier, title, content, reopen=False):
     )
 
 
-def login_page():
+def login_page(wait=0):
     from .landing import content
     login = creation_dialog(
         'portal-login','Войти',
@@ -220,7 +220,13 @@ def login_page():
         '<label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>'
         '<p role="status" data-login-status hidden></p><button type="submit" class="primary">Войти в панель</button></form>',
     )
-    return page(content(brand_link(),theme_control()+language_control()+login))
+    notice = (
+        f'<p class="notice" role="status" data-login-lock="{wait}"{" hidden" if not wait else ""}>'
+        '<span>Вход временно заблокирован.</span> '
+        '<span>До повторной попытки</span> <strong data-login-lock-time>'
+        f'{wait}</strong> <span>сек.</span></p>'
+    )
+    return page(content(brand_link(),theme_control()+language_control()+login,notice))
 
 
 def backup_problems(backup, elapsed=0):

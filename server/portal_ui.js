@@ -43,6 +43,23 @@
   });
   document.querySelector('dialog.creation-dialog[data-reopen]')?.showModal();
   const landingLogin=document.querySelector('[data-landing-login]');
+  const loginLock=document.querySelector('[data-login-lock]');
+  if(loginLock){
+    const remaining=loginLock.querySelector('[data-login-lock-time]');
+    let deadline=0;
+    const update=()=>{
+      const seconds=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+      loginLock.hidden=seconds===0;
+      remaining.textContent=seconds;
+    };
+    const showLock=seconds=>{
+      deadline=Date.now()+seconds*1000;
+      update();
+    };
+    showLock(Number(loginLock.dataset.loginLock));
+    setInterval(()=>{if(!loginLock.hidden)update()},1000);
+    landingLogin?.addEventListener('blocked-login',event=>showLock(event.detail));
+  }
   landingLogin?.addEventListener('submit',async event=>{
     event.preventDefault();
     const button=landingLogin.querySelector('[type="submit"]'),status=landingLogin.querySelector('[data-login-status]');
@@ -54,6 +71,14 @@
         credentials:'same-origin',redirect:'manual',cache:'no-store',
       });
       if(response.type==='opaqueredirect'||response.status===303){location.assign('/');return}
+      const retry=Number(response.headers.get('Retry-After'));
+      if(response.status===429&&retry>0){
+        landingLogin.dispatchEvent(new CustomEvent('blocked-login',{detail:retry}));
+        status.hidden=true;
+        landingLogin.closest('dialog')?.close();
+        loginLock?.scrollIntoView({block:'nearest'});
+        return;
+      }
       status.textContent=response.status===401?'Неверный логин или пароль.'
         :response.status===429?'Слишком много попыток. Попробуйте позже.'
         :'Не удалось войти. Повторите попытку.';

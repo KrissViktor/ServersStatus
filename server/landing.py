@@ -14,7 +14,7 @@ def chart(seed, baseline, label):
     )
 
 
-def content(brand, login):
+def content(brand, login, notice=''):
     rows = [
         ('Web-Atlas', 'Linux', 'На связи', 'normal', '24%', '48%', '63%'),
         ('SQL-Orion', 'Windows Server', 'Диск почти заполнен', 'warning', '31%', '72%', '91%'),
@@ -27,7 +27,7 @@ def content(brand, login):
         for name,os_name,state,kind,cpu,ram,disk in rows
     )
     return (
-        '<div class="public-landing"><header class="landing-header">'+brand+'<div class="landing-actions">'+login+'</div></header>'
+        '<div class="public-landing"><header class="landing-header">'+brand+'<div class="landing-actions">'+login+'</div></header>'+notice+
         '<section class="landing-intro"><div><h1>Состояние серверов<br>в одном месте</h1>'
         '<p>Server Pulse показывает нагрузку, свободное место, состояние служб и резервных копий. '
         'По истории замеров можно понять, когда началась проблема и что происходило с сервером в тот момент.</p>'

@@ -190,7 +190,9 @@ def index(request: Request, q: str = '', view: str = 'all', group: str = '', lay
     user=principal(request,db)
     if user is None:
         record_navigation(db,request,'landing')
-        return HTMLResponse(login_page())
+        with db() as c:
+            wait=blocked_seconds(c,client_address(request),time.time())
+        return HTMLResponse(login_page(wait))
     if view not in ('all', 'online', 'problems', 'offline', 'disks') or len(q) > 200 or len(group)>20:
         raise HTTPException(400)
     from .news import banner
@@ -212,6 +214,10 @@ def weekly_plan(request: Request, group: str = '', forecasts: str = ''):
     from .weekly_plan import render
     with db() as c:
         return HTMLResponse(render(c,group,time.time(),forecasts),headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'})
+
+
+def login_locked(wait):
+    return HTMLResponse(login_page(wait),status_code=429,headers={'Retry-After':str(wait),'Cache-Control':'no-store'})
 
 
 @app.post('/login')
@@ -236,7 +242,7 @@ async def login(request: Request):
         if wait:
             audit_blocked(c,name,now,address,browser)
             c.commit()
-            raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
+            return login_locked(wait)
         user = c.execute('SELECT * FROM users WHERE name=?', (name,)).fetchone()
     salt = user['salt'] if user else '00' * 16
     async with login_slots:
@@ -251,7 +257,7 @@ async def login(request: Request):
         if wait:
             audit_blocked(c,name,now,address,browser)
             c.commit()
-            raise HTTPException(429, 'Вход временно заблокирован', headers={'Retry-After': str(wait)})
+            return login_locked(wait)
         if not valid:
             audit_login(c,name,now,False,address,country,browser)
             wait = failed_login(c, address, now)
@@ -277,7 +283,7 @@ async def login(request: Request):
             c.execute('DELETE FROM session_users WHERE token NOT IN (SELECT token FROM sessions)')
     if not valid:
         if wait:
-            raise HTTPException(429, 'Две ошибки входа: вход временно заблокирован', headers={'Retry-After': str(wait)})
+            return login_locked(wait)
         raise HTTPException(401, 'Неверный логин или пароль')
     response = RedirectResponse('/', status_code=303)
     response.set_cookie('session', token, httponly=True, secure=os.environ.get('STATUS_INSECURE_LOCAL') != '1', samesite='strict', max_age=28800)
@@ -863,17 +869,10 @@ async def request_protection(request: Request, call_next):
                 return JSONResponse({'detail': 'Слишком большой запрос'}, status_code=413)
         except ValueError:
             return JSONResponse({'detail': 'Некорректная длина запроса'}, status_code=400)
-    # Do not cut off Windows agents behind the same public NAT as a blocked user.
-    if not request.url.path.startswith(('/assets/','/api/report/','/api/agent-update/','/api/processes/','/api/windows/','/api/console/')):
-        def read_wait():
-            with db() as c:return blocked_seconds(c,address,time.time())
-        wait=await run_in_threadpool(read_wait)
-        if wait:
-            return JSONResponse({'detail': 'Адрес временно заблокирован после ошибок входа'}, status_code=429, headers={'Retry-After': str(wait), 'Cache-Control': 'no-store'})
     if request.url.path == '/login' and request.method == 'POST':
         allowed, retry = login_limiter.allow(address)
         if not allowed:
-            return JSONResponse({'detail': 'Слишком частые попытки входа'}, status_code=429, headers={'Retry-After': str(retry), 'Cache-Control': 'no-store'})
+            return login_locked(retry)
     response = await call_next(request)
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'

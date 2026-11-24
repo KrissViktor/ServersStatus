@@ -284,7 +284,9 @@ class WorkflowTest(unittest.TestCase):
         with patch('server.app.time.time', return_value=1000):
             self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).status_code, 401)
             self.assertEqual(proxy.post('/login', data=wrong, headers=ip1).headers['retry-after'], '900')
-            self.assertEqual(proxy.get('/', headers=ip1).status_code, 429)
+            landing = proxy.get('/', headers=ip1)
+            self.assertEqual(landing.status_code, 200)
+            self.assertIn('data-login-lock="900"', landing.text)
             self.assertEqual(proxy.get('/', headers=ip2).status_code, 200)
             headers = dict(ip1, Authorization='Bearer agent-secret')
             payload = {'hostname': 'pc', 'cpu_percent': 1, 'memory_percent': 2, 'uptime_seconds': 3, 'disks': []}
