@@ -34,19 +34,18 @@ class ActivityTest(unittest.TestCase):
             self.assertEqual(c.execute('SELECT activity FROM ai_turns').fetchone()[0],'tool:events');c.execute("UPDATE ai_turns SET status='cancelled'")
         ai_chat._activity(a.db,identifier,'preparing_answer')
         with a.db() as c:self.assertEqual(c.execute('SELECT activity FROM ai_turns').fetchone()[0],'tool:events')
-    def test_longer_read_timeout_and_queue_survives_old_limit(self):
-        self.assertGreaterEqual(ai_chat.MAX_RUNTIME,540);self.assertGreaterEqual(ai_chat.MAX_TOOL_RUNTIME,900)
+    def test_stream_read_has_no_timeout_and_queue_survives_old_limit(self):
         job,messages=self.prepare();original=httpx.AsyncClient;seen=[]
         def client(**kwargs):
             seen.append(kwargs['timeout'].read)
             return original(transport=httpx.MockTransport(lambda request:httpx.Response(200,content=b'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')),**kwargs)
         with patch('server.ai_chat.httpx.AsyncClient',side_effect=client):asyncio.run(ai_chat.generate(a.db,job,messages,'TEST_KEY'))
-        self.assertEqual(seen,[540])
+        self.assertEqual(seen,[None])
         identifier=self.ask(nonce='c'*32,portal_access=True).json()['id']
         with a.db() as c:
             c.execute("UPDATE ai_turns SET status='running' WHERE id=?",(identifier,));tool_job=dict(c.execute('SELECT * FROM ai_turns WHERE id=?',(identifier,)).fetchone());tool_messages=ai_chat.context(c,tool_job)
         with patch('server.ai_chat.httpx.AsyncClient',side_effect=client):asyncio.run(ai_chat.generate(a.db,tool_job,tool_messages,'TEST_KEY'))
-        self.assertEqual(seen,[540,900])
+        self.assertEqual(seen,[None,None])
         now=time.time()
         with a.db() as c:
             c.execute("INSERT INTO ai_turns(owner,chat,nonce,question,status,created,updated) VALUES ('bob','other','other','q','queued',?,?)",(now-1200,now-1200));ai_chat.clean(c,now)

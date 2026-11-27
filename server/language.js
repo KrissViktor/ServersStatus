@@ -404,6 +404,20 @@ Telegram-бот|Telegram bot
 Проверка резервной копии|Backup verification
 База данных|Database
 Чтение SQLite работает|SQLite is readable
+Техническая информация|Technical details
+Модель|Model
+Время ответа (с)|Response time (s)
+Ожидание в очереди (с)|Queue wait (s)
+До первого текста (с)|Time to first text (s)
+Символы|Characters
+Символы/с между первым и последним фрагментами|Characters/s between first and last chunks
+Входные токены|Input tokens
+Выходные токены|Output tokens
+Всего токенов|Total tokens
+Выходные токены/с за всё время ответа|Output tokens/s over total response time
+Запросы к модели|Model requests
+Причина завершения|Finish reason
+Модель достигла своего лимита длины ответа. Показан неполный ответ.|The model reached its output limit. The partial answer is shown.
 Техническая информация о базе|Database details
 Время проверок и диагностика|Check times and diagnostics
 Статус серверов|Server status

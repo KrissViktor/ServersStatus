@@ -407,3 +407,14 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
   border-color: var(--red);
   white-space: normal;
 }
+.ai-answer-info { position: relative; margin: 0; padding: 0; border: 0; }
+.ai-answer-info summary { list-style: none; cursor: pointer; padding: 4px 8px; }
+.ai-answer-info summary::-webkit-details-marker { display: none; }
+.ai-answer-info dl {
+  position: absolute; inset-inline-end: 0; z-index: 2;
+  width: min(260px, 60vw); margin: 0; padding: 10px 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px;
+  font-size: 12px; overflow-wrap: anywhere;
+}
+.ai-answer-info dd { margin: 0; max-width: 100px; }

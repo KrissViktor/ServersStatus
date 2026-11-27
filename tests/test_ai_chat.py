@@ -94,10 +94,11 @@ class AIChatTest(unittest.TestCase):
         def handler(request):
             self.assertEqual(str(request.url),ai.ORIGIN+'/v1/chat/completions')
             self.assertEqual(request.headers['authorization'],'Bearer AI_PRIVATE_KEY_TEST_ONLY')
-            payload=json.loads(request.content);self.assertTrue(payload['stream']);self.assertEqual(payload['max_tokens'],512)
+            payload=json.loads(request.content);self.assertTrue(payload['stream']);self.assertEqual(payload['max_tokens'],-1);self.assertTrue(payload['stream_options']['include_usage'])
             return httpx.Response(200,stream=Stream())
         result=self.generate(handler,job,messages)
         self.assertEqual(result['status'],'completed');self.assertIn('first ',seen);self.assertEqual(result['reply'],'first <script>text</script>')
+        metrics=json.loads(result['metrics']);self.assertEqual(metrics['characters'],len(result['reply']));self.assertEqual(metrics['reason'],'stop')
         self.role('bob');self.chat='c'*32;self.nonce='d'*32;new_job,new_messages=self.prepare()
         self.assertNotIn('<script>',json.dumps(new_messages));self.assertEqual(len(new_messages),2)
 
@@ -109,9 +110,6 @@ class AIChatTest(unittest.TestCase):
         result=self.generate(lambda r:httpx.Response(302,headers={'Location':'https://evil.invalid/'}),job,messages)
         self.assertEqual(result['status'],'failed')
         with a.db() as c:c.execute("UPDATE ai_turns SET status='running' WHERE id=?",(job['id'],))
-        async def slow(request):await asyncio.sleep(1);return httpx.Response(200,content=b'')
-        with patch('server.ai_chat.MAX_RUNTIME',.01):result=self.generate(slow,job,messages)
-        self.assertEqual(result['status'],'failed');self.assertIn('Время',result['error'])
         with a.db() as c:c.execute("UPDATE ai_turns SET status='cancelled' WHERE id=?",(job['id'],))
         def forbidden(request):raise AssertionError('Cancelled request must not contact model')
         self.assertEqual(self.generate(forbidden,job,messages)['status'],'cancelled')

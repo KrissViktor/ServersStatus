@@ -22,10 +22,7 @@ CREATE INDEX IF NOT EXISTS ai_owner_chat ON ai_turns(owner,chat,id);
 CREATE INDEX IF NOT EXISTS ai_state ON ai_turns(status,created);
 CREATE UNIQUE INDEX IF NOT EXISTS ai_single_running ON ai_turns((1)) WHERE status='running';'''
 ORIGIN='http://127.0.0.1:18091'
-MAX_RUNTIME=540
-MAX_TOOL_RUNTIME=900
-MAX_QUEUE_WAIT=3*MAX_TOOL_RUNTIME
-MAX_REPLY=16384
+MAX_QUEUE_WAIT=2700
 _lock=threading.Lock()
 SYSTEM='Ты локальный помощник портала мониторинга. Отвечай по-русски, понятно и по существу. Используй только разрешённые для вопроса инструменты чтения. Не выдумывай результаты проверок, даты и источники. Не выполняй команды, не меняй настройки, не запрашивай секреты. Доступ к 1С, файловой системе и консоли не предоставлен.'
 
@@ -48,7 +45,7 @@ def initialize(c):
     from .ai_tools import SCHEMA as TOOL_SCHEMA
     c.executescript(SCHEMA+TOOL_SCHEMA)
     columns={row[1] for row in c.execute('PRAGMA table_info(ai_turns)')}
-    for name,definition in [('portal_access','INTEGER NOT NULL DEFAULT 0'),('internet_access','INTEGER NOT NULL DEFAULT 0'),('web_query',"TEXT NOT NULL DEFAULT ''"),('activity',"TEXT NOT NULL DEFAULT ''")]:
+    for name,definition in [('portal_access','INTEGER NOT NULL DEFAULT 0'),('internet_access','INTEGER NOT NULL DEFAULT 0'),('web_query',"TEXT NOT NULL DEFAULT ''"),('activity',"TEXT NOT NULL DEFAULT ''"),('metrics','TEXT')]:
         if name not in columns:c.execute('ALTER TABLE ai_turns ADD COLUMN '+name+' '+definition)
     c.commit()
 
@@ -83,9 +80,10 @@ def context(c,job):
     messages.append({'role':'user','content':job['question']});return messages
 
 
-def _save(db,identifier,reply,status=None,error=''):
+def _save(db,identifier,reply,status=None,error='',metrics=None):
     with db() as c:
-        c.execute("UPDATE ai_turns SET reply=?,updated=?,status=COALESCE(?,status),error=? WHERE id=? AND status='running'",(reply,time.time(),status,error,identifier))
+        c.execute("UPDATE ai_turns SET reply=?,updated=?,status=COALESCE(?,status),error=?,metrics=COALESCE(?,metrics) WHERE id=? AND status='running'",
+                  (reply,time.time(),status,error,json.dumps(metrics) if metrics is not None else None,identifier))
 
 
 def _activity(db,identifier,value):
@@ -100,6 +98,33 @@ def _active(db,identifier):
 
 async def generate(db,job,messages,api_key):
     reply='';done=False;last_save=0
+    started=time.monotonic()
+    queue_seconds=max(0,time.time()-job.get('created',time.time()))
+    first_text=last_text=None
+    model=None
+    finish_reason=None
+    requests=0
+    usage_reports=[]
+
+    def metrics():
+        elapsed=time.monotonic()-started
+        result={'seconds':elapsed,'queue_seconds':queue_seconds,'characters':len(reply),
+                'model':model,'reason':finish_reason,'requests':requests}
+        label=os.environ.get('STATUS_AI_MODEL_LABEL','').strip()
+        if label and requests:
+            result['model_label']=label[:160]
+        if first_text is not None:
+            result['first_text_seconds']=first_text-started
+            if last_text>first_text:
+                result['characters_per_second']=len(reply)/(last_text-first_text)
+        if requests and len(usage_reports)==requests:
+            for name in ('prompt_tokens','completion_tokens','total_tokens'):
+                values=[report.get(name) for report in usage_reports]
+                if all(type(value) is int and value>=0 for value in values):
+                    result[name]=sum(values)
+            if 'completion_tokens' in result and elapsed>0:
+                result['tokens_per_second']=result['completion_tokens']/elapsed
+        return result
     _activity(db,job['id'],'starting')
     from .ai_tools import Session
     session=Session(db,job,messages)
@@ -108,7 +133,7 @@ async def generate(db,job,messages,api_key):
     if definitions:
         messages=[dict(m) for m in messages];messages[0]['content']+=' '+session.instructions()
     async def consume():
-        nonlocal reply,done,last_save
+        nonlocal reply,done,last_save,first_text,last_text,model,finish_reason,requests
         rounds=4 if definitions else 1
         # Fetch current public context before generation: small local models may
         # answer from training data instead of choosing a tool themselves.
@@ -144,11 +169,15 @@ async def generate(db,job,messages,api_key):
                     identifier='automatic_page_'+str(index)
                     messages.append({'role':'assistant','content':None,'tool_calls':[{'id':identifier,'type':'function','function':{'name':'web_page','arguments':json.dumps(args)}}]})
                     messages.append({'role':'tool','tool_call_id':identifier,'content':json.dumps(page,ensure_ascii=False)})
-        async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(max(MAX_RUNTIME,MAX_TOOL_RUNTIME) if definitions else MAX_RUNTIME,connect=5,write=10,pool=5)) as client:
+        async with httpx.AsyncClient(trust_env=False,follow_redirects=False,timeout=httpx.Timeout(None,connect=5,write=10,pool=5)) as client:
             for step in range(rounds):
                 calls={};content='';finished=False;writing=False
+                finish_reason=None
+                usage=None
                 _activity(db,job['id'],'preparing_answer')
-                payload={'model':'serversstatus-local','messages':messages,'stream':True,'max_tokens':512,'temperature':0.6}
+                payload={'model':'serversstatus-local','messages':messages,'stream':True,
+                         'stream_options':{'include_usage':True},'max_tokens':-1,'temperature':0.6}
+                requests+=1
                 if definitions:payload.update(tools=definitions,tool_choice='auto' if step<rounds-1 and session.calls<MAX_CALLS else 'none')
                 async with client.stream('POST',ORIGIN+'/v1/chat/completions',headers={'Authorization':'Bearer '+api_key},json=payload) as response:
                     if response.status_code in (401,403):raise ModelError('Модель отклонила ключ доступа. Обратитесь к администратору.')
@@ -161,12 +190,15 @@ async def generate(db,job,messages,api_key):
                         try:value=json.loads(data)
                         except ValueError:raise ModelError('Получен некорректный ответ модели.')
                         if value.get('error'):raise ModelError('Модель сообщила об ошибке обработки запроса.')
+                        if isinstance(value.get('model'),str):model=value['model'][:256]
+                        if isinstance(value.get('usage'),dict):usage=value['usage']
                         for choice in value.get('choices',[]):
                             delta=choice.get('delta',{});part=delta.get('content')
                             if isinstance(part,str) and part:
                                 if not writing:_activity(db,job['id'],'writing_answer');writing=True
+                                last_text=time.monotonic()
+                                if first_text is None:first_text=last_text
                                 reply+=part;content+=part
-                            if len(reply)>MAX_REPLY:raise ModelError('Достигнут лимит длины ответа. Уточните вопрос.')
                             for call in delta.get('tool_calls',[]):
                                 index=call.get('index',0)
                                 if type(index) is not int or not 0<=index<3:raise ModelError('Слишком много запросов инструментов')
@@ -177,9 +209,14 @@ async def generate(db,job,messages,api_key):
                                     part=function.get(key)
                                     if isinstance(part,str):entry['function'][key]+=part
                                 if len(entry['function']['arguments'])>2048 or len(entry['function']['name'])>64 or len(entry['id'])>128:raise ModelError('Параметры инструмента слишком велики')
-                            if choice.get('finish_reason') is not None:finished=True
+                            if isinstance(choice.get('finish_reason'),str):
+                                finish_reason=choice['finish_reason'][:80]
+                                finished=True
                         if time.monotonic()-last_save>.5:
                             _save(db,job['id'],reply);last_save=time.monotonic()
+                if usage is not None:usage_reports.append(usage)
+                if finish_reason=='length':
+                    raise ModelError('Модель достигла своего лимита длины ответа. Показан неполный ответ.')
                 if calls:
                     if not definitions or step>=rounds-1 or session.calls>=MAX_CALLS:raise ModelError('Лимит инструментов исчерпан. Уточните вопрос.')
                     ordered=[calls[i] for i in sorted(calls)]
@@ -198,18 +235,17 @@ async def generate(db,job,messages,api_key):
     task=None
     try:
         if not _active(db,job['id']):return
-        task=asyncio.create_task(consume());deadline=time.monotonic()+(max(MAX_RUNTIME,MAX_TOOL_RUNTIME) if definitions else MAX_RUNTIME)
+        task=asyncio.create_task(consume())
         while not task.done():
             if not _active(db,job['id']):task.cancel();return
-            if time.monotonic()>deadline:raise ModelError('Время ожидания ответа истекло. Модель может быть занята; попробуйте повторить запрос.')
             await asyncio.wait({task},timeout=.5)
             if time.monotonic()-last_save>1:
                 _save(db,job['id'],reply);last_save=time.monotonic()
         await task
         if not done or not reply.strip():raise ModelError('Модель не завершила ответ. Попробуйте ещё раз.')
-        _save(db,job['id'],reply,'completed')
-    except ModelError as exc:_save(db,job['id'],reply[:MAX_REPLY],'failed',str(exc))
-    except Exception:_save(db,job['id'],reply[:MAX_REPLY],'failed','Нет связи с моделью. Проверьте туннель, паузу и состояние Backup.')
+        _save(db,job['id'],reply,'completed',metrics=metrics())
+    except ModelError as exc:_save(db,job['id'],reply,'failed',str(exc),metrics())
+    except Exception:_save(db,job['id'],reply,'failed','Нет связи с моделью. Проверьте туннель, паузу и состояние Backup.',metrics())
     finally:
         if task and not task.done():task.cancel()
         if task:
@@ -284,11 +320,12 @@ def register(app,db,authenticated,csrf_token):
         owner=user(request);valid_chat(chat)
         with db() as c:
             clean(c,time.time())
-            rows=c.execute('SELECT id,question,reply,status,created,error,portal_access,internet_access,activity FROM ai_turns WHERE owner=? AND chat=? ORDER BY id LIMIT 50',(owner,chat)).fetchall()
+            rows=c.execute('SELECT id,question,reply,status,created,error,portal_access,internet_access,activity,metrics FROM ai_turns WHERE owner=? AND chat=? ORDER BY id LIMIT 50',(owner,chat)).fetchall()
             if not rows:raise HTTPException(404)
             result=[]
             for row in rows:
-                item=dict(row);item['tools']=[dict(t) for t in c.execute('SELECT id,name,label,url,status,error,created FROM ai_tool_runs WHERE turn=? ORDER BY id',(row['id'],))];result.append(item)
+                item=dict(row);item['metrics']=json.loads(item['metrics']) if item['metrics'] else None
+                item['tools']=[dict(t) for t in c.execute('SELECT id,name,label,url,status,error,created FROM ai_tool_runs WHERE turn=? ORDER BY id',(row['id'],))];result.append(item)
         kick(db);return response({'turns':result})
 
     @app.post('/api/ai/ask')

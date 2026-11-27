@@ -10,6 +10,28 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
   let chat=null,busy=false,active=false,configured=false,timer=null,signature='',attempt=null;
   const id=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
   const node=(tag,text)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;return n};
+  const decimal=value=>new Intl.NumberFormat(document.documentElement.lang,{maximumFractionDigits:2}).format(value);
+  function answerInfo(turn){
+    const data=turn.metrics||{};
+    const details=node('details'),button=node('summary','ⓘ');
+    details.className='ai-answer-info';
+    button.title='Техническая информация';button.setAttribute('aria-label',button.title);
+    details.append(button);
+    const list=node('dl');
+    const fields=[
+      ['Модель',data.model_label||data.model],['Время ответа (с)',data.seconds],['Ожидание в очереди (с)',data.queue_seconds],
+      ['До первого текста (с)',data.first_text_seconds],['Символы',data.characters??Array.from(turn.reply).length],
+      ['Символы/с между первым и последним фрагментами',data.characters_per_second],
+      ['Входные токены',data.prompt_tokens],['Выходные токены',data.completion_tokens],['Всего токенов',data.total_tokens],
+      ['Выходные токены/с за всё время ответа',data.tokens_per_second],['Запросы к модели',data.requests],
+      ['Причина завершения',data.reason],
+    ];
+    for(const [label,value] of fields){
+      if(value!=null)list.append(node('dt',label),node('dd',typeof value==='number'?decimal(value):value));
+    }
+    details.append(list);
+    return details;
+  }
   function controls(){send.disabled=busy||active||!configured;cancel.hidden=!active;cancel.disabled=busy;fresh.disabled=busy||active;list.disabled=busy||active;remove.disabled=!chat||busy;state.textContent=!configured?'Не настроено':active?'Модель отвечает':'Локальная модель';state.className='badge '+(active?'warning':configured?'normal':'neutral')}
   async function request(url,options={}){
     const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options});
@@ -26,6 +48,10 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
       const q=node('article');q.className='ai-bubble ai-user';q.append(node('span','Вы'),node('p',turn.question));fragment.append(q);
       const answer=node('article');answer.className='ai-bubble ai-assistant';const header=node('header'),label=node('span','✦ Помощник'),status=node('small',labels[turn.status]||turn.status);header.append(label,status);answer.append(header);
       const pending=['queued','running'].includes(turn.status);answer.setAttribute('aria-busy',String(pending));
+      if(!pending){
+        if(turn.metrics)header.append(node('small',decimal(turn.metrics.seconds)+' с'));
+        header.append(answerInfo(turn));
+      }
       if(pending){const progress=node('div'),dot=node('span'),description=node('span',turn.status==='queued'?'Ожидаю своей очереди':stages[turn.activity]||'Обрабатываю вопрос'),time=node('time');progress.className='ai-progress';progress.setAttribute('role','status');dot.className='ai-progress-dot';dot.setAttribute('aria-hidden','true');time.dataset.aiStarted=turn.created;time.setAttribute('aria-hidden','true');progress.append(dot,description,time);answer.append(progress)}
       const text=node('div',turn.reply||(!pending?'Ответ отсутствует':''));text.className='ai-answer';if(!turn.reply&&pending)text.hidden=true;answer.append(text);
       if(turn.tools?.length||(!pending&&turn.activity)){
