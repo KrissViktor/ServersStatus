@@ -422,3 +422,5 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
   color: var(--green);
   border-color: var(--green);
 }
+.portal-sound-control:not([hidden]) { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; }
+.portal-sound-control .portal-icon { display: block; }

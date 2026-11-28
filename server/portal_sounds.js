@@ -8,12 +8,16 @@
   };
   const Audio=window.AudioContext||window.webkitAudioContext;
   const buttons=[...document.querySelectorAll('[data-portal-sounds]')];
-  let enabled=false, context, nextNote=0, previous;
-  try{enabled=localStorage.getItem(preference)==='on'}catch(_){}
+  let enabled=true, context, nextNote=0, previous;
+  try{enabled=localStorage.getItem(preference)!=='off'}catch(_){}
   function sync(){
     for(const button of buttons){
       button.hidden=!Audio;
       button.setAttribute('aria-pressed',String(enabled));
+      button.querySelector('[data-sound-on]').hidden=!enabled;
+      button.querySelector('[data-sound-off]').hidden=enabled;
+      const action=enabled?'Отключить звуки':'Включить звуки';
+      button.title=action;
     }
   }
   async function unlock(){
@@ -78,6 +82,6 @@
   document.addEventListener('pointerdown',unlock);
   document.addEventListener('keydown',unlock);
   window.addEventListener('storage',event=>{
-    if(event.key===preference){enabled=event.newValue==='on';sync()}
+    if(event.key===preference||event.key===null){enabled=event.newValue!=='off';sync()}
   });
 })();

@@ -1,5 +1,5 @@
 """Single entry point for portal administration."""
-from .dashboard import page, esc, theme_control
+from .dashboard import page, esc, sound_control, theme_control
 from .ui_icons import icon
 from .access import can_console,can_users
 
@@ -7,7 +7,7 @@ from .access import can_console,can_users
 def appearance_settings():
     return (
         '<section class="server appearance-settings"><h2>Внешний вид</h2>'+theme_control()+
-        '<p class="muted">Тема сохраняется в этом браузере.</p></section>'
+        sound_control(labeled=True)+'<p class="muted">Тема сохраняется в этом браузере.</p></section>'
     )
 
 

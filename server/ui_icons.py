@@ -1,5 +1,6 @@
 """Small original line icons shared by the portal views."""
 PATHS={
+ 'bell-muted':'<path d="m3 3 18 18M9 21h6M5 11v3c0 2-2 2-2 4h13M8 4a7 7 0 0 1 11 6v4l1 2"/>',
  'telegram':'<path d="m2 10 19-7-4 18-6-5-4 3 1-6 10-7-11 6-5-2Z"/>',
  'globe':'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
  'shield':'<path d="M12 2 4 5v6c0 6 4 9 8 11 4-2 8-5 8-11V5l-8-3Zm-4 10 3 3 5-6"/>',

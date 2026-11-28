@@ -401,8 +401,12 @@ def overview_shortcuts():
     return result+'</nav><a class="overview-groups" href="/groups">'+groups+'<span>Группы</span></a></div>'
 
 
-def sound_control():
-    return '<button type="button" data-portal-sounds aria-pressed="false" hidden>Звуки</button>'
+def sound_control(*, labeled=False):
+    from .ui_icons import icon
+    label='<span>Звуки</span>' if labeled else ''
+    return ('<button type="button" class="portal-sound-control" data-portal-sounds aria-pressed="true" '
+            'aria-label="Звуки" title="Звуки" hidden><span data-sound-on>'+icon('news')+
+            '</span><span data-sound-off hidden>'+icon('bell-muted')+'</span>'+label+'</button>')
 
 
 def dashboard(rows, q='', view='all', group='', news_html='', csrf='', layout='table'):
