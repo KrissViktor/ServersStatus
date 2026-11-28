@@ -405,6 +405,8 @@ Telegram-бот|Telegram bot
 База данных|Database
 Чтение SQLite работает|SQLite is readable
 Техническая информация|Technical details
+Рассуждения локальной модели|Local model reasoning
+Модель не закончила за 60 минут. Показан полученный текст.|The model did not finish within 60 minutes. The text received so far is shown.
 Модель|Model
 Время ответа (с)|Response time (s)
 Ожидание в очереди (с)|Queue wait (s)

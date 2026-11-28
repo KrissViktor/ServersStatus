@@ -54,6 +54,12 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
       }
       if(pending){const progress=node('div'),dot=node('span'),description=node('span',turn.status==='queued'?'Ожидаю своей очереди':stages[turn.activity]||'Обрабатываю вопрос'),time=node('time');progress.className='ai-progress';progress.setAttribute('role','status');dot.className='ai-progress-dot';dot.setAttribute('aria-hidden','true');time.dataset.aiStarted=turn.created;time.setAttribute('aria-hidden','true');progress.append(dot,description,time);answer.append(progress)}
       const text=node('div',turn.reply||(!pending?'Ответ отсутствует':''));text.className='ai-answer';if(!turn.reply&&pending)text.hidden=true;answer.append(text);
+      if(turn.metrics?.reasoning){
+        const details=node('details');details.className='ai-sources';details.open=pending;
+        const thought=node('div',turn.metrics.reasoning);thought.className='ai-answer';thought.dataset.noTranslate='';
+        details.append(node('summary','Рассуждения локальной модели'),thought);
+        answer.insertBefore(details,text);
+      }
       if(turn.tools?.length||(!pending&&turn.activity)){
         const details=node('details'),summary=node('summary',(pending?'Этапы работы':'Как готовился ответ')+(turn.tools?.length?' · '+turn.tools.length:''));details.className='ai-sources ai-worklog';details.open=pending;details.append(summary);if(!turn.tools?.length)details.append(node('p',turn.status==='completed'?'Ответ подготовлен локальной моделью.':'Последний этап: '+(stages[turn.activity]||'Обработка вопроса')));
         for(const t of turn.tools||[]){const row=node('div'),label=node('span','[S'+t.id+'] '+t.label);row.className='ai-work-step '+t.status;row.append(node('span',t.status==='running'?'◌':t.status==='failed'?'!':'✓'),label,node('small',t.status==='running'?'Выполняется…':t.status==='failed'?(t.error||'Ошибка'):t.name==='web_search'?'Получены результаты':'Готово'));

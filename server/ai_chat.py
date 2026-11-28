@@ -23,6 +23,8 @@ CREATE INDEX IF NOT EXISTS ai_state ON ai_turns(status,created);
 CREATE UNIQUE INDEX IF NOT EXISTS ai_single_running ON ai_turns((1)) WHERE status='running';'''
 ORIGIN='http://127.0.0.1:18091'
 MAX_QUEUE_WAIT=2700
+MAX_GENERATION_SECONDS=3600
+MAX_REASONING_CHARS=16000
 _lock=threading.Lock()
 SYSTEM='Ты локальный помощник портала мониторинга. Отвечай по-русски, понятно и по существу. Используй только разрешённые для вопроса инструменты чтения. Не выдумывай результаты проверок, даты и источники. Не выполняй команды, не меняй настройки, не запрашивай секреты. Доступ к 1С, файловой системе и консоли не предоставлен.'
 
@@ -105,11 +107,14 @@ async def generate(db,job,messages,api_key):
     finish_reason=None
     requests=0
     usage_reports=[]
+    reasoning=''
 
     def metrics():
         elapsed=time.monotonic()-started
         result={'seconds':elapsed,'queue_seconds':queue_seconds,'characters':len(reply),
                 'model':model,'reason':finish_reason,'requests':requests}
+        if reasoning:
+            result['reasoning']=reasoning
         label=os.environ.get('STATUS_AI_MODEL_LABEL','').strip()
         if label and requests:
             result['model_label']=label[:160]
@@ -133,7 +138,7 @@ async def generate(db,job,messages,api_key):
     if definitions:
         messages=[dict(m) for m in messages];messages[0]['content']+=' '+session.instructions()
     async def consume():
-        nonlocal reply,done,last_save,first_text,last_text,model,finish_reason,requests
+        nonlocal reply,done,last_save,first_text,last_text,model,finish_reason,requests,reasoning
         rounds=4 if definitions else 1
         # Fetch current public context before generation: small local models may
         # answer from training data instead of choosing a tool themselves.
@@ -194,6 +199,9 @@ async def generate(db,job,messages,api_key):
                         if isinstance(value.get('usage'),dict):usage=value['usage']
                         for choice in value.get('choices',[]):
                             delta=choice.get('delta',{});part=delta.get('content')
+                            thought=delta.get('reasoning_content')
+                            if isinstance(thought,str) and thought:
+                                reasoning=(reasoning+thought)[-MAX_REASONING_CHARS:]
                             if isinstance(part,str) and part:
                                 if not writing:_activity(db,job['id'],'writing_answer');writing=True
                                 last_text=time.monotonic()
@@ -213,7 +221,7 @@ async def generate(db,job,messages,api_key):
                                 finish_reason=choice['finish_reason'][:80]
                                 finished=True
                         if time.monotonic()-last_save>.5:
-                            _save(db,job['id'],reply);last_save=time.monotonic()
+                            _save(db,job['id'],reply,metrics={'reasoning':reasoning});last_save=time.monotonic()
                 if usage is not None:usage_reports.append(usage)
                 if finish_reason=='length':
                     raise ModelError('Модель достигла своего лимита длины ответа. Показан неполный ответ.')
@@ -238,9 +246,13 @@ async def generate(db,job,messages,api_key):
         task=asyncio.create_task(consume())
         while not task.done():
             if not _active(db,job['id']):task.cancel();return
+            if time.monotonic()-started>=MAX_GENERATION_SECONDS:
+                finish_reason='timeout'
+                task.cancel()
+                raise ModelError('Модель не закончила за 60 минут. Показан полученный текст.')
             await asyncio.wait({task},timeout=.5)
             if time.monotonic()-last_save>1:
-                _save(db,job['id'],reply);last_save=time.monotonic()
+                _save(db,job['id'],reply,metrics={'reasoning':reasoning});last_save=time.monotonic()
         await task
         if not done or not reply.strip():raise ModelError('Модель не завершила ответ. Попробуйте ещё раз.')
         _save(db,job['id'],reply,'completed',metrics=metrics())
