@@ -158,6 +158,7 @@ def page(content, refresh=False, protection_entry=False):
         content=topbar_insert(content,language_control())
         from .access import current_user
         if current_user().get('name'):
+            content=topbar_insert(content,sound_control())
             from .app import db
             from .bot_health import indicator_markup
             content=topbar_insert(content,indicator_markup(db))
@@ -189,7 +190,7 @@ def page(content, refresh=False, protection_entry=False):
                 '<aside id="ai-widget" class="ai-widget" role="dialog" aria-modal="false" aria-labelledby="ai-widget-title" hidden><header class="ai-widget-head"><strong id="ai-widget-title">✦ ИИ-помощник</strong><span class="badge neutral" id="ai-state">Подключение…</span><a href="/ai" title="Открыть полную страницу" aria-label="Открыть полную страницу помощника">↗</a><button type="button" id="ai-widget-close" aria-label="Свернуть чат">−</button></header><div id="ai-widget-body"><p role="status">Загрузка чата…</p></div></aside>'+ui_script('ai_chat.js')+ui_script('ai_widget.js'))
     shared=ui_script('ui_motion.js')+ui_script('chart_geometry.js')+ui_script('folding.js')+ui_script('cpu_cores.js')
     if refresh:shared+=ui_script('refresh.js')
-    shared+=''.join(ui_script(name) for name in ('portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','language.js'))
+    shared+=''.join(ui_script(name) for name in ('portal_sounds.js','portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','language.js'))
     app_metadata=(
         '<link rel="manifest" href="/manifest.webmanifest">'
         '<meta name="apple-mobile-web-app-capable" content="yes">'
@@ -400,6 +401,10 @@ def overview_shortcuts():
     return result+'</nav><a class="overview-groups" href="/groups">'+groups+'<span>Группы</span></a></div>'
 
 
+def sound_control():
+    return '<button type="button" data-portal-sounds aria-pressed="false" hidden>Звуки</button>'
+
+
 def dashboard(rows, q='', view='all', group='', news_html='', csrf='', layout='table'):
     all_rows=rows
     if group:rows=[row for row in rows if group in [item['id'] for item in dict(row).get('groups',[])]]
@@ -424,7 +429,12 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf='', layout='t
         current=' aria-current="true"' if view==selection else ''
         stats+='<a class="stat stat-filter" data-overview-view="'+selection+'" href="'+esc(url)+'"'+current+'><span>'+label+'</span><strong class="text-'+color+'">'+str(value)+'</strong></a>'
     stats+='</div>'
-    from .overview import compact_card, matches, search_form
+    from .overview import compact_card, issue_entries, matches, search_form
+    snapshot=esc(json.dumps([
+        [row['id'],'offline' if row['received'] is not None and now-row['received']>=180 else 'available',
+         [key for key,_ in issue_entries(row,now) if key!='connection:'+row['id']]]
+        for row in all_rows if dict(row).get('active',1)
+    ]))
     selected = [row for row in rows if matches(row, now, q, view) and (not group or group in [item['id'] for item in dict(row).get('groups',[])])]
     active=[row for row in selected if dict(row).get('active',1)]
     inactive=[row for row in selected if not dict(row).get('active',1)]
@@ -434,7 +444,7 @@ def dashboard(rows, q='', view='all', group='', news_html='', csrf='', layout='t
     cards+=table_render(selected,now)
     cards+='<p class="empty empty-results" '+('hidden' if selected else '')+'>Нет серверов по выбранным условиям.</p>'
     from .overview import LIVE_SCRIPT
-    cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results" data-layout="'+esc(layout)+'" data-refresh-interval="10000">' + cards + '</div>'+ui_script('overview.js')
+    cards = search_form(q, view, len(selected), len(rows), all_rows, group) + '<div id="server-results" data-sound-snapshot="'+snapshot+'" data-layout="'+esc(layout)+'" data-refresh-interval="10000">' + cards + '</div>'+ui_script('overview.js')
     from .incident_history import summary_html
     summary=summary_html([row for row in selected if dict(row).get('active',1)],now,csrf)
     from .drilldown import widget

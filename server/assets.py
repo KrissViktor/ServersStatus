@@ -9,6 +9,7 @@ ROOT=Path(__file__).parent
 PRODUCT_NAME='Server Pulse'
 FILES=frozenset(('dashboard.css','appearance.css','theme.js','language.js','ui_motion.js','folding.js','cpu_cores.js','refresh.js','portal_ui.js','interface_plus.js','chart_sync.js','resource_charts.js','overview.js','ai_chat.js','ai_widget.js','task_manager.js','drilldown.js','chart_geometry.js','disk_forecast.js','server-pulse.svg'))
 FILES=FILES.union(f'server-pulse-{size}.png' for size in (180,192,512))
+FILES=FILES.union(('portal_sounds.js',))
 
 
 @lru_cache(maxsize=32)

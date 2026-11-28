@@ -114,6 +114,7 @@
       const x = window.scrollX, y = window.scrollY;
       // Removing filtered cards must not clamp the viewport to the page bottom.
       document.body.style.minHeight = Math.max(window.innerHeight, y + window.innerHeight) + 'px';
+      window.portalSounds?.overview(next);
       updateResults(next,background);presentation();
       if(!background)window.portalMotion?.reveal(results);
       for (const id of ['overview-alerts', 'overview-stats', 'overview-tools']) {

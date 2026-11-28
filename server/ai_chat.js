@@ -8,6 +8,7 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
   function elapsed(){for(const el of panel.querySelectorAll('[data-ai-started]')){const seconds=Math.max(0,Math.floor(Date.now()/1000-Number(el.dataset.aiStarted)));el.textContent=seconds<60?seconds+' с':Math.floor(seconds/60)+' мин '+seconds%60+' с'}}
   setInterval(elapsed,1000);
   let chat=null,busy=false,active=false,configured=false,timer=null,signature='',attempt=null;
+  let turnStates=new Map();
   const id=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
   const node=(tag,text)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;return n};
   const decimal=value=>new Intl.NumberFormat(document.documentElement.lang,{maximumFractionDigits:2}).format(value);
@@ -42,6 +43,10 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
   function post(url,body){return request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf:panel.dataset.aiCsrf,...body})})}
   function empty(){history.replaceChildren();const block=node('div');block.className='ai-empty';block.append(node('span','✦'),node('h2','Чем помочь?'),node('p','Спросите о состоянии серверов или найдите решение в интернете.'),node('small','Метрики и журнал — только чтение. Интернет включён по умолчанию.'));history.append(block)}
   function render(turns){
+    if(turns.some(turn=>turn.status==='completed'&&turn.reply&&['queued','running'].includes(turnStates.get(turn.id)))){
+      window.portalSounds?.play('ai');
+    }
+    turnStates=new Map(turns.map(turn=>[turn.id,turn.status]));
     const next=JSON.stringify(turns);active=turns.some(t=>['queued','running'].includes(t.status));controls();if(next===signature)return;signature=next;
     const follow=history.scrollHeight-history.clientHeight-history.scrollTop<70,top=history.scrollTop,fragment=document.createDocumentFragment();
     for(const turn of turns){
@@ -90,7 +95,7 @@ window.initializeAIChat = (panel=document.querySelector('.ai-chat')) => {
     busy=true;controls();message.textContent='Отправляем…';
     const text=input.value.trim(),target=chat||attempt?.chat||id(),options={portal_access:portal.checked,internet_access:internet.checked,web_query:internet.checked?query.value.trim():''};
     if(!attempt||attempt.question!==text||attempt.chat!==target||Object.keys(options).some(k=>attempt[k]!==options[k]))attempt={chat:target,nonce:id(),question:text,...options};
-    try{const result=await post('/api/ai/ask',attempt);chat=result.chat;if(input.value.trim()===text)input.value='';attempt=null;message.textContent='';await chats();await load()}
+    try{const result=await post('/api/ai/ask',attempt);chat=result.chat;if(result.id&&!turnStates.has(result.id))turnStates.set(result.id,'queued');if(input.value.trim()===text)input.value='';attempt=null;message.textContent='';await chats();await load()}
     catch(error){message.textContent=error.message}
     finally{busy=false;controls()}
   });

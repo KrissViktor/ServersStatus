@@ -5,6 +5,7 @@
   let prior=new Map(),pending=false,last=0;
   const text=(tag,value,className='')=>{const node=document.createElement(tag);node.textContent=value;node.className=className;return node};
   function render(data){
+    window.portalSounds?.wallboard(data);
     const cards=[];let online=0,offline=0,problems=0;
     for(const item of data.items){
       if(item.state==='online')online++;if(item.state==='offline')offline++;if(item.issues.length)problems++;

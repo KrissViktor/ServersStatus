@@ -85,6 +85,7 @@ CPU, RAM и диски на общей шкале. Откройте снимок
 Всего|Total
 Онлайн|Online
 Нет связи|Offline
+Звуки|Sounds
 Вход временно заблокирован.|Sign-in is temporarily locked.
 До повторной попытки|You can try again in
 сек.|sec.

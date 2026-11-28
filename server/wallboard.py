@@ -5,7 +5,8 @@ from pathlib import Path
 from urllib.parse import quote
 from fastapi import Request
 from fastapi.responses import HTMLResponse,JSONResponse,RedirectResponse
-from .dashboard import page,esc,number,brand_mark
+from .dashboard import page,esc,number,brand_mark,sound_control
+from .bot_health import indicator_markup
 from .disks import monitored_disks
 from .overview import issues
 from .problem_acknowledgements import active as active_incidents
@@ -40,7 +41,7 @@ def register(app,db,authenticated):
         with db() as c:
             data=payload(c,group);selector=group_select(c,group)
         seed=json.dumps(data,ensure_ascii=False).replace('<','\\u003c')
-        content='<div class="wallboard" data-wallboard-url="/api/wallboard?group='+esc(quote(group,safe=''))+'"><header class="wallboard-toolbar"><a class="brand" href="/">'+brand_mark()+' Server Pulse</a><form>'+selector+'<button>Показать</button></form><time id="wallboard-clock"></time><button type="button" id="wallboard-fullscreen">Полный экран</button><a class="nav-link" href="/">← Обзор</a></header><div id="wallboard-summary" class="wallboard-summary"></div><p id="wallboard-status" class="muted" role="status"></p><div id="wallboard-grid" class="wallboard-grid"></div></div><script type="application/json" id="wallboard-seed">'+seed+'</script><script>'+SCRIPT.read_text(encoding='utf-8')+'</script>'
+        content='<div class="wallboard" data-wallboard-url="/api/wallboard?group='+esc(quote(group,safe=''))+'"><header class="wallboard-toolbar"><a class="brand" href="/">'+brand_mark()+' Server Pulse</a><form>'+selector+'<button>Показать</button></form>'+sound_control()+indicator_markup(db)+'<time id="wallboard-clock"></time><button type="button" id="wallboard-fullscreen">Полный экран</button><a class="nav-link" href="/">← Обзор</a></header><div id="wallboard-summary" class="wallboard-summary"></div><p id="wallboard-status" class="muted" role="status"></p><div id="wallboard-grid" class="wallboard-grid"></div></div><script type="application/json" id="wallboard-seed">'+seed+'</script><script>'+SCRIPT.read_text(encoding='utf-8')+'</script>'
         return HTMLResponse(page(content))
 
     @app.get('/api/wallboard')

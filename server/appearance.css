@@ -418,3 +418,7 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
   font-size: 12px; overflow-wrap: anywhere;
 }
 .ai-answer-info dd { margin: 0; max-width: 100px; }
+[data-portal-sounds][aria-pressed="true"] {
+  color: var(--green);
+  border-color: var(--green);
+}

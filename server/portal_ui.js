@@ -11,6 +11,7 @@
       if(active===null)return;
       const color=active?'normal':'danger';
       if(telegram.classList.contains(color))return;
+      if(active===false&&telegram.classList.contains('normal'))window.portalSounds?.play('telegram');
       telegram.classList.toggle('normal',active);
       telegram.classList.toggle('danger',!active);
       const label=active?'Telegram-бот работает':'Telegram-бот не работает';

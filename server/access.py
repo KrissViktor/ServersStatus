@@ -77,7 +77,7 @@ def middleware(db):
             if user:
                 if hidden and ((path.startswith('/users') and not can_users()) or (not path.startswith('/users') and not can_console())):
                     return JSONResponse({'detail':'Not Found'},status_code=404,headers={'Cache-Control':'no-store'})
-                current=(path in ('/','/news','/wallboard','/api/wallboard','/preferences') and request.method=='GET') or path=='/logout' or (path.startswith('/servers/') and len(path.split('/'))==3 and request.method=='GET') or (path.startswith('/api/servers/') and path.endswith(('/processes','/services')) and request.method=='GET')
+                current=(path in ('/','/news','/wallboard','/api/wallboard','/preferences','/bot/indicator') and request.method=='GET') or path=='/logout' or (path.startswith('/servers/') and len(path.split('/'))==3 and request.method=='GET') or (path.startswith('/api/servers/') and path.endswith(('/processes','/services')) and request.method=='GET')
                 infrastructure=path in ('/health','/login','/password-reset') or path.startswith(('/api/report/','/api/processes/','/api/agent-update/','/api/windows/','/api/console/'))
                 if not current and not infrastructure and not can_history():return JSONResponse({'detail':'Доступ закрыт'},status_code=403,headers={'Cache-Control':'no-store'})
                 if request.method=='GET' and not infrastructure and not path.startswith('/api/'):
