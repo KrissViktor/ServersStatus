@@ -86,6 +86,11 @@ CPU, RAM и диски на общей шкале. Откройте снимок
 Онлайн|Online
 Нет связи|Offline
 Звуки|Sounds
+Персонализация|Personalization
+Тема оформления и звуковые уведомления.|Appearance theme and sound notifications.
+Звуковые уведомления|Sound notifications
+Сигналы для событий мониторинга и ответов ИИ.|Sounds for monitoring events and AI replies.
+Настройки сохраняются в этом браузере.|Preferences are saved in this browser.
 Отключить звуки|Mute sounds
 Включить звуки|Enable sounds
 Вход временно заблокирован.|Sign-in is temporarily locked.

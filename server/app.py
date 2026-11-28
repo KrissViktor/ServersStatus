@@ -516,9 +516,6 @@ def traffic_status(request: Request, days: int = 7, ip: str = '', kind: str = ''
 def preferences(request: Request):
     if not authenticated(request):
         return RedirectResponse('/',303)
-    from .access import can_history
-    if can_history():
-        return RedirectResponse('/admin',303)
     from .admin_ui import preferences_page
     return HTMLResponse(preferences_page(),headers={'Cache-Control':'no-store'})
 

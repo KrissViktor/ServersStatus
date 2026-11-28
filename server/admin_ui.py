@@ -1,24 +1,31 @@
 """Single entry point for portal administration."""
 from .dashboard import page, esc, sound_control, theme_control
 from .ui_icons import icon
-from .access import can_console,can_users
+from .access import can_console,can_history,can_users
 
 
 def appearance_settings():
     return (
-        '<section class="server appearance-settings"><h2>Внешний вид</h2>'+theme_control()+
-        sound_control(labeled=True)+'<p class="muted">Тема сохраняется в этом браузере.</p></section>'
+        '<div class="personalization-grid">'
+        '<section class="server appearance-settings"><h2>'+icon('settings')+' Внешний вид</h2>'+theme_control()+'</section>'
+        '<section class="server appearance-settings"><h2>'+icon('news')+' Звуковые уведомления</h2>'
+        '<p class="muted">Сигналы для событий мониторинга и ответов ИИ.</p>'
+        +sound_control(labeled=True)+'</section></div>'
     )
 
 
 def preferences_page():
-    return page('<header class="topbar"><a class="brand" href="/">ServersStatus</a></header>'
-                '<div class="heading"><h1>Настройки</h1></div>'+appearance_settings())
+    back=('<a class="nav-link" href="/admin">← Администрирование</a>' if can_history()
+          else '<a class="nav-link" href="/">← Обзор</a>')
+    return page('<header class="topbar"><a class="brand" href="/">Server Pulse</a>'+back+'</header>'
+                '<div class="heading"><div><h1>Персонализация</h1>'
+                '<p class="muted">Настройки сохраняются в этом браузере.</p></div></div>'+appearance_settings())
 
 
 def administration_page():
     from .ai_connection import available
     sections = [
+        ('/preferences','Персонализация','Тема оформления и звуковые уведомления.'),
         ('/problems','Отмеченные проблемы','Кто отметил «Всё окей», комментарии и возврат предупреждений.'),
         ('/groups','Группы серверов','Площадки, роли и состав групп.'),
         ('/agents', 'Управление агентами', 'Добавление серверов, ключи доступа и снятие защиты для работы с консолью.'),
@@ -42,7 +49,8 @@ def administration_page():
     icons={'/problems':'incident','/groups':'layers','/agents':'server','/updates':'update','/portal-health':'heatmap','/host':'wallboard','/bot':'message','/ai':'sparkles','/events':'timeline','/portal-settings':'settings','/report-rollups':'chart','/users':'users'}
     categories=[('Мониторинг',{'/problems','/groups','/agents','/events','/ai'}),('Обслуживание',{'/updates','/portal-health','/host','/bot','/portal-settings','/report-rollups'}),('Доступ',{'/users'})]
     content='<header class="topbar"><a class="brand" href="/">Статус серверов</a><a class="nav-link" href="/">← Все серверы</a></header><div class="heading"><div><h1>Администрирование</h1><p class="muted">Настройки и обслуживание портала</p></div></div>'
-    content+=appearance_settings()
+    icons['/preferences']='settings'
+    categories.insert(0,('Настройки',{'/preferences'}))
     icons['/users/sessions']='users'
     icons['/bot']='telegram'
     icons['/admin/traffic']='chart'

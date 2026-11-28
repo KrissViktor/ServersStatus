@@ -424,3 +424,7 @@ html{overflow-anchor:none}.cpu-breakdown>summary{color:#d7c5a7}.resource-inspect
 }
 .portal-sound-control:not([hidden]) { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; }
 .portal-sound-control .portal-icon { display: block; }
+.personalization-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,290px),1fr)); gap: 14px; }
+.personalization-grid .server { margin: 0; }
+.personalization-grid h2 { display: flex; align-items: center; gap: 8px; font-size: 20px; }
+.personalization-grid .portal-sound-control { margin-top: 12px; }
